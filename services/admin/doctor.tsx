@@ -64,10 +64,15 @@ export function useAddDoctor(options?: {
         department: formData.department.trim(),
         aadhaar: formData.aadhaar.replace(/[-\s]/g, ""), // Remove hyphens/spaces
         address: formData.address.trim(),
-        experience: formData.experience.trim(),
+        experience: Number(formData.experience),
         consultationFee: Number(formData.consultationFee),
         availabilityDays: formData.availabilityDays.split(",").map(d => d.trim().toUpperCase()),
         password: formData.password,
+       workingHours: {
+  start: formData.workingHours.start,
+  end: formData.workingHours.end,
+}
+        
       };
 
       const response: ApiResponse<{ data: DoctorResponse }> =

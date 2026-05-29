@@ -5,7 +5,7 @@ import { Plus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Modal from "../ui/modal";
 
-export type FieldType = "text" | "email" | "tel" | "number" | "password" | "textarea" | "select" | "radio" | "checkbox" | "date";
+export type FieldType = "text" | "email" | "tel" | "number" | "password" | "textarea" | "select" | "radio" | "checkbox" | "date" | "time";
 export type FormDataValue = unknown;
 export type ReusableFormData = Record<string, FormDataValue>;
 

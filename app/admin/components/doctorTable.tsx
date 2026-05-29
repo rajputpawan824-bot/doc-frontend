@@ -499,7 +499,7 @@ export function DoctorTable({ showDeactivated = false }: DoctorTableProps) {
                 qualification: selectedDoctor.qualification,
                 registrationNumber: selectedDoctor.registrationNumber,
                 phoneNumber: selectedDoctor.phoneNumber,
-                experience: "",
+                experience:0,
                 salary: selectedDoctor.salary,
                 unit: selectedDoctor.unit,
                 email: selectedDoctor.email,
@@ -511,6 +511,10 @@ export function DoctorTable({ showDeactivated = false }: DoctorTableProps) {
                 consultationFee: "",
                 availabilityDays: [],
                 documents: [],
+                workingHours: {
+                start: "",
+                end: "",
+},
                 isActive: selectedDoctor.isActive,
               }}
               onSubmit={handleFormSubmit}
@@ -536,7 +540,7 @@ export function DoctorTable({ showDeactivated = false }: DoctorTableProps) {
                 qualification: selectedDoctor.qualification,
                 registrationNumber: selectedDoctor.registrationNumber,
                 phoneNumber: selectedDoctor.phoneNumber,
-                experience: "",
+                experience: 0,
                 salary: selectedDoctor.salary,
                 unit: selectedDoctor.unit,
                 email: selectedDoctor.email,
@@ -548,6 +552,10 @@ export function DoctorTable({ showDeactivated = false }: DoctorTableProps) {
                 consultationFee: "",
                 availabilityDays: [],
                 documents: [],
+                workingHours: {
+  start: "",
+  end: "",
+},
                 isActive: selectedDoctor.isActive,
               }}
               onSubmit={handleFormSubmit}
