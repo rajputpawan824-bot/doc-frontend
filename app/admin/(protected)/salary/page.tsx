@@ -1,0 +1,864 @@
+// components/salary/SalaryManagement.tsx
+"use client";
+
+import { useState, useEffect } from "react";
+import {
+  IndianRupee,
+  Users,
+  Search,
+  RefreshCw,
+  Filter,
+  Calendar,
+  Clock,
+  TrendingUp,
+  TrendingDown,
+  History,
+  Award,
+  AlertCircle,
+  Download,
+  FileText,
+  ChevronDown,
+  CheckCircle,
+  XCircle,
+  UserCheck,
+  UserX,
+  DollarSign,
+  Calculator,
+  BarChart3,
+  Wallet,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import DataTable from "@/components/reusable/data-table";
+import ReusableModal, {
+  FormSection,
+} from "@/components/reusable/reusable-modal";
+import { ColumnDef } from "@tanstack/react-table";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { toast } from "sonner";
+import { useQueryClient } from "@tanstack/react-query";
+
+// ==================== API HOOKS ====================
+import {
+  useSalaryList,
+  useSalarySummary,
+  useSalaryHistory,
+  useSalaryDetails,
+  useAddSalaryAdjustment,
+  useUpdateSalary,
+  useDownloadPayslip,
+} from "@/services/admin/salary";
+
+import type {
+  EmployeeSalary,
+  SalaryHistoryResponse,
+  UserRole,
+  SalaryType,
+} from "@/lib/validations/Admin/salary";
+
+import {
+  formatCurrency,
+  getMonthName,
+  getMonthYearOptions,
+} from "@/lib/validations/Admin/salary";
+
+// ==================== TYPES ====================
+interface MonthYear {
+  month: number;
+  year: number;
+}
+
+// ==================== MAIN COMPONENT ====================
+const SalaryManagement = () => {
+  const queryClient = useQueryClient();
+  const [activeTab, setActiveTab] = useState("manage");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedRole, setSelectedRole] = useState<UserRole>("ALL");
+  const [isSalaryModalOpen, setIsSalaryModalOpen] = useState(false);
+  const [isAdjustmentModalOpen, setIsAdjustmentModalOpen] = useState(false);
+  const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
+  const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
+  const [selectedEmployee, setSelectedEmployee] =
+    useState<EmployeeSalary | null>(null);
+  const [selectedEmployeeForHistory, setSelectedEmployeeForHistory] =
+    useState<EmployeeSalary | null>(null);
+  const [page, setPage] = useState(1);
+  const [limit] = useState(10);
+
+  // Get current month and year
+  const currentDate = new Date();
+  const [selectedMonthYear, setSelectedMonthYear] = useState<MonthYear>({
+    month: currentDate.getMonth() + 1,
+    year: currentDate.getFullYear(),
+  });
+
+  // ==================== API QUERIES ====================
+  // Fetch salary list
+  const {
+    data: salaryListData,
+    isLoading: isLoadingList,
+    refetch: refetchList,
+  } = useSalaryList({
+    userRole: selectedRole,
+    page,
+    limit,
+    month: selectedMonthYear.month,
+    year: selectedMonthYear.year,
+  });
+
+  // Fetch salary summary
+  const {
+    data: salarySummary,
+    isLoading: isLoadingSummary,
+    refetch: refetchSummary,
+  } = useSalarySummary({
+    userRole: selectedRole,
+    month: selectedMonthYear.month,
+    year: selectedMonthYear.year,
+  });
+
+  // Fetch salary history for selected employee
+  const { data: salaryHistory, isLoading: isLoadingHistory } = useSalaryHistory(
+    selectedEmployeeForHistory?.userId || "",
+    selectedEmployeeForHistory?.role || "ALL",
+  );
+
+  // Fetch salary details for selected employee
+  const { data: salaryDetails, isLoading: isLoadingDetails } = useSalaryDetails(
+    selectedEmployee
+      ? {
+          userId: selectedEmployee.userId,
+          userRole: selectedEmployee.role,
+          month: selectedMonthYear.month,
+          year: selectedMonthYear.year,
+        }
+      : null,
+  );
+
+  // ==================== MUTATIONS ====================
+  // Add salary adjustment mutation
+  const addAdjustmentMutation = useAddSalaryAdjustment({
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["salary-list"] });
+      queryClient.invalidateQueries({ queryKey: ["salary-summary"] });
+      queryClient.invalidateQueries({ queryKey: ["salary-history"] });
+      toast.success("Salary adjustment added successfully");
+      setIsAdjustmentModalOpen(false);
+      setSelectedEmployee(null);
+    },
+    onError: (error) => {
+      toast.error(`Failed to add adjustment: ${error.message}`);
+    },
+  });
+
+  // Update salary mutation
+  const updateSalaryMutation = useUpdateSalary({
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["salary-list"] });
+      queryClient.invalidateQueries({ queryKey: ["salary-summary"] });
+      toast.success("Salary updated successfully");
+      setIsSalaryModalOpen(false);
+      setSelectedEmployee(null);
+    },
+    onError: (error) => {
+      toast.error(`Failed to update salary: ${error.message}`);
+    },
+  });
+
+  // Download payslip mutation
+  const downloadPayslipMutation = useDownloadPayslip();
+
+  // ==================== HELPER FUNCTIONS ====================
+  function formatDate(date: Date | string) {
+    const dateObj = typeof date === "string" ? new Date(date) : date;
+    return dateObj.toLocaleDateString("en-IN", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    });
+  }
+
+  // Filter employees based on search query
+  const filteredEmployees = (salaryListData?.data || []).filter((employee) => {
+    if (!searchQuery) return true;
+
+    const query = searchQuery.toLowerCase();
+    return (
+      employee.name.toLowerCase().includes(query) ||
+      employee.userId.toLowerCase().includes(query) ||
+      employee.role.toLowerCase().includes(query)
+    );
+  });
+
+  // ==================== HANDLERS ====================
+  const handleSalaryUpdate = (data: Record<string, unknown>) => {
+    if (!selectedEmployee) return;
+
+    updateSalaryMutation.mutate({
+      userId: selectedEmployee.userId,
+      userRole: selectedEmployee.role,
+      newSalary: Number(data.newSalary),
+      reason: String(data.reason || ""),
+      month: selectedMonthYear.month,
+      year: selectedMonthYear.year,
+    });
+  };
+
+  const handleAdjustmentAdd = (data: Record<string, unknown>) => {
+    if (!selectedEmployee) return;
+
+    addAdjustmentMutation.mutate({
+      userId: selectedEmployee.userId,
+      userRole: selectedEmployee.role,
+      type: data.type as SalaryType,
+      amount: Number(data.amount),
+      reason: String(data.reason || ""),
+      month: selectedMonthYear.month,
+      year: selectedMonthYear.year,
+    });
+  };
+
+  const handleDownloadPayslip = (employee: EmployeeSalary) => {
+    downloadPayslipMutation.mutate({
+      userId: employee.userId,
+      userRole: employee.role,
+      month: selectedMonthYear.month,
+      year: selectedMonthYear.year,
+    });
+  };
+
+  const handleRefresh = () => {
+    refetchList();
+    refetchSummary();
+    toast.success("Data refreshed");
+  };
+
+  // ==================== FORM SECTIONS ====================
+  const salaryFormSections: FormSection[] = [
+    {
+      title: "Salary Update",
+      icon: <TrendingUp className="h-4 w-4" />,
+      fields: [
+        {
+          name: "employeeName",
+          label: "Employee Name",
+          type: "text",
+          required: true,
+          width: "full",
+          defaultValue: selectedEmployee?.name || "",
+          disabled: true,
+        },
+        {
+          name: "currentSalary",
+          label: "Current Salary",
+          type: "number",
+          required: true,
+          width: "half",
+          defaultValue: selectedEmployee?.baseSalary || 0,
+          disabled: true,
+        },
+        {
+          name: "newSalary",
+          label: "New Salary",
+          type: "number",
+          required: true,
+          width: "half",
+          placeholder: "Enter new salary amount",
+          min: 0,
+        },
+        {
+          name: "reason",
+          label: "Reason for Update",
+          type: "textarea",
+          required: true,
+          width: "full",
+          placeholder: "Enter reason for salary update (minimum 5 characters)",
+          rows: 4,
+        },
+      ],
+    },
+  ];
+
+  const adjustmentFormSections: FormSection[] = [
+    {
+      title: "Salary Adjustment",
+      icon: <Calculator className="h-4 w-4" />,
+      fields: [
+        {
+          name: "employeeName",
+          label: "Employee Name",
+          type: "text",
+          required: true,
+          width: "full",
+          defaultValue: selectedEmployee?.name || "",
+          disabled: true,
+        },
+        {
+          name: "type",
+          label: "Adjustment Type",
+          type: "select",
+          required: true,
+          width: "half",
+          options: [
+            {
+              value: "BONUS",
+              label: "Bonus",
+              color: "bg-green-100 text-green-800",
+            },
+            {
+              value: "PENALTY",
+              label: "Penalty",
+              color: "bg-red-100 text-red-800",
+            },
+            {
+              value: "DEDUCTION",
+              label: "Deduction",
+              color: "bg-orange-100 text-orange-800",
+            },
+            {
+              value: "INCREMENT",
+              label: "Increment",
+              color: "bg-blue-100 text-blue-800",
+            },
+            {
+              value: "REVISION",
+              label: "Revision",
+              color: "bg-purple-100 text-purple-800",
+            },
+          ],
+        },
+        {
+          name: "amount",
+          label: "Amount",
+          type: "number",
+          required: true,
+          width: "half",
+          placeholder: "Enter amount",
+          min: 0,
+        },
+        {
+          name: "reason",
+          label: "Reason",
+          type: "textarea",
+          required: true,
+          width: "full",
+          placeholder: "Enter reason for adjustment (minimum 5 characters)",
+          rows: 4,
+        },
+      ],
+    },
+  ];
+
+  // ==================== TABLE COLUMNS ====================
+  const employeeColumns: ColumnDef<EmployeeSalary>[] = [
+    {
+      accessorKey: "employeeInfo",
+      header: "Employee Information",
+      cell: ({ row }) => {
+        const employee = row.original;
+        return (
+          <div className="flex flex-col">
+            <div className="font-medium flex items-center gap-2">
+              <UserCheck className="h-4 w-4" />
+              {employee.name}
+            </div>
+            <div className="text-sm text-muted-foreground">
+              {employee.role.replace("_", " ")}
+            </div>
+            <div className="text-xs text-muted-foreground">
+              ID: {employee.userId.slice(0, 8)}...
+            </div>
+            <Badge
+              variant={employee.isActive ? "default" : "secondary"}
+              className="mt-1 w-fit text-xs"
+            >
+              {employee.isActive ? "Active" : "Inactive"}
+            </Badge>
+          </div>
+        );
+      },
+    },
+    {
+      accessorKey: "salaryDetails",
+      header: "Salary Details",
+      cell: ({ row }) => {
+        const employee = row.original;
+        return (
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground">Base:</span>
+              <span className="font-medium">
+                {formatCurrency(employee.baseSalary)}
+              </span>
+            </div>
+            {employee.bonus > 0 && (
+              <div className="flex items-center gap-2 text-green-600 text-xs">
+                <span>Bonus:</span>
+                <span>+{formatCurrency(employee.bonus)}</span>
+              </div>
+            )}
+            {employee.penalty > 0 && (
+              <div className="flex items-center gap-2 text-red-600 text-xs">
+                <span>Penalty:</span>
+                <span>-{formatCurrency(employee.penalty)}</span>
+              </div>
+            )}
+            <div className="flex items-center gap-2 pt-1 border-t">
+              <span className="text-sm font-semibold text-blue-600">Net:</span>
+              <span className="font-bold text-blue-600">
+                {formatCurrency(employee.netSalary)}
+              </span>
+            </div>
+          </div>
+        );
+      },
+    },
+    {
+      accessorKey: "adjustments",
+      header: "Adjustments",
+      cell: ({ row }) => {
+        const employee = row.original;
+        return (
+          <div className="space-y-1">
+            {employee.adjustments.length > 0 ? (
+              <>
+                <Badge variant="outline" className="text-xs">
+                  {employee.adjustments.length} adjustment(s)
+                </Badge>
+                <div className="text-xs text-muted-foreground">
+                  Latest: {employee.adjustments[0].type}
+                </div>
+              </>
+            ) : (
+              <span className="text-sm text-gray-500">No adjustments</span>
+            )}
+          </div>
+        );
+      },
+    },
+    {
+      id: "actions",
+      header: "Actions",
+      cell: ({ row }) => {
+        const employee = row.original;
+        return (
+          <div className="flex flex-col gap-2">
+            <div className="flex gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  setSelectedEmployee(employee);
+                  setIsSalaryModalOpen(true);
+                }}
+                title="Update salary"
+                disabled={updateSalaryMutation.isPending}
+              >
+                <TrendingUp className="h-4 w-4" />
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  setSelectedEmployee(employee);
+                  setIsAdjustmentModalOpen(true);
+                }}
+                title="Add adjustment"
+                disabled={addAdjustmentMutation.isPending}
+              >
+                <Calculator className="h-4 w-4" />
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  setSelectedEmployeeForHistory(employee);
+                  setIsHistoryModalOpen(true);
+                }}
+                title="View history"
+              >
+                <History className="h-4 w-4" />
+              </Button>
+            </div>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => handleDownloadPayslip(employee)}
+              className="text-xs"
+              disabled={downloadPayslipMutation.isPending}
+            >
+              <Download className="h-3 w-3 mr-1" />
+              Payslip
+            </Button>
+          </div>
+        );
+      },
+    },
+  ];
+
+  // Loading state
+  const isLoading = isLoadingList || isLoadingSummary;
+
+  // ==================== RENDER ====================
+  return (
+    <div className="container mx-auto p-6 space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
+            <Wallet className="h-8 w-8 text-purple-600" />
+            Salary Management
+          </h1>
+          <p className="text-muted-foreground">
+            Manage employee salaries, adjustments, bonuses, and penalties
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            onClick={handleRefresh}
+            className="hover:bg-gray-50"
+            disabled={isLoading}
+          >
+            <RefreshCw
+              className={`mr-2 h-4 w-4 ${isLoading ? "animate-spin" : ""}`}
+            />
+            Refresh
+          </Button>
+        </div>
+      </div>
+
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Total Monthly Salary
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {formatCurrency(salarySummary?.totalMonthlySalary || 0)}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Average Salary
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {formatCurrency(salarySummary?.averageSalary || 0)}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Total Bonuses
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-green-600">
+              +{formatCurrency(salarySummary?.totalBonus || 0)}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Total Penalties
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-red-600">
+              -{formatCurrency(salarySummary?.totalPenalty || 0)}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Pending Adjustments
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-yellow-600">
+              {formatCurrency(salarySummary?.pendingAdjustment || 0)}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Filters */}
+      <div className="flex flex-col md:flex-row gap-4 items-start md:items-center">
+        <div className="flex-1 max-w-md">
+          <Select
+            value={selectedRole}
+            onValueChange={(value: UserRole) => setSelectedRole(value)}
+          >
+            <SelectTrigger>
+              <Filter className="h-4 w-4 mr-2" />
+              <SelectValue placeholder="Select role" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ALL">All Roles</SelectItem>
+              <SelectItem value="DOCTOR">Doctor</SelectItem>
+              <SelectItem value="NURSE">Nurse</SelectItem>
+              <SelectItem value="RECEPTIONIST">Receptionist</SelectItem>
+              <SelectItem value="TECHNICIAN">Technician</SelectItem>
+              <SelectItem value="PHARMACIST">Pharmacist</SelectItem>
+              <SelectItem value="ADMIN">Admin</SelectItem>
+              <SelectItem value="STAFF">Staff</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="flex-1 max-w-md">
+          <Select
+            value={`${selectedMonthYear.month}-${selectedMonthYear.year}`}
+            onValueChange={(value) => {
+              const [month, year] = value.split("-");
+              setSelectedMonthYear({
+                month: Number(month),
+                year: Number(year),
+              });
+            }}
+          >
+            <SelectTrigger>
+              <Calendar className="h-4 w-4 mr-2" />
+              <SelectValue placeholder="Select month" />
+            </SelectTrigger>
+            <SelectContent>
+              {getMonthYearOptions().map((option) => (
+                <SelectItem
+                  key={`${option.value.month}-${option.value.year}`}
+                  value={`${option.value.month}-${option.value.year}`}
+                >
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="relative flex-1 max-w-md">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+          <Input
+            placeholder="Search employees..."
+            className="pl-10"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+        </div>
+      </div>
+
+      {/* Employee Salary List */}
+      <Card className="border shadow-sm">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Users className="h-5 w-5 text-purple-600" />
+            Employee Salary List ({filteredEmployees.length} employees)
+          </CardTitle>
+          <CardDescription>
+            Manage salaries, add bonuses/penalties, and view history
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {isLoading ? (
+            <div className="flex justify-center items-center h-64">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
+            </div>
+          ) : (
+            <DataTable
+              columns={employeeColumns}
+              data={filteredEmployees}
+              searchColumn="name"
+              searchPlaceholder="Search employees..."
+              emptyMessage={
+                <div className="text-center py-12">
+                  <Users className="mx-auto h-12 w-12 text-gray-400" />
+                  <h3 className="mt-4 text-lg font-semibold">
+                    No employees found
+                  </h3>
+                  <p className="text-muted-foreground">
+                    {selectedRole !== "ALL"
+                      ? `No ${selectedRole.toLowerCase()} employees found`
+                      : "No employee records available"}
+                  </p>
+                </div>
+              }
+            />
+          )}
+        </CardContent>
+      </Card>
+
+      {/* ==================== MODALS ==================== */}
+
+      {/* Update Salary Modal */}
+      {selectedEmployee && (
+        <ReusableModal
+          isOpen={isSalaryModalOpen}
+          onClose={() => {
+            setIsSalaryModalOpen(false);
+            setSelectedEmployee(null);
+          }}
+          onSave={handleSalaryUpdate}
+          title={
+            <div className="flex items-center gap-2">
+              <TrendingUp className="h-5 w-5" />
+              Update Salary
+              <Badge variant="outline" className="ml-2">
+                {selectedEmployee.name}
+              </Badge>
+            </div>
+          }
+          sections={salaryFormSections}
+          initialData={{
+            employeeName: selectedEmployee.name,
+            currentSalary: selectedEmployee.baseSalary,
+          }}
+          isEdit={false}
+          size="lg"
+          saveButtonText="Update Salary"
+          cancelButtonText="Cancel"
+          saveButtonColor="linear-gradient(135deg, #8b5cf6, #7c3aed)"
+          validationOnChange={true}
+          // isLoading={updateSalaryMutation.isPending}
+        />
+      )}
+
+      {/* Add Adjustment Modal */}
+      {selectedEmployee && (
+        <ReusableModal
+          isOpen={isAdjustmentModalOpen}
+          onClose={() => {
+            setIsAdjustmentModalOpen(false);
+            setSelectedEmployee(null);
+          }}
+          onSave={handleAdjustmentAdd}
+          title={
+            <div className="flex items-center gap-2">
+              <Calculator className="h-5 w-5" />
+              Add Salary Adjustment
+              <Badge variant="outline" className="ml-2">
+                {selectedEmployee.name}
+              </Badge>
+            </div>
+          }
+          sections={adjustmentFormSections}
+          initialData={{
+            employeeName: selectedEmployee.name,
+          }}
+          isEdit={false}
+          size="lg"
+          saveButtonText="Add Adjustment"
+          cancelButtonText="Cancel"
+          saveButtonColor="linear-gradient(135deg, #f59e0b, #d97706)"
+          validationOnChange={true}
+          // isLoading={addAdjustmentMutation.isPending}
+        />
+      )}
+
+      {/* Salary History Modal */}
+      {selectedEmployeeForHistory && (
+        <ReusableModal
+          isOpen={isHistoryModalOpen}
+          onClose={() => {
+            setIsHistoryModalOpen(false);
+            setSelectedEmployeeForHistory(null);
+          }}
+          onSave={() => {}}
+          title={
+            <div className="flex items-center gap-2">
+              <History className="h-5 w-5" />
+              Salary History
+              <Badge variant="outline" className="ml-2">
+                {selectedEmployeeForHistory.name}
+              </Badge>
+            </div>
+          }
+          sections={[]}
+          initialData={{}}
+          isEdit={false}
+          size="xl"
+          saveButtonText=""
+          cancelButtonText="Close"
+        >
+          <div className="space-y-4 max-h-[500px] overflow-y-auto">
+            {isLoadingHistory ? (
+              <div className="flex justify-center items-center h-32">
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-purple-600"></div>
+              </div>
+            ) : salaryHistory && salaryHistory.data.length > 0 ? (
+              salaryHistory.data.map((record: SalaryHistoryResponse) => (
+                <Card key={record.id} className="border">
+                  <CardContent className="pt-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <Badge
+                        className={
+                          record.type === "BONUS" || record.type === "INCREMENT"
+                            ? "bg-green-100 text-green-800"
+                            : "bg-red-100 text-red-800"
+                        }
+                      >
+                        {record.type}
+                      </Badge>
+                      <span className="text-sm text-muted-foreground">
+                        {getMonthName(record.month)} {record.year}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-lg font-semibold">
+                        {record.type === "BONUS" || record.type === "INCREMENT"
+                          ? "+"
+                          : "-"}
+                        {formatCurrency(record.amount)}
+                      </span>
+                      <span className="text-xs text-muted-foreground">
+                        {formatDate(record.createdAt)}
+                      </span>
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      {record.reason}
+                    </p>
+                  </CardContent>
+                </Card>
+              ))
+            ) : (
+              <div className="text-center py-8">
+                <History className="mx-auto h-12 w-12 text-gray-400" />
+                <p className="mt-2 text-muted-foreground">
+                  No salary history available
+                </p>
+              </div>
+            )}
+          </div>
+        </ReusableModal>
+      )}
+    </div>
+  );
+};
+
+export default SalaryManagement;

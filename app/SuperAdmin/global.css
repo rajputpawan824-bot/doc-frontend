@@ -1,0 +1,8 @@
+.bg-sidebar {
+  background-color: #1a73e8;
+  overflow: hidden;
+}
+.bg-sidebar nav {
+  max-height: calc(100% - 28%);
+  /* overflow: auto; */
+}

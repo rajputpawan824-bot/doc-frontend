@@ -1,0 +1,1291 @@
+"use client";
+
+import { useState, useEffect } from "react";
+import {
+  Users,
+  UserPlus,
+  UserCog,
+  UserMinus,
+  Archive,
+  Search,
+  RefreshCw,
+  UserCheck,
+  Monitor,
+  Phone,
+  Mail,
+  Calendar,
+  Clock,
+  IndianRupee,
+  MapPin,
+  Shield,
+  Briefcase,
+  Building,
+  Key,
+  Eye,
+  Loader2,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
+import DataTable from "@/components/reusable/data-table";
+import ReusableModal, {
+  FormSection,
+} from "@/components/reusable/reusable-modal";
+import { ColumnDef } from "@tanstack/react-table";
+import { Switch } from "@/components/ui/switch";
+import { toast } from "sonner";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  ReceptionFormData,
+  ReceptionResponse,
+  RECEPTION_VALIDATION_RULES,
+  Receptionist,
+  Shift,
+  Gender,
+  getCanEditPatientStatus,
+  stringToBoolean,
+} from "@/lib/validations/Admin/reception";
+import DynamicDetailModal, {
+  SectionConfig,
+  ActionButton,
+  transformValidation,
+} from "@/components/reusable/detail-modal";
+import {
+  useReceptionists,
+  useDeactivatedReceptionists,
+  useToggleReceptionistStatus,
+  useTogglePatientEditPermission,
+  useAddReception,
+  useReceptionistById, // Changed from getReceptionistsById
+  useUpdateReceptionist,
+  useUpdateReceptionistPassword,
+} from "@/services/admin/reception";
+
+// ==================== MAIN COMPONENT ====================
+const ReceptionistManagement = () => {
+  const [activeTab, setActiveTab] = useState("view");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  const [selectedReceptionistId, setSelectedReceptionistId] = useState<
+    string | null
+  >(null);
+  const queryClient = useQueryClient();
+
+  // API Hooks
+  const { data: receptionists = [], isLoading, refetch } = useReceptionists();
+  const { data: deactivatedReceptionists = [], refetch: refetchDeactivated } =
+    useDeactivatedReceptionists();
+
+  // Fetch detailed receptionist data by ID
+  const {
+    data: selectedReceptionist,
+    isLoading: isDetailLoading,
+    refetch: refetchDetail,
+  } = useReceptionistById(selectedReceptionistId || undefined);
+
+  const addReceptionMutation = useAddReception({
+    onSuccess: (data) => {
+      toast.success("Receptionist added successfully");
+      setIsAddModalOpen(false);
+      queryClient.invalidateQueries({ queryKey: ["receptionists"] });
+    },
+    onError: (error) => {
+      toast.error(error.message || "Failed to add receptionist");
+    },
+  });
+
+  const toggleStatusMutation = useToggleReceptionistStatus();
+  const togglePermissionMutation = useTogglePatientEditPermission();
+
+  // ==================== DATA MANAGEMENT ====================
+  useEffect(() => {
+    if (activeTab === "deactivated") {
+      refetchDeactivated();
+    }
+  }, [activeTab, refetchDeactivated]);
+
+  const filteredActiveReceptionists = receptionists.filter(
+    (r) =>
+      !searchQuery ||
+      r.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      r.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      r.phoneNumber.includes(searchQuery) ||
+      (r.deskNumber &&
+        r.deskNumber.toLowerCase().includes(searchQuery.toLowerCase())),
+  );
+
+  const filteredDeactivatedReceptionists = deactivatedReceptionists.filter(
+    (r) =>
+      !searchQuery ||
+      r.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      r.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      r.phoneNumber.includes(searchQuery),
+  );
+
+  // ==================== DETAIL MODAL CONFIGURATION ====================
+  const detailSections: SectionConfig[] = [
+    {
+      id: "personal-info",
+      title: "Personal Information",
+      description: "Basic details and contact information",
+      icon: <Users className="h-5 w-5 text-blue-600" />,
+      layout: "grid",
+      columns: 2,
+      bgColor: "#f8fafc",
+      borderColor: "#e2e8f0",
+      fields: [
+        {
+          key: "name",
+          label: "Full Name",
+          type: "text",
+          icon: <Users className="w-4 h-4" />,
+          width: "full",
+          important: true,
+        },
+        {
+          key: "email",
+          label: "Email Address",
+          type: "email",
+          icon: <Mail className="w-4 h-4" />,
+          width: "half",
+        },
+        {
+          key: "phoneNumber",
+          label: "Phone Number",
+          type: "phone",
+          icon: <Phone className="w-4 h-4" />,
+          width: "half",
+        },
+        {
+          key: "gender",
+          label: "Gender",
+          type: "badge",
+          icon: <Users className="w-4 h-4" />,
+          width: "half",
+        },
+        {
+          key: "aadhaar",
+          label: "Aadhaar Number",
+          type: "text",
+          icon: <Shield className="w-4 h-4" />,
+          width: "half",
+          format: (value) => {
+            if (!value) return "N/A";
+            // Format as XXXX XXXX XXXX
+            return value.replace(/(\d{4})(\d{4})(\d{4})/, "$1 $2 $3");
+          },
+        },
+        {
+          key: "address",
+          label: "Address",
+          type: "text",
+          icon: <MapPin className="w-4 h-4" />,
+          width: "full",
+        },
+      ],
+    },
+    {
+      id: "employment-details",
+      title: "Employment Details",
+      description: "Work-related information and shift details",
+      icon: <Briefcase className="h-5 w-5 text-green-600" />,
+      layout: "grid",
+      columns: 2,
+      bgColor: "#f0fdf4",
+      borderColor: "#bbf7d0",
+      fields: [
+        {
+          key: "salary",
+          label: "Monthly Salary",
+          type: "currency",
+          icon: <IndianRupee className="w-4 h-4" />,
+          width: "half",
+          important: true,
+        },
+        {
+          key: "shift",
+          label: "Shift",
+          type: "badge",
+          icon: <Clock className="w-4 h-4" />,
+          width: "half",
+          format: (value) => (
+            <Badge
+              className={
+                value === "MORNING"
+                  ? "bg-yellow-100 text-yellow-800"
+                  : value === "EVENING"
+                    ? "bg-orange-100 text-orange-800"
+                    : "bg-indigo-100 text-indigo-800"
+              }
+            >
+              {value}
+            </Badge>
+          ),
+        },
+        {
+          key: "deskNumber",
+          label: "Desk Number",
+          type: "text",
+          icon: <Building className="w-4 h-4" />,
+          width: "half",
+        },
+        {
+          key: "shiftTiming",
+          label: "Shift Timing",
+          type: "text",
+          icon: <Clock className="w-4 h-4" />,
+          width: "half",
+        },
+        {
+          key: "previousExperience",
+          label: "Previous Experience",
+          type: "text",
+          icon: <Briefcase className="w-4 h-4" />,
+          width: "full",
+        },
+      ],
+    },
+    {
+      id: "permissions-status",
+      size: 50,
+      title: "Permissions & Status",
+      description: "Access rights and account status",
+      icon: <Shield className="h-5 w-5 text-purple-600" />,
+      layout: "grid",
+      columns: 1,
+      bgColor: "#faf5ff",
+      borderColor: "#e9d5ff",
+      fields: [
+        {
+          key: "isActive",
+          label: "Account Status",
+          type: "status",
+          icon: <UserCheck className="w-4 h-4" />,
+          width: "half",
+          format: (value) => (
+            <Badge
+              className={
+                value
+                  ? "bg-green-100 text-green-800"
+                  : "bg-red-100 text-red-800"
+              }
+            >
+              {value ? "Active" : "Inactive"}
+            </Badge>
+          ),
+        },
+        {
+          key: "canEditPatient", // Use singular
+          label: "Patient Edit Permission",
+          type: "boolean",
+          icon: <UserCog className="w-4 h-4" />,
+          width: "half",
+        },
+      ],
+    },
+    {
+      id: "system-info",
+      size: 50,
+      title: "System Information",
+      description: "Account creation and update history",
+      icon: <Calendar className="h-5 w-5 text-gray-600" />,
+      layout: "grid",
+      columns: 1,
+      fields: [
+        {
+          key: "createdAt",
+          label: "Account Created",
+          type: "datetime",
+          icon: <Calendar className="w-4 h-4" />,
+          width: "half",
+        },
+        {
+          key: "updatedAt",
+          label: "Last Updated",
+          type: "datetime",
+          icon: <Clock className="w-4 h-4" />,
+          width: "half",
+        },
+        {
+          key: "userId",
+          label: "User ID",
+          type: "text",
+          icon: <Key className="w-4 h-4" />,
+          width: "half",
+        },
+        {
+          key: "id",
+          label: "Receptionist ID",
+          type: "text",
+          icon: <Key className="w-4 h-4" />,
+          width: "half",
+        },
+      ],
+    },
+  ];
+
+  const detailActions: ActionButton[] = selectedReceptionist
+    ? [
+        {
+          label: "Edit Details",
+          variant: "outline",
+          icon: <UserCog className="w-4 h-4" />,
+          onClick: (data) => {
+            setIsDetailModalOpen(false);
+            setIsEditModalOpen(true);
+          },
+        },
+        {
+          label: getCanEditPatientStatus(selectedReceptionist)
+            ? "Disable Patient Edit"
+            : "Enable Patient Edit",
+          variant: "secondary",
+          icon: <UserCog className="w-4 h-4" />,
+          onClick: (data) => {
+            handleTogglePatientEditMode(
+              data.id,
+              getCanEditPatientStatus(selectedReceptionist),
+            );
+          },
+          loading: togglePermissionMutation.isPending,
+        },
+        {
+          label: selectedReceptionist.isActive ? "Deactivate" : "Activate",
+          variant: selectedReceptionist.isActive ? "destructive" : "default",
+          icon: selectedReceptionist.isActive ? (
+            <UserMinus className="w-4 h-4" />
+          ) : (
+            <UserCheck className="w-4 h-4" />
+          ),
+          onClick: (data) => {
+            if (selectedReceptionist.isActive) {
+              handleDeactivate(data.id);
+            } else {
+              handleReactivate(data.id);
+            }
+          },
+          loading: toggleStatusMutation.isPending,
+          confirm: selectedReceptionist.isActive
+            ? {
+                title: "Deactivate Receptionist",
+                message:
+                  "Are you sure you want to deactivate this receptionist? They will lose access to the system.",
+              }
+            : {
+                title: "Activate Receptionist",
+                message:
+                  "Are you sure you want to reactivate this receptionist?",
+              },
+        },
+      ]
+    : [];
+
+  // ==================== FORM SECTIONS ====================
+  const addFormSections: FormSection[] = [
+    {
+      title: "Personal Information",
+      icon: <Users className="h-4 w-4" />,
+      fields: [
+        {
+          name: "name",
+          label: "Full Name",
+          type: "text",
+          required: true,
+          placeholder: "Enter full name",
+          width: "full",
+          validation: transformValidation(RECEPTION_VALIDATION_RULES.name),
+        },
+        {
+          name: "email",
+          label: "Email Address",
+          type: "email",
+          required: true,
+          placeholder: "email@example.com",
+          width: "half",
+          validation: transformValidation(RECEPTION_VALIDATION_RULES.email),
+        },
+        {
+          name: "phone",
+          label: "Phone Number",
+          type: "tel",
+          required: true,
+          placeholder: "9876543210",
+          width: "half",
+          validation: transformValidation(RECEPTION_VALIDATION_RULES.phone),
+        },
+        {
+          name: "gender",
+          label: "Gender",
+          type: "select",
+          required: true,
+          width: "half",
+          options: [
+            { value: Gender.MALE, label: "Male" },
+            { value: Gender.FEMALE, label: "Female" },
+            { value: Gender.OTHER, label: "Other" },
+          ],
+          validation: transformValidation(RECEPTION_VALIDATION_RULES.gender),
+        },
+        {
+          name: "aadhaar",
+          label: "Aadhaar Number",
+          type: "text",
+          required: true,
+          placeholder: "123456789012",
+          width: "half",
+          validation: transformValidation(RECEPTION_VALIDATION_RULES.aadhaar),
+        },
+      ],
+    },
+    {
+      title: "Employment Details",
+      icon: <Briefcase className="h-4 w-4" />,
+      fields: [
+        {
+          name: "salary",
+          label: "Salary (₹)",
+          type: "number",
+          required: true,
+          placeholder: "30000",
+          width: "half",
+          min: 10000,
+          max: 100000,
+          step: 1000,
+          validation: transformValidation(RECEPTION_VALIDATION_RULES.salary),
+        },
+        {
+          name: "shift",
+          label: "Shift",
+          type: "select",
+          required: true,
+          width: "half",
+          options: [
+            { value: Shift.MORNING, label: "Morning" },
+            { value: Shift.EVENING, label: "Evening" },
+          ],
+          validation: transformValidation(RECEPTION_VALIDATION_RULES.shift),
+        },
+        {
+          name: "deskNumber",
+          label: "Desk Number (Optional)",
+          type: "text",
+          placeholder: "e.g., D-01, Reception-1",
+          width: "half",
+          validation: transformValidation(
+            RECEPTION_VALIDATION_RULES.deskNumber,
+          ),
+        },
+        {
+          name: "shiftTiming",
+          label: "Shift Timing (Optional)",
+          type: "text",
+          placeholder: "e.g., 9AM - 5PM",
+          width: "half",
+          validation: transformValidation(
+            RECEPTION_VALIDATION_RULES.shiftTiming,
+          ),
+        },
+      ],
+    },
+    {
+      title: "Additional Information",
+      icon: <MapPin className="h-4 w-4" />,
+      fields: [
+        {
+          name: "experience",
+          label: "Experience (Years)",
+          type: "number",
+          required: true,
+          placeholder: "2",
+          width: "half",
+          min: 0,
+          max: 50,
+          step: 1,
+          validation: transformValidation(
+            RECEPTION_VALIDATION_RULES.experience,
+          ),
+        },
+        {
+          name: "address",
+          label: "Complete Address",
+          type: "textarea",
+          required: true,
+          placeholder:
+            "Enter complete residential address with city, state, and pincode",
+          width: "full",
+          rows: 3,
+          validation: transformValidation(RECEPTION_VALIDATION_RULES.address),
+        },
+      ],
+    },
+  ];
+
+  const editFormSections: FormSection[] = [
+    {
+      title: "Edit Receptionist Details",
+      icon: <UserCog className="h-4 w-4" />,
+      fields: [
+        {
+          name: "name",
+          label: "Full Name",
+          type: "text",
+          required: true,
+          width: "full",
+          validation: transformValidation(RECEPTION_VALIDATION_RULES.name),
+        },
+        {
+          name: "email",
+          label: "Email Address",
+          type: "email",
+          required: true,
+          width: "half",
+          validation: transformValidation(RECEPTION_VALIDATION_RULES.email),
+          disabled: true, // Email should not be editable
+        },
+        {
+          name: "salary",
+          label: "Salary (₹)",
+          type: "number",
+          required: true,
+          width: "half",
+          min: 10000,
+          max: 100000,
+          step: 1000,
+          validation: transformValidation(RECEPTION_VALIDATION_RULES.salary),
+        },
+        {
+          name: "shift",
+          label: "Shift",
+          type: "select",
+          required: true,
+          width: "half",
+          options: [
+            { value: Shift.MORNING, label: "Morning" },
+            { value: Shift.EVENING, label: "Evening" },
+          ],
+          validation: transformValidation(RECEPTION_VALIDATION_RULES.shift),
+        },
+        {
+          name: "phone",
+          label: "Phone Number",
+          type: "tel",
+          required: true,
+          width: "half",
+          placeholder: "9876543210",
+          validation: transformValidation(RECEPTION_VALIDATION_RULES.phone),
+        },
+        {
+          name: "password",
+          label: "Update Password",
+          type: "password",
+          placeholder: "Leave empty to keep current password",
+          width: "half",
+          validation: transformValidation(RECEPTION_VALIDATION_RULES.password),
+        },
+        {
+          name: "gender",
+          label: "Gender",
+          type: "select",
+          required: true,
+          width: "half",
+          options: [
+            { value: Gender.MALE, label: "Male" },
+            { value: Gender.FEMALE, label: "Female" },
+            { value: Gender.OTHER, label: "Other" },
+          ],
+          validation: transformValidation(RECEPTION_VALIDATION_RULES.gender),
+        },
+        {
+          name: "aadhaar",
+          label: "Aadhaar Number",
+          type: "text",
+          required: true,
+          width: "half",
+          placeholder: "123456789012",
+          validation: transformValidation(RECEPTION_VALIDATION_RULES.aadhaar),
+        },
+        {
+          name: "address",
+          label: "Address",
+          type: "textarea",
+          required: true,
+          width: "full",
+          rows: 3,
+          validation: transformValidation(RECEPTION_VALIDATION_RULES.address),
+        },
+        {
+          name: "experience",
+          label: "Experience (Years)",
+          type: "number",
+          required: true,
+          width: "half",
+          min: 0,
+          max: 50,
+          step: 1,
+          validation: transformValidation(
+            RECEPTION_VALIDATION_RULES.experience,
+          ),
+        },
+        {
+          name: "deskNumber",
+          label: "Desk Number",
+          type: "text",
+          width: "half",
+          validation: transformValidation(
+            RECEPTION_VALIDATION_RULES.deskNumber,
+          ),
+        },
+        {
+          name: "shiftTiming",
+          label: "Shift Timing",
+          type: "text",
+          width: "half",
+          validation: transformValidation(
+            RECEPTION_VALIDATION_RULES.shiftTiming,
+          ),
+        },
+      ],
+    },
+  ];
+
+  // ==================== HANDLERS ====================
+  const handleAddReceptionist = (data: ReceptionFormData) => {
+    const formData: ReceptionFormData = {
+      name: data.name,
+      email: data.email,
+      phone: data.phone,
+      experience: data.experience,
+      salary: Number(data.salary),
+      shift: data.shift,
+      gender: data.gender,
+      aadhaar: data.aadhaar,
+      address: data.address,
+      deskNumber: data.deskNumber,
+      shiftTiming: data.shiftTiming,
+    };
+
+    addReceptionMutation.mutate(formData);
+  };
+
+  const updateReceptionMutation = useUpdateReceptionist({
+    onSuccess: (data) => {
+      toast.success("Receptionist updated successfully");
+      setIsEditModalOpen(false);
+      setSelectedReceptionistId(null);
+      queryClient.invalidateQueries({ queryKey: ["receptionists"] });
+      queryClient.invalidateQueries({ queryKey: ["receptionist", data.id] });
+    },
+    onError: (error) => {
+      toast.error(error.message || "Failed to update receptionist");
+    },
+  });
+
+  const updateReceptionMutationPassword = useUpdateReceptionistPassword({
+    onSuccess: (data) => {
+      toast.success("Receptionist updated successfully");
+      setIsEditModalOpen(false);
+      setSelectedReceptionistId(null);
+      queryClient.invalidateQueries({ queryKey: ["receptionists"] });
+      queryClient.invalidateQueries({ queryKey: ["receptionist", data.id] });
+    },
+    onError: (error) => {
+      toast.error(error.message || "Failed to update receptionist");
+    },
+  });
+
+  const handleEditReceptionist = (data: ReceptionFormData) => {
+    if (!selectedReceptionist) return;
+
+    const updateData: Partial<ReceptionFormData> = {
+      name: data.name,
+      salary: Number(data.salary),
+      shift: data.shift,
+      phone: data.phone,
+      gender: data.gender,
+      aadhaar: data.aadhaar,
+      address: data.address,
+      experience: data.experience,
+      deskNumber: data.deskNumber,
+      shiftTiming: data.shiftTiming,
+      ...(data.password && { password: data.password }),
+    };
+
+    if (data.password)
+      updateReceptionMutationPassword.mutate({
+        id: selectedReceptionist.id,
+        data: { password: data.password },
+      });
+
+    updateReceptionMutation.mutate({
+      id: selectedReceptionist.id,
+      data: updateData,
+    });
+  };
+
+  const handleTogglePatientEditMode = (
+    receptionistId: string,
+    currentStatus: boolean,
+  ) => {
+    togglePermissionMutation.mutate(
+      {
+        id: receptionistId,
+        canEditPatient: !currentStatus, // Singular
+      },
+      {
+        onSuccess: () => {
+          toast.success(
+            `Patient edit permission ${!currentStatus ? "enabled" : "disabled"}`,
+          );
+          queryClient.invalidateQueries({ queryKey: ["receptionists"] });
+          queryClient.invalidateQueries({
+            queryKey: ["receptionist", receptionistId],
+          });
+        },
+        onError: (error) => {
+          toast.error("Failed to update permission");
+        },
+      },
+    );
+  };
+
+  const handleDeactivate = (receptionistId: string) => {
+    toggleStatusMutation.mutate(
+      {
+        id: receptionistId,
+        isActive: false,
+      },
+      {
+        onSuccess: () => {
+          toast.success("Receptionist deactivated successfully");
+          setIsDetailModalOpen(false);
+          queryClient.invalidateQueries({ queryKey: ["receptionists"] });
+          queryClient.invalidateQueries({
+            queryKey: ["receptionist", receptionistId],
+          });
+        },
+        onError: (error) => {
+          toast.error("Failed to deactivate receptionist");
+        },
+      },
+    );
+  };
+
+  const handleReactivate = (receptionistId: string) => {
+    toggleStatusMutation.mutate(
+      {
+        id: receptionistId,
+        isActive: true,
+      },
+      {
+        onSuccess: () => {
+          toast.success("Receptionist reactivated successfully");
+          setIsDetailModalOpen(false);
+          queryClient.invalidateQueries({ queryKey: ["receptionists"] });
+          queryClient.invalidateQueries({
+            queryKey: ["receptionist", receptionistId],
+          });
+          queryClient.invalidateQueries({
+            queryKey: ["deactivated-receptionists"],
+          });
+        },
+        onError: (error) => {
+          toast.error("Failed to reactivate receptionist");
+        },
+      },
+    );
+  };
+
+  const handleRefresh = () => {
+    refetch();
+    if (activeTab === "deactivated") {
+      refetchDeactivated();
+    }
+  };
+
+  const handleViewDetails = (receptionistId: string) => {
+    setSelectedReceptionistId(receptionistId);
+    setIsDetailModalOpen(true);
+  };
+
+  // ==================== TABLE COLUMNS ====================
+  const activeColumns: ColumnDef<Receptionist>[] = [
+    {
+      accessorKey: "name",
+      header: "Receptionist",
+      cell: ({ row }) => {
+        const receptionist = row.original;
+        return (
+          <div className="flex flex-col">
+            <div className="font-medium flex items-center gap-2">
+              {receptionist.name}
+              {receptionist.deskNumber && (
+                <Badge variant="outline" className="text-xs">
+                  <Building className="h-3 w-3 mr-1" />
+                  {receptionist.deskNumber}
+                </Badge>
+              )}
+            </div>
+            <div className="text-sm text-muted-foreground flex items-center gap-2">
+              <Mail className="h-3 w-3" />
+              {receptionist.email}
+            </div>
+            <div className="text-xs text-muted-foreground flex items-center gap-2 mt-1">
+              <Phone className="h-3 w-3" />
+              {receptionist.phoneNumber}
+            </div>
+          </div>
+        );
+      },
+    },
+    {
+      accessorKey: "details",
+      header: "Details",
+      cell: ({ row }) => {
+        const receptionist = row.original;
+        return (
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <IndianRupee className="h-3 w-3 text-green-600" />
+              <span className="text-sm font-medium">
+                ₹{receptionist.salary.toLocaleString()}
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Clock className="h-3 w-3 text-blue-600" />
+              <Badge variant="secondary" className="capitalize">
+                {receptionist.shift.toLowerCase()}
+              </Badge>
+            </div>
+            {receptionist.shiftTiming && (
+              <div className="text-xs text-muted-foreground">
+                {receptionist.shiftTiming}
+              </div>
+            )}
+          </div>
+        );
+      },
+    },
+    {
+      accessorKey: "experience",
+      header: "Experience",
+      cell: ({ row }) => {
+        const receptionist = row.original;
+        return (
+          <div className="text-sm text-muted-foreground max-w-[200px] truncate">
+            {receptionist.previousExperience.substring(0, 60)}...
+          </div>
+        );
+      },
+    },
+    {
+      accessorKey: "editMode",
+      header: "Patient Edit",
+      cell: ({ row }) => {
+        const receptionist = row.original;
+        const canEdit = getCanEditPatientStatus(receptionist);
+        return (
+          <div className="flex flex-col items-start gap-2">
+            <div className="flex items-center gap-2">
+              <Switch
+                checked={canEdit}
+                onCheckedChange={() =>
+                  handleTogglePatientEditMode(receptionist.id, canEdit)
+                }
+                className={`${canEdit ? "bg-green-500" : "bg-gray-300"}`}
+              />
+              <span className="text-sm font-medium">
+                {canEdit ? "Enabled" : "Disabled"}
+              </span>
+            </div>
+            <div className="text-xs text-muted-foreground">
+              {canEdit ? "Can edit patient details" : "View only mode"}
+            </div>
+          </div>
+        );
+      },
+    },
+    {
+      accessorKey: "status",
+      header: "Status",
+      cell: ({ row }) => {
+        const receptionist = row.original;
+        return (
+          <Badge
+            className={
+              receptionist.isActive
+                ? "bg-green-100 text-green-800 hover:bg-green-100"
+                : "bg-red-100 text-red-800 hover:bg-red-100"
+            }
+          >
+            {receptionist.isActive ? "Active" : "Inactive"}
+          </Badge>
+        );
+      },
+    },
+    {
+      id: "actions",
+      header: "Actions",
+      cell: ({ row }) => {
+        const receptionist = row.original;
+        return (
+          <div className="flex gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => handleViewDetails(receptionist.id)} // Pass ID instead of object
+              title="View details"
+              disabled={isDetailLoading}
+            >
+              {isDetailLoading && selectedReceptionistId === receptionist.id ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Eye className="h-4 w-4" />
+              )}
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                // For edit, still use the existing data since we need to populate the form
+                setSelectedReceptionistId(receptionist.id);
+                setIsEditModalOpen(true);
+              }}
+              title="Edit receptionist"
+            >
+              <UserCog className="h-4 w-4" />
+            </Button>
+            <Button
+              size="sm"
+              variant="destructive"
+              onClick={() => handleDeactivate(receptionist.id)}
+              title="Deactivate receptionist"
+            >
+              <UserMinus className="h-4 w-4" />
+            </Button>
+          </div>
+        );
+      },
+    },
+  ];
+
+  const deactivatedColumns: ColumnDef<Receptionist>[] = [
+    {
+      accessorKey: "name",
+      header: "Receptionist",
+      cell: ({ row }) => {
+        const receptionist = row.original;
+        return (
+          <div className="flex flex-col">
+            <div className="font-medium text-gray-700">{receptionist.name}</div>
+            <div className="text-sm text-gray-500">{receptionist.email}</div>
+            <div className="text-xs text-gray-400">
+              {receptionist.phoneNumber}
+            </div>
+          </div>
+        );
+      },
+    },
+    {
+      accessorKey: "details",
+      header: "Details",
+      cell: ({ row }) => {
+        const receptionist = row.original;
+        return (
+          <div className="space-y-1">
+            <div className="text-sm">
+              Salary: ₹{receptionist.salary.toLocaleString()}
+            </div>
+            <div className="text-sm">
+              Shift: {receptionist.shift.toLowerCase()}
+            </div>
+            <div className="text-xs text-gray-500">
+              Last active:{" "}
+              {new Date(receptionist.updatedAt).toLocaleDateString()}
+            </div>
+          </div>
+        );
+      },
+    },
+    {
+      accessorKey: "experience",
+      header: "Experience",
+      cell: ({ row }) => {
+        const receptionist = row.original;
+        return (
+          <div className="text-sm text-gray-500 max-w-[180px] truncate">
+            {receptionist.previousExperience.substring(0, 50)}...
+          </div>
+        );
+      },
+    },
+    {
+      accessorKey: "deactivationDate",
+      header: "Deactivated On",
+      cell: ({ row }) => {
+        const receptionist = row.original;
+        return (
+          <div className="flex items-center gap-2">
+            <Calendar className="h-3 w-3 text-gray-400" />
+            <span className="text-sm">
+              {new Date(receptionist.updatedAt).toLocaleDateString()}
+            </span>
+          </div>
+        );
+      },
+    },
+    {
+      id: "actions",
+      header: "Action",
+      cell: ({ row }) => {
+        const receptionist = row.original;
+        return (
+          <div className="flex gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => handleViewDetails(receptionist.id)} // Pass ID instead of object
+              title="View details"
+              disabled={isDetailLoading}
+            >
+              {isDetailLoading && selectedReceptionistId === receptionist.id ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Eye className="h-4 w-4" />
+              )}
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => handleReactivate(receptionist.id)}
+              className="hover:bg-green-50 hover:text-green-700 hover:border-green-200"
+            >
+              <UserCheck className="mr-2 h-4 w-4" />
+              Reactivate
+            </Button>
+          </div>
+        );
+      },
+    },
+  ];
+
+  // ==================== RENDER ====================
+  return (
+    <div className="container mx-auto p-6 space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
+            <Users className="h-8 w-8" />
+            Receptionist Management
+          </h1>
+          <p className="text-muted-foreground">
+            Manage receptionists, patient edit permissions, and shift schedules
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            onClick={handleRefresh}
+            className="hover:bg-gray-50"
+            disabled={isLoading}
+          >
+            <RefreshCw
+              className={`mr-2 h-4 w-4 ${isLoading ? "animate-spin" : ""}`}
+            />
+            Refresh
+          </Button>
+          <Button
+            onClick={() => setIsAddModalOpen(true)}
+            className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700"
+            disabled={addReceptionMutation.isPending}
+          >
+            <UserPlus className="mr-2 h-4 w-4" />
+            {addReceptionMutation.isPending ? "Adding..." : "Add Receptionist"}
+          </Button>
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <Tabs
+        value={activeTab}
+        onValueChange={setActiveTab}
+        className="space-y-4"
+      >
+        <TabsList className="grid grid-cols-2 w-full max-w-md">
+          <TabsTrigger value="view" className="flex items-center gap-2">
+            <Users className="h-4 w-4" />
+            Active Receptionists ({filteredActiveReceptionists.length})
+          </TabsTrigger>
+          <TabsTrigger value="deactivated" className="flex items-center gap-2">
+            <Archive className="h-4 w-4" />
+            Deactivated ({filteredDeactivatedReceptionists.length})
+          </TabsTrigger>
+        </TabsList>
+
+        {/* Active Receptionists Tab */}
+        <TabsContent value="view" className="space-y-4">
+          <Card className="border shadow-sm">
+            <CardHeader className="">
+              <CardTitle className="flex items-center gap-2">
+                <Users className="h-5 w-5 text-green-600" />
+                Active Receptionists ({filteredActiveReceptionists.length})
+              </CardTitle>
+              <CardDescription>
+                Manage receptionist details, patient edit permissions, and
+                status
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {isLoading ? (
+                <div className="flex justify-center items-center h-64">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600"></div>
+                </div>
+              ) : (
+                <DataTable
+                  columns={activeColumns}
+                  data={filteredActiveReceptionists}
+                  searchColumn="name"
+                  searchPlaceholder="Search active receptionists..."
+                  emptyMessage={
+                    <div className="text-center py-12">
+                      <Users className="mx-auto h-12 w-12 text-gray-400" />
+                      <h3 className="mt-4 text-lg font-semibold">
+                        No active receptionists
+                      </h3>
+                      <p className="text-muted-foreground">
+                        Add your first receptionist to get started
+                      </p>
+                    </div>
+                  }
+                />
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Deactivated Receptionists Tab */}
+        <TabsContent value="deactivated" className="space-y-4">
+          <Card className="border shadow-sm">
+            <CardHeader className="bg-gradient-to-r from-gray-50 to-white">
+              <CardTitle className="flex items-center gap-2">
+                <Archive className="h-5 w-5 text-gray-600" />
+                Deactivated Receptionists (
+                {filteredDeactivatedReceptionists.length})
+              </CardTitle>
+              <CardDescription>
+                View and restore deactivated receptionists
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {isLoading ? (
+                <div className="flex justify-center items-center h-64">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-600"></div>
+                </div>
+              ) : (
+                <DataTable
+                  columns={deactivatedColumns}
+                  data={filteredDeactivatedReceptionists}
+                  searchColumn="name"
+                  searchPlaceholder="Search deactivated receptionists..."
+                  emptyMessage={
+                    <div className="text-center py-12">
+                      <UserCheck className="mx-auto h-12 w-12 text-gray-400" />
+                      <h3 className="mt-4 text-lg font-semibold">
+                        All receptionists are active
+                      </h3>
+                      <p className="text-muted-foreground">
+                        No deactivated receptionists found
+                      </p>
+                    </div>
+                  }
+                />
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+
+      {/* Add Receptionist Modal */}
+      <ReusableModal
+        isOpen={isAddModalOpen}
+        onClose={() => setIsAddModalOpen(false)}
+        onSave={handleAddReceptionist}
+        title="Add New Receptionist"
+        sections={addFormSections}
+        size="xl"
+        saveButtonText={
+          addReceptionMutation.isPending ? "Adding..." : "Add Receptionist"
+        }
+        cancelButtonText="Cancel"
+        saveButtonColor="linear-gradient(135deg, #10b981, #059669)"
+        validationOnChange={true}
+        // isSubmitting={addReceptionMutation.isPending}
+      />
+
+      {/* Edit Receptionist Modal */}
+      <ReusableModal
+        isOpen={isEditModalOpen}
+        onClose={() => {
+          setIsEditModalOpen(false);
+          setSelectedReceptionistId(null);
+        }}
+        onSave={handleEditReceptionist}
+        title="Edit Receptionist"
+        sections={editFormSections}
+        size="lg"
+        saveButtonText="Update Receptionist"
+        cancelButtonText="Cancel"
+        saveButtonColor="linear-gradient(135deg, #3b82f6, #2563eb)"
+        validationOnChange={true}
+        initialData={
+          selectedReceptionist
+            ? {
+                name: selectedReceptionist.name,
+                email: selectedReceptionist.email,
+                salary: selectedReceptionist.salary,
+                shift: selectedReceptionist.shift,
+                phone: selectedReceptionist.phoneNumber,
+                gender: selectedReceptionist.gender,
+                aadhaar: selectedReceptionist.aadhaar,
+                address: selectedReceptionist.address,
+                experience:
+                  selectedReceptionist.experience ??
+                  selectedReceptionist.previousExperience,
+                deskNumber: selectedReceptionist.deskNumber,
+                shiftTiming: selectedReceptionist.shiftTiming,
+              }
+            : undefined
+        }
+      />
+
+      {/* Detail Modal */}
+      <DynamicDetailModal
+        isOpen={isDetailModalOpen}
+        onClose={() => {
+          setIsDetailModalOpen(false);
+          setSelectedReceptionistId(null);
+        }}
+        title="Receptionist Details"
+        subtitle={selectedReceptionist?.email}
+        data={selectedReceptionist}
+        sections={detailSections}
+        actions={detailActions}
+        size="xl"
+        headerColor="#10b981"
+        showRawData={false}
+        isLoading={isDetailLoading}
+      />
+    </div>
+  );
+};
+
+export default ReceptionistManagement;
