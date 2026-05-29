@@ -43,7 +43,7 @@ interface DoctorFormData {
   qualification: string;
   registrationNumber: string;
   phoneNumber: string;
-  experience: string;
+  experience: number;
   salary: string;
   unit: "morning" | "evening" | "rotational";
   email: string;
@@ -56,6 +56,10 @@ interface DoctorFormData {
   availabilityDays: string[];
   documents: string[];
   isActive: boolean;
+  workingHours: {
+  start: string;
+  end: string;
+};
 }
 
 interface DoctorFormProps {
@@ -83,27 +87,38 @@ export function DoctorForm({
 }: DoctorFormProps) {
   const [showPassword, setShowPassword] = useState(false);
   const [activeTab, setActiveTab] = useState("personal");
-  const [formData, setFormData] = useState<DoctorFormData>(
-    initialData || {
-      name: "",
-      qualification: "",
-      registrationNumber: "",
-      phoneNumber: "",
-      experience: "",
-      salary: "",
-      unit: "morning",
-      email: "",
-      password: "",
-      gender: "male",
-      government: false,
-      adjunct: false,
-      address: "",
-      consultationFee: "",
-      availabilityDays: [],
-      documents: [],
-      isActive: true,
-    }
-  );
+
+  const defaultFormData: DoctorFormData = {
+  name: "",
+  qualification: "",
+  registrationNumber: "",
+  phoneNumber: "",
+  experience: 0,
+  salary: "",
+  unit: "morning",
+  email: "",
+  password: "",
+  gender: "male",
+  government: false,
+  adjunct: false,
+  address: "",
+  consultationFee: "",
+  availabilityDays: [],
+  documents: [],
+  isActive: true,
+  workingHours: {
+    start: "",
+    end: "",
+  },
+};
+const [formData, setFormData] = useState<DoctorFormData>({
+  ...defaultFormData,
+  ...initialData,
+  workingHours: {
+    start: initialData?.workingHours?.start || "",
+    end: initialData?.workingHours?.end || "",
+  },
+});
 
   const [errors, setErrors] = useState<Partial<Record<keyof DoctorFormData, string>>>({});
 
@@ -230,7 +245,40 @@ export function DoctorForm({
               </SelectContent>
             </Select>
           </div>
+          {/*Working Hour*/}
+          <div className="space-y-2">
+  <Label>Start Time *</Label>
+  <Input
+    type="time"
+    value={formData.workingHours.start}
+    onChange={(e) =>
+      setFormData((prev) => ({
+        ...prev,
+        workingHours: {
+          ...prev.workingHours,
+          start: e.target.value,
+        },
+      }))
+    }
+  />
+</div>
 
+<div className="space-y-2">
+  <Label>End Time *</Label>
+  <Input
+    type="time"
+    value={formData.workingHours.end}
+    onChange={(e) =>
+      setFormData((prev) => ({
+        ...prev,
+        workingHours: {
+          ...prev.workingHours,
+          end: e.target.value,
+        },
+      }))
+    }
+  />
+</div>
           {/* Phone Number */}
           <div className="space-y-2">
             <Label htmlFor="phoneNumber">Phone Number *</Label>
@@ -527,6 +575,7 @@ export function DoctorForm({
                   <Label htmlFor="experience">Experience (Optional)</Label>
                   <Input
                     id="experience"
+                      type="number"
                     placeholder="e.g., 5 years in Cardiology"
                     value={formData.experience}
                     onChange={(e) => handleInputChange("experience", e.target.value)}
@@ -585,7 +634,13 @@ export function DoctorForm({
                       <SelectItem value="rotational">
                         <div className="flex items-center">
                           <Clock className="h-4 w-4 mr-2" />
-                          Rotational
+                          Afternoon
+                        </div>
+                      </SelectItem>
+                       <SelectItem value="rotational">
+                        <div className="flex items-center">
+                          <Clock className="h-4 w-4 mr-2" />
+                          Night
                         </div>
                       </SelectItem>
                     </SelectContent>
@@ -649,6 +704,45 @@ export function DoctorForm({
               <CardTitle>Additional Information</CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
+              {/* Working Hours */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <Label htmlFor="workingHoursStart">Working Hour Start</Label>
+                  <Input
+                    id="workingHoursStart"
+                    type="time"
+                    value={formData.workingHours.start}
+                    onChange={(e) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        workingHours: {
+                          ...prev.workingHours,
+                          start: e.target.value,
+                        },
+                      }))
+                    }
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="workingHoursEnd">Working Hour End</Label>
+                  <Input
+                    id="workingHoursEnd"
+                    type="time"
+                    value={formData.workingHours.end}
+                    onChange={(e) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        workingHours: {
+                          ...prev.workingHours,
+                          end: e.target.value,
+                        },
+                      }))
+                    }
+                  />
+                </div>
+              </div>
+
               {/* Availability Days */}
               <div className="space-y-4">
                 <h3 className="text-lg font-medium">Availability Days (Optional)</h3>
@@ -752,7 +846,7 @@ export function DoctorForm({
           qualification: "",
           registrationNumber: "",
           phoneNumber: "",
-          experience: "",
+          experience: 0,
           salary: "",
           unit: "morning",
           email: "",
@@ -765,6 +859,10 @@ export function DoctorForm({
           availabilityDays: [],
           documents: [],
           isActive: true,
+          workingHours: {
+  start: "",
+  end: "",
+},
         })}>
           Reset
         </Button>

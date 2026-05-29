@@ -16,9 +16,13 @@ export interface DoctorFormData {
   department: string;
   aadhaar: string;
   address: string;
-  experience: string;
+  experience: number;
   consultationFee: number;
   availabilityDays: string;
+  workingHours: {
+    start: string;
+    end: string;
+  };
   password?: string;
 }
 
@@ -27,7 +31,7 @@ export interface DoctorResponse {
   userId: string;
   qualification: string;
   registrationNo: string;
-  experience: string;
+experience: number;
   salary: number;
   shift: "MORNING" | "AFTERNOON" | "EVENING" | "NIGHT";
   gender: "MALE" | "FEMALE" | "OTHER";
@@ -159,13 +163,16 @@ export const DOCTOR_VALIDATION_RULES: ValidationRules = {
       message: "Address cannot exceed 200 characters",
     },
   },
-  experience: {
-    required: "Experience is required",
-    pattern: {
-      value: /^\d+\s*(years?|yrs?)?$/i,
-      message: "Experience must be in format like '6 years' or '6'",
-    },
+experience: {
+  required: "Experience is required",
+  validate: (value: unknown) => {
+    const num = Number(value);
+    if (isNaN(num) || num < 0) {
+      return "Experience must be a valid number";
+    }
+    return true;
   },
+},
   consultationFee: {
     required: "Consultation fee is required",
     validate: (value: unknown) => {
@@ -212,6 +219,7 @@ export function useDoctorFormValidation() {
   return useFormValidation(DOCTOR_VALIDATION_RULES);
 }
 
+
 export interface CreateDoctorPayload {
   name: string;
   email: string;
@@ -224,20 +232,29 @@ export interface CreateDoctorPayload {
   department: string;
   aadhaar: string;
   address: string;
-  experience: string;
+  experience: number;
   consultationFee: number;
   availabilityDays: string;
   password?: string;
+  workingHours: {
+  start: string;
+  end: string;
+};
 }
 
-// Utility function to format Aadhaar number for display
-export function formatAadhaarNumber(aadhaar: string): string {
+export function formatAadhaarNumber(value: unknown): string {
+  const aadhaar = String(value ?? "");
+
   const clean = aadhaar.replace(/[-\s]/g, "");
-  if (clean.length !== 12) return aadhaar;
-  return `${clean.substring(0, 4)}-${clean.substring(4, 8)}-${clean.substring(
-    8,
-    12
-  )}`;
+
+  if (clean.length !== 12) {
+    return aadhaar;
+  }
+
+  return `${clean.substring(0, 4)}-${clean.substring(
+    4,
+    8
+  )}-${clean.substring(8, 12)}`;
 }
 
 // Utility function to calculate years of experience

@@ -270,6 +270,7 @@ const DoctorsPage = ({ initialDoctors }: { initialDoctors?: DoctorResponse[] }) 
           icon: <Mail className="w-4 h-4" />,
           width: "half",
         },
+        
         {
           key: "user.phone", // Use dot notation
           label: "Phone Number",
@@ -293,7 +294,7 @@ const DoctorsPage = ({ initialDoctors }: { initialDoctors?: DoctorResponse[] }) 
                     : "bg-purple-100 text-purple-800"
               }
             >
-              {value}
+              {String(value)}
             </Badge>
           ),
         },
@@ -380,7 +381,7 @@ const DoctorsPage = ({ initialDoctors }: { initialDoctors?: DoctorResponse[] }) 
           icon: <IndianRupee className="w-4 h-4" />,
           width: "half",
           important: true,
-          format: (value) => `₹${value.toLocaleString()}`,
+         format: (value) => `₹${Number(value).toLocaleString()}`,
         },
         {
           key: "consultationFee",
@@ -657,6 +658,18 @@ const DoctorsPage = ({ initialDoctors }: { initialDoctors?: DoctorResponse[] }) 
           validation: transformValidation(DOCTOR_VALIDATION_RULES.shift),
         },
         {
+          name: "workingHours.start",
+          label: "Working Hour Start",
+          type: "time",
+          width: "half",
+        },
+        {
+          name: "workingHours.end",
+          label: "Working Hour End",
+          type: "time",
+          width: "half",
+        },
+        {
           name: "availabilityDays",
           label: "Availability Days",
           type: "text",
@@ -779,6 +792,18 @@ const DoctorsPage = ({ initialDoctors }: { initialDoctors?: DoctorResponse[] }) 
           validation: transformValidation(DOCTOR_VALIDATION_RULES.shift),
         },
         {
+          name: "workingHours.start",
+          label: "Working Hour Start",
+          type: "time",
+          width: "half",
+        },
+        {
+          name: "workingHours.end",
+          label: "Working Hour End",
+          type: "time",
+          width: "half",
+        },
+        {
           name: "aadhaar",
           label: "Aadhaar Number",
           type: "text",
@@ -837,6 +862,11 @@ const DoctorsPage = ({ initialDoctors }: { initialDoctors?: DoctorResponse[] }) 
 
   // ==================== HANDLERS ====================
   const handleAddDoctor = (data: Record<string, unknown>) => {
+    const workingHours = {
+      start: String(data["workingHours.start"] || ""),
+      end: String(data["workingHours.end"] || ""),
+    };
+
     const formData: DoctorFormData = {
       name: String(data.name || ""),
       email: String(data.email || ""),
@@ -849,10 +879,11 @@ const DoctorsPage = ({ initialDoctors }: { initialDoctors?: DoctorResponse[] }) 
       department: String(data.department || ""),
       aadhaar: String(data.aadhaar || ""),
       address: String(data.address || ""),
-      experience: String(data.experience || ""),
+      experience: Number(data.experience || ""),
       consultationFee: Number(data.consultationFee),
       availabilityDays: String(data.availabilityDays || ""),
       password: data.password ? String(data.password) : undefined,
+      workingHours,
     };
 
     addDoctorMutation.mutate(formData);
@@ -889,6 +920,11 @@ const DoctorsPage = ({ initialDoctors }: { initialDoctors?: DoctorResponse[] }) 
   const handleEditDoctor = (data: Record<string, unknown>) => {
     if (!selectedDoctor) return;
 
+    const workingHours = {
+      start: String(data["workingHours.start"] || ""),
+      end: String(data["workingHours.end"] || ""),
+    };
+
     const updateData: Partial<DoctorFormData> = {
       name: String(data.name || ""),
       email: String(data.email || ""),
@@ -902,8 +938,9 @@ const DoctorsPage = ({ initialDoctors }: { initialDoctors?: DoctorResponse[] }) 
       department: String(data.department || ""),
       aadhaar: String(data.aadhaar || ""),
       address: String(data.address || ""),
-      experience: String(data.experience || ""),
+      experience: Number(data.experience || ""),
       availabilityDays: String(data.availabilityDays || ""),
+      workingHours,
     };
 
     editDoctorMutation.mutate({
