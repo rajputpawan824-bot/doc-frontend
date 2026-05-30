@@ -56,7 +56,15 @@ export default function DataTable<TData, TValue>({
 }: DataTableProps<TData, TValue>) {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
-  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
+  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>(() => {
+    return columns.reduce((visibility, column) => {
+    const columnId = column.id;
+      if (columnId === "searchIndex") {
+        visibility[columnId] = false;
+      }
+      return visibility;
+    }, {} as VisibilityState);
+  });
   const [rowSelection, setRowSelection] = useState({});
   const [globalFilter, setGlobalFilter] = useState("");
 

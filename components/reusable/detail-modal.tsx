@@ -385,6 +385,10 @@ export function transformValidation(validationRule?: ValidationRuleLike) {
   return Object.keys(transformed).length > 0 ? transformed : undefined;
 }
 
+const getNestedValue = (obj: any, path: string) => {
+  return path.split(".").reduce((acc, key) => acc?.[key], obj);
+};
+
 // ==================== MAIN COMPONENT ====================
 export default function DynamicDetailModal({
   isOpen,
@@ -580,7 +584,7 @@ export default function DynamicDetailModal({
                 {section.layout === 'list' ? (
                   <div className="space-y-4">
                     {section.fields.map((field) => {
-                      const value = data[field.key];
+                      const value = getNestedValue(data, field.key);
                       return (
                         <div key={field.key} className="flex items-start gap-4 py-2">
                           <div className="flex-shrink-0 w-32">
@@ -602,7 +606,7 @@ export default function DynamicDetailModal({
                 ) : section.layout === 'stats' ? (
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     {section.fields.map((field) => {
-                      const value = data[field.key];
+                      const value = getNestedValue(data, field.key);
                       return (
                         <div key={field.key} className="text-center p-4 bg-white rounded-lg border">
                           <div className="text-2xl font-bold mb-1" style={{ color: headerColor }}>
@@ -619,7 +623,7 @@ export default function DynamicDetailModal({
                 ) : section.layout === 'cards' ? (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {section.fields.map((field) => {
-                      const value = data[field.key];
+                      const value = getNestedValue(data, field.key);
                       return (
                         <div key={field.key} className="bg-white p-4 rounded-lg border space-y-2">
                           <div className="text-sm font-medium text-slate-700 flex items-center gap-2">
@@ -640,7 +644,7 @@ export default function DynamicDetailModal({
                   // Default grid layout
                   <div className={`grid grid-cols-1 md:grid-cols-${section.columns || 2} gap-4`}>
                     {section.fields.map((field) => {
-                      const value = data[field.key];
+                      const value = getNestedValue(data, field.key);
                       return (
                         <div 
                           key={field.key} 

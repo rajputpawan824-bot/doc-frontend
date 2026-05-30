@@ -66,6 +66,8 @@ import {
   useUpdateDoctor,
   useUpdateDoctorDisable,
   useUpdateDoctorPassword,
+  useDoctorDashboardStats,
+  type DoctorDashboardStats,
 } from "@/services/admin/doctor";
 
 // Types
@@ -99,8 +101,19 @@ const DoctorsPage = ({ initialDoctors }: { initialDoctors?: DoctorResponse[] }) 
   const queryClient = useQueryClient();
 
   // API Hooks
-  const { data: doctorsResponse, isLoading, refetch } = useDoctors();
+const {
+  data: doctorsResponse,
+  isLoading,
+  refetch: refetchDoctors,
+} = useDoctors();
+
+
   const doctors = doctorsResponse?.data || initialDoctors || [];
+ const {
+  data,
+  refetch: refetchDashboardStats,
+} = useDoctorDashboardStats();
+  const dashboardStats = data as DoctorDashboardStats | undefined;
   const {
     data: selectedDoctor,
     isLoading: isDetailLoading,
@@ -112,6 +125,7 @@ const DoctorsPage = ({ initialDoctors }: { initialDoctors?: DoctorResponse[] }) 
       toast.success("Doctor added successfully");
       setIsAddModalOpen(false);
       queryClient.invalidateQueries({ queryKey: ["doctors"] });
+      queryClient.invalidateQueries({ queryKey: ["doctors", "dashboard-stats"] });
     },
     onError: (error) => {
       toast.error(error.message || "Failed to add doctor");
@@ -125,6 +139,7 @@ const DoctorsPage = ({ initialDoctors }: { initialDoctors?: DoctorResponse[] }) 
       toast.success("Doctor updated successfully");
       setIsEditModalOpen(false);
       queryClient.invalidateQueries({ queryKey: ["doctors"] });
+      queryClient.invalidateQueries({ queryKey: ["doctors", "dashboard-stats"] });
     },
     onError: (error) => {
       toast.error(error.message || "Failed to update doctor");
@@ -135,6 +150,7 @@ const DoctorsPage = ({ initialDoctors }: { initialDoctors?: DoctorResponse[] }) 
     onSuccess: (data) => {
       toast.success(`Doctor ${data.status === "active" ? "activated" : "disabled"} successfully`);
       queryClient.invalidateQueries({ queryKey: ["doctors"] });
+      queryClient.invalidateQueries({ queryKey: ["doctors", "dashboard-stats"] });
     },
     onError: (error) => {
       toast.error(error.message || "Failed to update doctor status");
@@ -179,45 +195,39 @@ const DoctorsPage = ({ initialDoctors }: { initialDoctors?: DoctorResponse[] }) 
   const stats = [
     {
       title: "Total Doctors",
-      value: doctors.length.toString(),
+      value: (dashboardStats?.totalDoctors ?? 0).toString(),
       icon: Users,
       color: doctorColors.primary,
       bgColor: `${doctorColors.primary}15`,
-      change: "+12%",
+      //change: "+12%",
       trend: "up",
     },
     {
       title: "Active Doctors",
-      value: activeDoctors.length.toString(),
+      value: (dashboardStats?.activeDoctors ?? 0).toString(),
       icon: UserCheck,
       color: doctorColors.accent,
       bgColor: `${doctorColors.accent}15`,
-      change: "+5%",
+     // change: "+5%",
       trend: "up",
     },
     {
       title: "On Leave",
-      value: onLeaveDoctors.length.toString(),
+      value: (dashboardStats?.onLeaveDoctors ?? 0).toString(),
       icon: UserMinus,
       color: doctorColors.warning,
       bgColor: `${doctorColors.warning}15`,
-      change: "+2",
+    //  change: "+2",
       trend: "up",
     },
     {
       title: "Avg. Consultation Fee",
-      value: `₹${
-        doctors.length > 0
-          ? Math.round(
-              doctors.reduce((sum, d) => sum + d.consultationFee, 0) /
-                doctors.length,
-            )
-          : "0"
-      }`,
+      value: `₹${dashboardStats?.averageConsultationFee ?? 0}`,
       icon: IndianRupee,
       color: doctorColors.indigo,
       bgColor: `${doctorColors.indigo}15`,
-      change: "+8%",
+     // change: "+8%",
+     change:"",
       trend: "up",
     },
   ];
@@ -477,7 +487,10 @@ const DoctorsPage = ({ initialDoctors }: { initialDoctors?: DoctorResponse[] }) 
               <UserCheck className="w-4 h-4" />
             ),
           onClick: () => {
-            blockDoctorMutation.mutate(selectedDoctor.id);
+            updateDoctorMutationDisabled.mutate({
+      id: selectedDoctor.id,
+      isActive: true,
+    });
             setIsDetailModalOpen(false);
           },
         },
@@ -984,12 +997,34 @@ const DoctorsPage = ({ initialDoctors }: { initialDoctors?: DoctorResponse[] }) 
       }
     : null;
 
-  const handleRefresh = () => {
-    refetch();
-  };
+  const handleRefresh = async () => {
+  await Promise.all([
+    refetchDoctors(),
+    refetchDashboardStats(),
+  ]);
+
+  toast.success("Data refreshed");
+};
 
   // ==================== TABLE COLUMNS ====================
+  const searchColumn: ColumnDef<DoctorResponse>[] = [
+    {
+      id: "searchIndex",
+      accessorFn: (doctor) =>
+        `${doctor.user?.name ?? ""} ${doctor.user?.email ?? ""} ${doctor.user?.phone ?? ""} ${doctor.registrationNo ?? ""} ${doctor.id ?? ""}`.toLowerCase(),
+      header: "Search Index",
+      cell: () => null,
+      enableSorting: false,
+      enableHiding: true,
+      filterFn: (row, columnId, filterValue) =>
+        String(row.getValue(columnId) ?? "")
+          .toLowerCase()
+          .includes(String(filterValue ?? "").toLowerCase()),
+    },
+  ];
+
   const activeColumns: ColumnDef<DoctorResponse>[] = [
+    ...searchColumn,
     {
       accessorKey: "name",
       header: "Doctor",
@@ -1132,7 +1167,12 @@ const DoctorsPage = ({ initialDoctors }: { initialDoctors?: DoctorResponse[] }) 
             <Button
               size="sm"
               variant="destructive"
-              onClick={() => blockDoctorMutation.mutate(doctor.id)}
+            onClick={() =>
+    blockDoctorMutation.mutate({
+      id: doctor.id,
+      isActive: false,
+    })
+  }
               title="Delete doctor"
               disabled={blockDoctorMutation.isPending}
             >
@@ -1212,9 +1252,12 @@ const DoctorsPage = ({ initialDoctors }: { initialDoctors?: DoctorResponse[] }) 
             <Button
               size="sm"
               variant="outline"
-              onClick={() => {
-                updateDoctorMutationDisabled.mutate(doctor.id);
-              }}
+            onClick={() => {
+    updateDoctorMutationDisabled.mutate({
+      id: doctor.id,
+      isActive: true,
+    });
+  }}
               disabled={updateDoctorMutationDisabled.isPending}
               className="hover:bg-green-50 hover:text-green-700 hover:border-green-200"
             >
@@ -1339,7 +1382,7 @@ const DoctorsPage = ({ initialDoctors }: { initialDoctors?: DoctorResponse[] }) 
                 <DataTable
                   columns={activeColumns}
                   data={filteredDoctors.active}
-                  searchColumn="name"
+                  searchColumn="searchIndex"
                   searchPlaceholder="Search active doctors..."
                   emptyMessage={
                     <div className="text-center py-12">
@@ -1379,7 +1422,7 @@ const DoctorsPage = ({ initialDoctors }: { initialDoctors?: DoctorResponse[] }) 
                 <DataTable
                   columns={inactiveColumns}
                   data={filteredDoctors.inactive}
-                  searchColumn="name"
+                  searchColumn="searchIndex"
                   searchPlaceholder="Search inactive doctors..."
                   emptyMessage={
                     <div className="text-center py-12">
@@ -1419,7 +1462,7 @@ const DoctorsPage = ({ initialDoctors }: { initialDoctors?: DoctorResponse[] }) 
                 <DataTable
                   columns={inactiveColumns}
                   data={filteredDoctors["on-leave"]}
-                  searchColumn="name"
+                  searchColumn="searchIndex"
                   searchPlaceholder="Search doctors on leave..."
                   emptyMessage={
                     <div className="text-center py-12">

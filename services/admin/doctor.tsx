@@ -19,6 +19,13 @@ type DoctorApiRecord = Omit<DoctorResponse, "availabilityDays"> & {
   availabilityDays: DoctorAvailability;
 };
 
+export interface DoctorDashboardStats {
+  totalDoctors: number;
+  activeDoctors: number;
+  onLeaveDoctors: number;
+  averageConsultationFee: number;
+}
+
 type CreateDoctorRequest = Omit<CreateDoctorPayload, "availabilityDays"> & {
   availabilityDays: string[];
 };
@@ -248,20 +255,27 @@ export function useUpdateDoctor(options?: {
 }
 
 // In your doctor.ts validation file
+type UpdateDoctorStatusPayload = {
+  id: string;
+  isActive: boolean;
+};
+
 export function useUpdateDoctorDisable(options?: {
   onSuccess?: (data: DoctorResponse) => void;
   onError?: (error: Error) => void;
 }) {
   const queryClient = useQueryClient();
 
-  return useMutation<DoctorResponse, Error, string>({
-    mutationFn: async (id: string) => {
+  return useMutation<DoctorResponse, Error, UpdateDoctorStatusPayload>({
+    mutationFn: async ({ id, isActive }) => {
       const response: ApiResponse<{ data: DoctorResponse }> =
-        await clientApi.put(`/doctors/${id}/disable`);
+        await clientApi.put(`/doctors/${id}/disable`, {
+          isActive,
+        });
 
       if (!response.success || !response.data) {
         throw new Error(
-          getErrorMessage(response.error, "Failed to block doctor"),
+          getErrorMessage(response.error, "Failed to update doctor"),
         );
       }
 
@@ -300,3 +314,23 @@ export function useUpdateDoctorPassword() {
     },
   });
 }
+
+export const useDoctorDashboardStats = () => {
+  return useQuery({
+    queryKey: ["doctors", "dashboard-stats"],
+    queryFn: async (): Promise<DoctorDashboardStats> => {
+      const response: ApiResponse<{ data: DoctorDashboardStats }> =
+        await clientApi.get("/doctors/dashboard-stats");
+
+      if (!response.success || !response.data) {
+        throw new Error(
+          getErrorMessage(response.error, "Failed to fetch dashboard stats"),
+        );
+      }
+
+      return response.data.data;
+    },
+    retry: 2,
+    retryDelay: 1000,
+  });
+};
