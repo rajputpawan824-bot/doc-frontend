@@ -221,7 +221,9 @@ export function useUpdateReceptionistPassword(options?: {
   >({
     mutationFn: async ({ id, data }) => {
       const response: ApiResponse<{ data: ReceptionResponse }> =
-        await clientApi.put(`/receptionists/${id}/password`, data);
+        await clientApi.put(`/receptionists/password/${id}`,  {
+    newPassword: data.password,
+  });
 
       if (!response.success) {
         throw new Error(response.error || "Failed to update receptionist");
@@ -350,7 +352,7 @@ export const useToggleReceptionistStatus = () => {
   return useMutation({
     mutationFn: async ({ id, isActive }: { id: string; isActive: boolean }) => {
       const response: ApiResponse<{ data: ReceptionResponse }> =
-        await clientApi.put(`/receptionists/${id}/disable`, { isActive });
+        await clientApi.put(`/receptionists/disable/${id}`, { isActive });
 
       if (!response.success) {
         throw new Error(response.error || "Failed to update receptionist status");
