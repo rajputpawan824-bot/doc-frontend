@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertCircle, Trash2, X } from "lucide-react";
+import { AlertCircle, CheckCircle, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Modal from "./modal";
 
@@ -12,11 +12,15 @@ interface DeleteModalProps {
   description: string;
   data: Record<string, unknown>;
   isLoading?: boolean;
+  confirmLabel?: string;
+  itemHeading?: string;
+  destructive?: boolean;
 }
 
-const hospitalColors = {
+const modalColors = {
   primary: "#1a73e8",
   danger: "#ef4444",
+  success: "#16a34a",
 };
 
 export default function DeleteModal({
@@ -27,7 +31,15 @@ export default function DeleteModal({
   description,
   data,
   isLoading = false,
+  confirmLabel,
+  itemHeading,
+  destructive = true,
 }: DeleteModalProps) {
+  const buttonLabel = confirmLabel ?? (destructive ? "Disabled" : "Enable");
+  const buttonColor = destructive ? modalColors.danger : modalColors.success;
+  const headingText = itemHeading ?? "Item to be Disable:";
+  const ActionIcon = destructive ? Trash2 : CheckCircle;
+
   return (
     <Modal
       isOpen={isOpen}
@@ -48,19 +60,19 @@ export default function DeleteModal({
             onClick={onConfirm}
             disabled={isLoading}
             className="hover:scale-105 transition-transform"
-            style={{ 
-              background: `linear-gradient(135deg, ${hospitalColors.danger}, #dc2626)`,
+            style={{
+              background: `linear-gradient(135deg, ${buttonColor}, ${destructive ? "#dc2626" : "#15803d"})`,
             }}
           >
             {isLoading ? (
               <div className="flex items-center gap-2">
                 <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                Deleting...
+                {buttonLabel}...
               </div>
             ) : (
               <>
-                <Trash2 className="w-4 h-4 mr-2" />
-                Delete Permanently
+                <ActionIcon className="w-4 h-4 mr-2" />
+                {buttonLabel}
               </>
             )}
           </Button>
@@ -69,26 +81,31 @@ export default function DeleteModal({
     >
       <div className="space-y-6">
         <div className="flex items-start gap-4">
-          <div 
+          <div
             className="w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0"
-            style={{ backgroundColor: `${hospitalColors.danger}15` }}
+            style={{
+              backgroundColor: `${buttonColor}15`,
+            }}
           >
-            <AlertCircle 
-              className="w-6 h-6" 
-              style={{ color: hospitalColors.danger }}
+            <AlertCircle
+              className="w-6 h-6"
+              style={{ color: buttonColor }}
             />
           </div>
           <div>
             <p className="text-slate-700 mb-4">{description}</p>
-            <div 
+            <div
               className="p-4 rounded-lg border"
-              style={{ 
-                backgroundColor: `${hospitalColors.danger}05`,
-                borderColor: `${hospitalColors.danger}20`
+              style={{
+                backgroundColor: `${buttonColor}05`,
+                borderColor: `${buttonColor}20`,
               }}
             >
-              <h4 className="font-semibold mb-2" style={{ color: hospitalColors.danger }}>
-                Item to be deleted:
+              <h4
+                className="font-semibold mb-2"
+                style={{ color: buttonColor }}
+              >
+                {headingText}
               </h4>
               <div className="space-y-1 text-sm text-slate-600">
                 {Object.entries(data).map(([key, value]) => (
@@ -100,12 +117,6 @@ export default function DeleteModal({
               </div>
             </div>
           </div>
-        </div>
-        
-        <div className="p-4 rounded-lg bg-slate-50 border border-slate-200">
-          <p className="text-sm text-slate-600">
-            ⚠️ <span className="font-semibold">Warning:</span> This action cannot be undone. All associated data will be permanently removed.
-          </p>
         </div>
       </div>
     </Modal>

@@ -384,7 +384,7 @@ export const useTogglePatientEditPermission = () => {
       canEditPatient: boolean; // Singular
     }) => {
       const response: ApiResponse<{ data: ReceptionResponse }> =
-        await clientApi.put(`/receptionists/${id}/permissions`, {
+        await clientApi.put(`/receptionists/${id}/patient-edit-permission`, {
           canEditPatient, // Singular in API payload
         });
 

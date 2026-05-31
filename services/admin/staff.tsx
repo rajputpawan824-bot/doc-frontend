@@ -71,6 +71,14 @@ export interface StaffListResponse {
   total?: number;
 }
 
+export interface StaffDashboardStats {
+  total?: number;
+  active?: number;
+  inactive?: number;
+  totalSalary?: number;
+  categoryCounts?: Record<string, number>;
+}
+
 export function useAddStaff(options?: {
   onSuccess?: (data: StaffResponse) => void;
   onError?: (error: Error) => void;
@@ -98,6 +106,7 @@ export function useAddStaff(options?: {
         ...(formData.password && { password: formData.password }),
       };
 
+      console.log("CREATE STAFF PAYLOAD", payload);
       const response: ApiResponse<{ data: StaffResponse }> =
         await clientApi.post("/staff/create-staff", payload);
 
@@ -449,6 +458,10 @@ export function useUpdateStaffPassword(options?: {
     onError: options?.onError,
   });
 }
+type DisableStaffPayload = {
+  id: string;
+  isActive: boolean;
+};
 
 export function useDisableStaff(options?: {
   onSuccess?: (data: StaffResponse) => void;
@@ -456,10 +469,12 @@ export function useDisableStaff(options?: {
 }) {
   const queryClient = useQueryClient();
 
-  return useMutation<StaffResponse, Error, string>({
-    mutationFn: async (id: string) => {
+  return useMutation<StaffResponse, Error, DisableStaffPayload>({
+    mutationFn: async ({ id, isActive }) => {
       const response: ApiResponse<{ data: StaffResponse }> =
-        await clientApi.put(`/staff/${id}/disable`);
+        await clientApi.put(`/staff/disable/${id}`, {
+          isActive,
+        });
 
       if (!response.success) {
         throw new Error(response.error || "Failed to disable staff");
@@ -487,10 +502,10 @@ export function useEnableStaff(options?: {
 }) {
   const queryClient = useQueryClient();
 
-  return useMutation<StaffResponse, Error, string>({
-    mutationFn: async (id: string) => {
+  return useMutation<StaffResponse, Error, DisableStaffPayload>({
+    mutationFn: async ({ id, isActive }) => {
       const response: ApiResponse<{ data: StaffResponse }> =
-        await clientApi.put(`/staff/${id}`, { isActive: true });
+        await clientApi.put(`/staff/disable/${id}`, { isActive });
 
       if (!response.success) {
         throw new Error(response.error || "Failed to enable staff");
@@ -567,46 +582,29 @@ export function useSearchStaff(searchTerm: string, category?: StaffCategory) {
   });
 }
 
-// Hook to get staff statistics — uses /staff/all-staff to calculate
-export function useStaffStats() {
-  return useQuery({
-    queryKey: ["staff-stats"],
+export function useStaffDashboardStats() {
+  return useQuery<StaffDashboardStats>({
+    queryKey: ["staff", "dashboard-stats"],
     queryFn: async () => {
-      // Get all staff to calculate stats
-      const response = await clientApi.get<RawStaffListResponse>(
-        "/staff/all-staff",
-      );
+      const response: ApiResponse<{ data: StaffDashboardStats }> =
+        await clientApi.get("/staff/dashboard-stats");
 
-      if (!response.success || !response.data) {
-        throw new Error("Failed to fetch staff statistics");
+      if (!response.success) {
+        throw new Error(response.error || "Failed to fetch dashboard stats");
+      }
+      if (!response.data) {
+        throw new Error("No data received from server");
       }
 
-      const staffList: RawStaff[] = response.data.data ?? [];
-
-      // Calculate statistics
-      const totalStaff = staffList.length;
-      const activeStaff = staffList.filter((s) => s.user?.isActive ?? false).length;
-      const inactiveStaff = totalStaff - activeStaff;
-
-      // Count by category
-      const categoryCounts: Record<string, number> = {};
-      staffList.forEach((staff) => {
-        categoryCounts[staff.category] =
-          (categoryCounts[staff.category] || 0) + 1;
-      });
-
-      // Calculate total payroll
-      const totalSalary = staffList.reduce(
-        (sum, staff) => sum + (staff.salary || 0),
-        0,
-      );
+      const data = response.data.data;
 
       return {
-        total: totalStaff,
-        active: activeStaff,
-        inactive: inactiveStaff,
-        categoryCounts,
-        totalSalary,
+        total: data.total ?? (data as any).totalStaff ?? 0,
+        active: data.active ?? (data as any).activeStaff ?? 0,
+        inactive: data.inactive ?? (data as any).inactiveStaff ?? 0,
+        totalSalary:
+          data.totalSalary ?? (data as any).totalPayroll ?? (data as any).totalSalary ?? 0,
+        categoryCounts: data.categoryCounts ?? (data as any).countByCategory ?? {},
       };
     },
     retry: 2,
