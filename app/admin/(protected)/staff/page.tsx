@@ -79,7 +79,7 @@ import {
   useUpdateStaff,
   useDisableStaff,
   useEnableStaff,
-  useStaffStats,
+  useStaffDashboardStats,
   useActiveStaff,
   useInactiveStaff,
   useAllStaff,
@@ -336,14 +336,18 @@ const StaffManagement = () => {
     refetch,
   } = useStaff({ status: filterActive });
 
-  const { data: staffStats, isLoading: isStatsLoading } = useStaffStats();
+  const {
+    data: staffStats,
+    isLoading: isStatsLoading,
+    refetch: refetchStaffStats,
+  } = useStaffDashboardStats();
 
   const addStaffMutation = useAddStaff({
     onSuccess: (data) => {
       toast.success("Staff created successfully");
       setModalOpen(false);
       queryClient.invalidateQueries({ queryKey: ["staff"] });
-      queryClient.invalidateQueries({ queryKey: ["staff-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["staff", "dashboard-stats"] });
     },
     onError: (error) => {
       toast.error(error.message || "Failed to add staff");
@@ -356,7 +360,7 @@ const StaffManagement = () => {
       setModalOpen(false);
       setEditingStaff(null);
       queryClient.invalidateQueries({ queryKey: ["staff"] });
-      queryClient.invalidateQueries({ queryKey: ["staff-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["staff", "dashboard-stats"] });
     },
     onError: (error) => {
       toast.error(error.message || "Failed to update staff");
@@ -369,7 +373,7 @@ const StaffManagement = () => {
       setDeleteModalOpen(false);
       setStaffToDelete(null);
       queryClient.invalidateQueries({ queryKey: ["staff"] });
-      queryClient.invalidateQueries({ queryKey: ["staff-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["staff", "dashboard-stats"] });
     },
     onError: (error) => {
       console.log(error);
@@ -383,7 +387,7 @@ const StaffManagement = () => {
       setDeleteModalOpen(false);
       setStaffToDelete(null);
       queryClient.invalidateQueries({ queryKey: ["staff"] });
-      queryClient.invalidateQueries({ queryKey: ["staff-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["staff", "dashboard-stats"] });
     },
     onError: (error) => {
       toast.error(error.message || "Failed to enable staff");
@@ -393,15 +397,18 @@ const StaffManagement = () => {
   // Get staff data from API response
   const staff = staffResponse?.data || [];
 
-  const filteredStaff = useMemo(() => {
-    let result = staff;
+
+
+  const staffList: StaffMember[] = (staffResponse?.data || []) as StaffMember[];
+  const filteredStaff = useMemo<StaffMember[]>(() => {
+    let result = staffList;
 
     if (viewMode === "other") {
       result = result.filter((s) => s.category !== "DOCTOR");
     }
 
     return result;
-  }, [staff, viewMode]);
+  }, [staffList, viewMode]);
 
   // Stats data
   const stats = [
@@ -414,7 +421,7 @@ const StaffManagement = () => {
     },
     {
       title: "Inactive Staff",
-      value: staffStats?.categoryCounts?.DOCTOR?.toString() || "0",
+      value: staffStats?.inactive?.toString() || "0",
       icon: Stethoscope,
       color: "text-indigo-600",
       bgColor: "bg-indigo-100",
@@ -617,14 +624,15 @@ const StaffManagement = () => {
                   <UserMinus className="h-4 w-4 mr-2" />
                   Disable
                 </DropdownMenuItem>
-              ) : // <DropdownMenuItem
-                //   onClick={() => handleEnableStaff(staff)}
-                //   className="text-green-600"
-                // >
-                //   <UserPlus className="h-4 w-4 mr-2" />
-                //   Enable
-                // </DropdownMenuItem>
-                null}
+              ) : (
+                <DropdownMenuItem
+                  onClick={() => handleEnableStaff(staff)}
+                  className="text-green-600"
+                >
+                  <UserPlus className="h-4 w-4 mr-2" />
+                  Reactivate
+                </DropdownMenuItem>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
         );
@@ -679,19 +687,22 @@ const StaffManagement = () => {
           type: "badge",
           icon: <Users className="w-4 h-4" />,
           width: "half",
-          format: (value) => (
-            <Badge
-              className={
-                value === "MALE"
-                  ? "bg-blue-100 text-blue-800"
-                  : value === "FEMALE"
-                    ? "bg-pink-100 text-pink-800"
-                    : "bg-purple-100 text-purple-800"
-              }
-            >
-              {value}
-            </Badge>
-          ),
+          format: (value) => {
+            const genderValue = typeof value === "string" ? value : "";
+            return (
+              <Badge
+                className={
+                  genderValue === "MALE"
+                    ? "bg-blue-100 text-blue-800"
+                    : genderValue === "FEMALE"
+                      ? "bg-pink-100 text-pink-800"
+                      : "bg-purple-100 text-purple-800"
+                }
+              >
+                {genderValue}
+              </Badge>
+            );
+          },
         },
         {
           key: "aadhaar",
@@ -699,7 +710,10 @@ const StaffManagement = () => {
           type: "text",
           icon: <Shield className="w-4 h-4" />,
           width: "half",
-          format: formatAadhaarNumber,
+          format: (value) => {
+            const aadhaarValue = typeof value === "string" ? value : "";
+            return formatAadhaarNumber(aadhaarValue);
+          },
         },
         {
           key: "address",
@@ -728,18 +742,24 @@ const StaffManagement = () => {
           width: "full",
           important: true,
         },
-        {
-          key: "category",
-          label: "Category",
-          type: "badge",
-          icon: <Users className="w-4 h-4" />,
-          width: "half",
-          format: (value) => (
-            <Badge className={getCategoryColor(value)}>
-              {value.replace("_", " ")}
-            </Badge>
-          ),
-        },
+          {
+            key: "category",
+            label: "Category",
+            type: "badge",
+            icon: <Users className="w-4 h-4" />,
+            width: "half",
+            format: (value) => {
+              const categoryValue =
+                typeof value === "string"
+                  ? (value as StaffCategory)
+                  : ("ADMIN" as StaffCategory);
+              return (
+                <Badge className={getCategoryColor(categoryValue)}>
+                  {categoryValue.replace("_", " ")}
+                </Badge>
+              );
+            },
+          },
         {
           key: "department",
           label: "Department",
@@ -787,14 +807,13 @@ const StaffManagement = () => {
           type: "badge",
           icon: <Clock className="w-4 h-4" />,
           width: "half",
-
-          // In the detailSections section, update the format function for shift:
-          format: (value: string) => {
+          format: (value) => {
+            const shiftValue = typeof value === "string" ? value : "";
             return (
               <Badge
-                className={shiftColors[value] || "bg-gray-100 text-gray-800"}
+                className={shiftColors[shiftValue] || "bg-gray-100 text-gray-800"}
               >
-                {value}
+                {shiftValue}
               </Badge>
             );
           },
@@ -806,7 +825,10 @@ const StaffManagement = () => {
           icon: <IndianRupee className="w-4 h-4" />,
           width: "half",
           important: true,
-          format: (value) => `₹${value.toLocaleString("en-IN")}`,
+          format: (value) => {
+            const amount = typeof value === "number" ? value : Number(value || 0);
+            return `₹${amount.toLocaleString("en-IN")}`;
+          },
         },
         {
           key: "staffCode",
@@ -872,7 +894,8 @@ const StaffManagement = () => {
           type: "datetime",
           icon: <Clock className="w-4 h-4" />,
           width: "half",
-          format: (value) => value || "Never logged in",
+          format: (value) =>
+            typeof value === "string" && value ? value : "Never logged in",
         },
       ],
     },
@@ -924,11 +947,21 @@ const StaffManagement = () => {
         gender: data.gender as StaffFormData["gender"],
         aadhaar: String(data.aadhaar || ""),
         address: String(data.address || ""),
-        ...(data.department && { department: String(data.department) }),
-        ...(data.registrationNo && { registrationNo: String(data.registrationNo) }),
-        ...(data.staffCode && { staffCode: String(data.staffCode) }),
-        ...(data.joiningDate && { joiningDate: String(data.joiningDate) }),
-        ...(data.roleBadge && { roleBadge: String(data.roleBadge) }),
+       ...(typeof data.department === "string" && {
+  department: data.department,
+}),
+...(typeof data.registrationNo === "string" && {
+  registrationNo: data.registrationNo,
+}),
+...(typeof data.staffCode === "string" && {
+  staffCode: data.staffCode,
+}),
+...(typeof data.joiningDate === "string" && {
+  joiningDate: data.joiningDate,
+}),
+...(typeof data.roleBadge === "string" && {
+  roleBadge: data.roleBadge,
+}),
       };
 
       addStaffMutation.mutate(formData);
@@ -940,16 +973,16 @@ const StaffManagement = () => {
       const isActive = staffToDelete.user?.isActive || staffToDelete.isActive;
 
       if (isActive) {
-        disableStaffMutation.mutate(staffToDelete?.id);
+        disableStaffMutation.mutate({ id: staffToDelete.id, isActive: false });
       } else {
-        enableStaffMutation.mutate(staffToDelete.id);
+        enableStaffMutation.mutate({ id: staffToDelete.id, isActive: true });
       }
     }
   };
 
   const handleRefresh = () => {
     refetch();
-    queryClient.invalidateQueries({ queryKey: ["staff-stats"] });
+    refetchStaffStats();
   };
 
   // Get initial form data for editing
@@ -1168,12 +1201,24 @@ const StaffManagement = () => {
             ? `Are you sure you want to disable ${staffToDelete?.user?.name || staffToDelete?.name}? They will no longer be able to access the system.`
             : `Are you sure you want to enable ${staffToDelete?.user?.name || staffToDelete?.name}? They will regain access to the system.`
         }
+        confirmLabel={
+          staffToDelete?.user?.isActive || staffToDelete?.isActive
+            ? "Disable"
+            : "Enable"
+        }
+        itemHeading={
+          staffToDelete?.user?.isActive || staffToDelete?.isActive
+            ? "Item to be disable:"
+            : "Item to be enabled:"
+        }
+        destructive={
+          staffToDelete?.user?.isActive || staffToDelete?.isActive
+        }
         data={{
           Name: staffToDelete?.user?.name || staffToDelete?.name,
           Category: staffToDelete?.category?.replace("_", " "),
           Email: staffToDelete?.user?.email || staffToDelete?.email,
         }}
-
         isLoading={
           staffToDelete?.user?.isActive || staffToDelete?.isActive
             ? disableStaffMutation.isPending
@@ -1189,7 +1234,7 @@ const StaffManagement = () => {
         }}
         title="Staff Details"
         subtitle={selectedStaff?.category?.replace("_", " ")}
-        data={selectedStaff}
+        data={selectedStaff as Record<string, unknown> | undefined}
         sections={detailSections}
         // actions={detailActions}
         size="xl"
