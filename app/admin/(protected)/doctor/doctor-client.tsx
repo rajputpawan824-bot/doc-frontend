@@ -248,7 +248,7 @@ const {
   //               <Badge
   //                 className={shiftColors[value] || "bg-gray-100 text-gray-800"}
   //               >
-  //                 {value}
+  //                 {String(value ?? "")}
   //               </Badge>
   //             );
   //           },
@@ -399,7 +399,7 @@ const {
           type: "currency",
           icon: <IndianRupee className="w-4 h-4" />,
           width: "half",
-          format: (value) => `₹${value}`,
+          format: (value) => `₹${String(value ?? "")}`,
         },
       ],
     },

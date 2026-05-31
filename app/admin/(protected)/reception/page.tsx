@@ -37,6 +37,7 @@ import { Badge } from "@/components/ui/badge";
 import DataTable from "@/components/reusable/data-table";
 import ReusableModal, {
   FormSection,
+  ReusableFormData,
 } from "@/components/reusable/reusable-modal";
 import { ColumnDef } from "@tanstack/react-table";
 import { Switch } from "@/components/ui/switch";
@@ -80,10 +81,38 @@ const ReceptionistManagement = () => {
   >(null);
   const queryClient = useQueryClient();
 
+  
+
   // API Hooks
   const { data: receptionists = [], isLoading, refetch } = useReceptionists();
   const { data: deactivatedReceptionists = [], refetch: refetchDeactivated } =
     useDeactivatedReceptionists();
+
+  const isString = (value: unknown): value is string =>
+    typeof value === "string";
+
+  const isReceptionist = (item: unknown): item is Receptionist => {
+    if (!item || typeof item !== "object") return false;
+    const receptionist = item as Receptionist;
+
+    return (
+      isString(receptionist.id) &&
+      receptionist.id.trim().length > 0 &&
+      isString(receptionist.userId) &&
+      receptionist.userId.trim().length > 0 &&
+      isString(receptionist.name) &&
+      isString(receptionist.email) &&
+      isString(receptionist.phoneNumber) &&
+      typeof receptionist.isActive === "boolean" &&
+      receptionist.createdAt instanceof Date &&
+      receptionist.updatedAt instanceof Date
+    );
+  };
+
+  const validReceptionists = receptionists.filter(isReceptionist) as Receptionist[];
+  const validDeactivatedReceptionists = deactivatedReceptionists.filter(
+    isReceptionist,
+  ) as Receptionist[];
 
   // Fetch detailed receptionist data by ID
   const {
@@ -112,18 +141,21 @@ const ReceptionistManagement = () => {
       refetchDeactivated();
     }
   }, [activeTab, refetchDeactivated]);
+const activeReceptionists = validReceptionists.filter(
+  (r) => r.isActive === true,
+);
 
-  const filteredActiveReceptionists = receptionists.filter(
-    (r) =>
-      !searchQuery ||
-      r.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      r.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      r.phoneNumber.includes(searchQuery) ||
-      (r.deskNumber &&
-        r.deskNumber.toLowerCase().includes(searchQuery.toLowerCase())),
-  );
+const filteredActiveReceptionists = activeReceptionists.filter(
+  (r) =>
+    !searchQuery ||
+    r.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    r.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    r.phoneNumber.includes(searchQuery) ||
+    (r.deskNumber &&
+      r.deskNumber.toLowerCase().includes(searchQuery.toLowerCase())),
+);
 
-  const filteredDeactivatedReceptionists = deactivatedReceptionists.filter(
+  const filteredDeactivatedReceptionists = validDeactivatedReceptionists.filter(
     (r) =>
       !searchQuery ||
       r.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -178,11 +210,16 @@ const ReceptionistManagement = () => {
           type: "text",
           icon: <Shield className="w-4 h-4" />,
           width: "half",
-          format: (value) => {
-            if (!value) return "N/A";
-            // Format as XXXX XXXX XXXX
-            return value.replace(/(\d{4})(\d{4})(\d{4})/, "$1 $2 $3");
-          },
+      format: (value) => {
+  const aadhaar = String(value ?? "");
+
+  if (!aadhaar) return "-";
+
+  return aadhaar.replace(
+    /(\d{4})(\d{4})(\d{4})/,
+    "$1 $2 $3"
+  );
+},
         },
         {
           key: "address",
@@ -227,7 +264,7 @@ const ReceptionistManagement = () => {
                     : "bg-indigo-100 text-indigo-800"
               }
             >
-              {value}
+              {String(value ?? "")}
             </Badge>
           ),
         },
@@ -333,61 +370,76 @@ const ReceptionistManagement = () => {
     },
   ];
 
-  const detailActions: ActionButton[] = selectedReceptionist
-    ? [
-        {
-          label: "Edit Details",
-          variant: "outline",
-          icon: <UserCog className="w-4 h-4" />,
-          onClick: (data) => {
-            setIsDetailModalOpen(false);
-            setIsEditModalOpen(true);
+  const detailActions: ActionButton[] =
+    selectedReceptionist && isReceptionist(selectedReceptionist)
+      ? [
+          {
+            label: "Edit Details",
+            variant: "outline",
+            icon: <UserCog className="w-4 h-4" />,
+            onClick: (data) => {
+              setIsDetailModalOpen(false);
+              setIsEditModalOpen(true);
+            },
           },
-        },
-        {
-          label: getCanEditPatientStatus(selectedReceptionist)
-            ? "Disable Patient Edit"
-            : "Enable Patient Edit",
-          variant: "secondary",
-          icon: <UserCog className="w-4 h-4" />,
-          onClick: (data) => {
-            handleTogglePatientEditMode(
-              data.id,
-              getCanEditPatientStatus(selectedReceptionist),
-            );
+          {
+            label: getCanEditPatientStatus(selectedReceptionist)
+              ? "Disable Patient Edit"
+              : "Enable Patient Edit",
+            variant: "secondary",
+            icon: <UserCog className="w-4 h-4" />,
+            onClick: (data) => {
+              const receptionistId =
+                typeof data.id === "string"
+                  ? data.id
+                  : selectedReceptionist.id;
+
+              if (!receptionistId) return;
+
+              handleTogglePatientEditMode(
+                receptionistId,
+                getCanEditPatientStatus(selectedReceptionist),
+              );
+            },
+            loading: togglePermissionMutation.isPending,
           },
-          loading: togglePermissionMutation.isPending,
-        },
-        {
-          label: selectedReceptionist.isActive ? "Deactivate" : "Activate",
-          variant: selectedReceptionist.isActive ? "destructive" : "default",
-          icon: selectedReceptionist.isActive ? (
-            <UserMinus className="w-4 h-4" />
-          ) : (
-            <UserCheck className="w-4 h-4" />
-          ),
-          onClick: (data) => {
-            if (selectedReceptionist.isActive) {
-              handleDeactivate(data.id);
-            } else {
-              handleReactivate(data.id);
-            }
-          },
-          loading: toggleStatusMutation.isPending,
-          confirm: selectedReceptionist.isActive
-            ? {
-                title: "Deactivate Receptionist",
-                message:
-                  "Are you sure you want to deactivate this receptionist? They will lose access to the system.",
+          {
+            label: selectedReceptionist.isActive ? "Deactivate" : "Activate",
+            variant: selectedReceptionist.isActive ? "destructive" : "default",
+            icon: selectedReceptionist.isActive ? (
+              <UserMinus className="w-4 h-4" />
+            ) : (
+              <UserCheck className="w-4 h-4" />
+            ),
+            onClick: (data) => {
+              const receptionistId =
+                typeof data.id === "string"
+                  ? data.id
+                  : selectedReceptionist.id;
+
+              if (!receptionistId) return;
+
+              if (selectedReceptionist.isActive) {
+                handleDeactivate(receptionistId);
+              } else {
+                handleReactivate(receptionistId);
               }
-            : {
-                title: "Activate Receptionist",
-                message:
-                  "Are you sure you want to reactivate this receptionist?",
-              },
-        },
-      ]
-    : [];
+            },
+            loading: toggleStatusMutation.isPending,
+            confirm: selectedReceptionist.isActive
+              ? {
+                  title: "Deactivate Receptionist",
+                  message:
+                    "Are you sure you want to deactivate this receptionist? They will lose access to the system.",
+                }
+              : {
+                  title: "Activate Receptionist",
+                  message:
+                    "Are you sure you want to reactivate this receptionist?",
+                },
+          },
+        ]
+      : [];
 
   // ==================== FORM SECTIONS ====================
   const addFormSections: FormSection[] = [
@@ -658,19 +710,32 @@ const ReceptionistManagement = () => {
   ];
 
   // ==================== HANDLERS ====================
-  const handleAddReceptionist = (data: ReceptionFormData) => {
+  const handleAddReceptionist = (data: ReusableFormData) => {
+    if (
+      !isString(data.name) ||
+      !isString(data.email) ||
+      !isString(data.phone) ||
+      !isString(data.experience) ||
+      !isString(data.shift) ||
+      !isString(data.gender) ||
+      !isString(data.aadhaar) ||
+      !isString(data.address)
+    ) {
+      return;
+    }
+
     const formData: ReceptionFormData = {
       name: data.name,
       email: data.email,
       phone: data.phone,
       experience: data.experience,
       salary: Number(data.salary),
-      shift: data.shift,
-      gender: data.gender,
+      shift: data.shift as ReceptionFormData["shift"],
+      gender: data.gender as ReceptionFormData["gender"],
       aadhaar: data.aadhaar,
       address: data.address,
-      deskNumber: data.deskNumber,
-      shiftTiming: data.shiftTiming,
+      deskNumber: isString(data.deskNumber) ? data.deskNumber : "",
+      shiftTiming: isString(data.shiftTiming) ? data.shiftTiming : "",
     };
 
     addReceptionMutation.mutate(formData);
@@ -702,31 +767,36 @@ const ReceptionistManagement = () => {
     },
   });
 
-  const handleEditReceptionist = (data: ReceptionFormData) => {
-    if (!selectedReceptionist) return;
+  const handleEditReceptionist = (data: ReusableFormData) => {
+    if (!selectedReceptionist || typeof selectedReceptionist.id !== "string")
+      return;
 
-    const updateData: Partial<ReceptionFormData> = {
-      name: data.name,
-      salary: Number(data.salary),
-      shift: data.shift,
-      phone: data.phone,
-      gender: data.gender,
-      aadhaar: data.aadhaar,
-      address: data.address,
-      experience: data.experience,
-      deskNumber: data.deskNumber,
-      shiftTiming: data.shiftTiming,
-      ...(data.password && { password: data.password }),
-    };
+    const receptionistId = selectedReceptionist.id;
+    const updateData: Partial<ReceptionFormData> = {};
 
-    if (data.password)
+    if (isString(data.name)) updateData.name = data.name;
+    if (isString(data.salary) || typeof data.salary === "number")
+      updateData.salary = Number(data.salary);
+    if (isString(data.shift))
+      updateData.shift = data.shift as ReceptionFormData["shift"];
+    if (isString(data.phone)) updateData.phone = data.phone;
+    if (isString(data.gender))
+      updateData.gender = data.gender as ReceptionFormData["gender"];
+    if (isString(data.aadhaar)) updateData.aadhaar = data.aadhaar;
+    if (isString(data.address)) updateData.address = data.address;
+    if (isString(data.experience)) updateData.experience = data.experience;
+    if (isString(data.deskNumber)) updateData.deskNumber = data.deskNumber;
+    if (isString(data.shiftTiming)) updateData.shiftTiming = data.shiftTiming;
+    if (isString(data.password)) updateData.password = data.password;
+
+    if (isString(data.password))
       updateReceptionMutationPassword.mutate({
-        id: selectedReceptionist.id,
+        id: receptionistId,
         data: { password: data.password },
       });
 
     updateReceptionMutation.mutate({
-      id: selectedReceptionist.id,
+      id: receptionistId,
       data: updateData,
     });
   };
