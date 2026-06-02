@@ -99,21 +99,29 @@ export const useCreateLeave = (options?: {
 
   return useMutation<LeaveResponse, Error, LeaveFormData>({
     mutationFn: async (formData: LeaveFormData) => {
+      console.log("[DEBUG] 6. MUTATION FN EXECUTED - formData:", formData);
+      
       const payload: LeaveRequest = {
-        staffId: formData.staffId,
+        ...(formData.userId ? { userId: formData.userId.trim() } : {}),
         leaveType: formData.leaveType,
-        startDate: formData.startDate,
-        endDate: formData.endDate,
+        fromDate: formData.fromDate,
+        toDate: formData.toDate,
         reason: formData.reason.trim(),
         emergencyContact: formData.emergencyContact?.trim(),
-        halfDay: formData.halfDay,
         isHalfDay: formData.isHalfDay,
+        ...(formData.isHalfDay && formData.halfDayType
+          ? { halfDayType: formData.halfDayType }
+          : {}),
       };
 
+      console.log("[DEBUG] LEAVE PAYLOAD", payload);
+
       const response = await clientApi.post<{ data: LeaveResponse }>(
-        "/leave/create-leave",
+        "/leave/apply-leave",
         payload,
       );
+
+      console.log("[DEBUG] 8. AFTER POST - Response:", response);
 
       if (!response.success) {
         throw new Error(response.error || "Failed to create leave");
@@ -146,12 +154,12 @@ export const useApproveLeave = (options?: {
   return useMutation<
     LeaveResponse,
     Error,
-    { leaveId: string; rejectionReason?: string }
+    { leaveId: string; isPaid: boolean }
   >({
-    mutationFn: async ({ leaveId, rejectionReason }) => {
+    mutationFn: async ({ leaveId, isPaid }) => {
       const payload: LeaveApprovalPayload = {
         status: "APPROVED",
-        rejectionReason,
+        isPaid,
       };
 
       const response = await clientApi.put<{ data: LeaveResponse }>(
@@ -336,7 +344,7 @@ export const useLeaveStats = (options?: {
         const response = await clientApi.get<{
           data: {
             totalLeaves: number;
-            pendingApprovals: number;
+            pendingLeaves: number;
             approvedToday: number;
             onLeaveToday: number;
             upcomingLeaves: number;

@@ -105,11 +105,20 @@ export default function LoginClient() {
     }));
   };
 
+  const loginEndpoint =
+    selectedRole === "doctor"
+      ? "/doctors/login"
+      : selectedRole === "staff" || selectedRole === "nurse"
+      ? "/staff/login"
+      : selectedRole === "receptionist"
+      ? "/receptionists/login"
+      : "/admins/login";
+
   const {
     mutate: login,
     isPending: isLoading,
     error,
-  } = useApiMutation<LoginResponse, LoginFormData>("/admins/login", "POST", {
+  } = useApiMutation<LoginResponse, LoginFormData>(loginEndpoint, "POST", {
     onSuccess: async (data: LoginResponse & { access_token?: string; refresh_token?: string }) => {
       // ✅ Save the token into cookies so clientApi can read it on every request
       const token = data?.token ?? data?.access_token;

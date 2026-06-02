@@ -25,10 +25,22 @@ import {
   LeaveType, 
   HalfDayType 
 } from "@/lib/validations/Admin/leave";
+import { useCreateLeave } from "@/services/admin/leave";
 import { format } from "date-fns";
 
 export default function DoctorLeavePage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
+  
+  // [DEBUGGING] Initialize mutation hook
+  const createLeaveMutation = useCreateLeave({
+    onSuccess: (data) => {
+      console.log("[DEBUG] Mutation SUCCESS - Leave created:", data);
+      setIsModalOpen(false);
+    },
+    onError: (error) => {
+      console.error("[DEBUG] Mutation ERROR:", error);
+    },
+  });
 
   // Mock Summary Data
   const leaveBalance = {
@@ -44,7 +56,7 @@ export default function DoctorLeavePage() {
       _id: "1",
       staffId: "D001",
       staffName: "Dr. John Smith",
-      leaveType: "SICK_LEAVE",
+      leaveType: "SICK",
       fromDate: "2026-05-10",
       toDate: "2026-05-12",
       numberOfDays: 3,
@@ -59,7 +71,7 @@ export default function DoctorLeavePage() {
       _id: "2",
       staffId: "D001",
       staffName: "Dr. John Smith",
-      leaveType: "CASUAL_LEAVE",
+      leaveType: "CASUAL",
       fromDate: "2026-05-20",
       toDate: "2026-05-20",
       numberOfDays: 1,
@@ -74,7 +86,7 @@ export default function DoctorLeavePage() {
       _id: "3",
       staffId: "D001",
       staffName: "Dr. John Smith",
-      leaveType: "HALF_DAY",
+      leaveType: "EMERGENCY",
       fromDate: "2026-04-15",
       toDate: "2026-04-15",
       numberOfDays: 0.5,
@@ -171,11 +183,9 @@ export default function DoctorLeavePage() {
       type: "select",
       required: true,
       options: [
-        { label: "Paid Leave", value: "PAID_LEAVE" },
-        { label: "Sick Leave", value: "SICK_LEAVE" },
-        { label: "Casual Leave", value: "CASUAL_LEAVE" },
-        { label: "Emergency Leave", value: "EMERGENCY_LEAVE" },
-        { label: "Half Day", value: "HALF_DAY" },
+        { label: "Sick Leave", value: "SICK" },
+        { label: "Casual Leave", value: "CASUAL" },
+        { label: "Emergency Leave", value: "EMERGENCY" },
       ],
       width: "half",
     },
@@ -187,14 +197,14 @@ export default function DoctorLeavePage() {
       width: "half",
     },
     {
-      name: "startDate",
+      name: "fromDate",
       label: "Start Date",
       type: "date",
       required: true,
       width: "half",
     },
     {
-      name: "endDate",
+      name: "toDate",
       label: "End Date",
       type: "date",
       required: true,
@@ -205,9 +215,10 @@ export default function DoctorLeavePage() {
       label: "Half Day Leave",
       type: "checkbox",
       width: "half",
+      defaultValue: false,
     },
     {
-      name: "halfDay",
+      name: "halfDayType",
       label: "Shift Option",
       type: "select",
       options: [
@@ -215,6 +226,8 @@ export default function DoctorLeavePage() {
         { label: "Second Half", value: "SECOND_HALF" },
       ],
       width: "half",
+      hidden: (formData) => !Boolean(formData.isHalfDay),
+      required: (formData) => Boolean(formData.isHalfDay),
     },
     {
       name: "reason",
@@ -227,8 +240,18 @@ export default function DoctorLeavePage() {
   ];
 
   const handleApplyLeave = (data: any) => {
-    console.log("Applying leave:", data);
-    setIsModalOpen(false);
+    console.log("[DEBUG] 1. FORM SUBMIT TRIGGERED - Form data:", data);
+    console.log("[DEBUG] 2. FORM SUBMIT - About to call mutate()");
+    console.log("[DEBUG] 3. Mutation hook status before mutate:", createLeaveMutation.status);
+    console.log("[DEBUG] 4. Payload being sent:", JSON.stringify(data, null, 2));
+    
+    // Call the mutation
+    try {
+      createLeaveMutation.mutate(data);
+      console.log("[DEBUG] 5. mutate() called successfully");
+    } catch (err) {
+      console.error("[DEBUG] 5. ERROR calling mutate():", err);
+    }
   };
 
   return (
@@ -238,7 +261,10 @@ export default function DoctorLeavePage() {
           <h1 className="text-2xl font-bold text-slate-900">Leave Management</h1>
           <p className="text-slate-500">Apply for leave and track your leave history</p>
         </div>
-        <Button className="gap-2 bg-blue-600 hover:bg-blue-700" onClick={() => setIsModalOpen(true)}>
+        <Button className="gap-2 bg-blue-600 hover:bg-blue-700" onClick={() => {
+          console.log("[DEBUG] 0. APPLY LEAVE BUTTON CLICKED");
+          setIsModalOpen(true);
+        }}>
           <Plus className="h-4 w-4" />
           Apply Leave
         </Button>

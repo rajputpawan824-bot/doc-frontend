@@ -13,13 +13,13 @@ export interface FieldConfig {
   name: string;
   label: string;
   type: FieldType;
-  required?: boolean;
+  required?: boolean | ((formData: ReusableFormData) => boolean);
   placeholder?: string;
   options?: Array<{ value: string; label: string; color?: string }>;
   width?: "full" | "half" | "third" | "quarter";
   defaultValue?: FormDataValue;
   disabled?: boolean;
-  hidden?: boolean;
+  hidden?: boolean | ((formData: ReusableFormData) => boolean);
   rows?: number; // For textarea
   min?: number; // For number input
   max?: number; // For number input
@@ -168,15 +168,29 @@ function ReusableModalContent({
   );
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  const validateField = (name: string, value: FormDataValue): string | null => {
+  const validateField = (
+    name: string,
+    value: FormDataValue,
+    currentFormData: ReusableFormData,
+  ): string | null => {
     const field = allFields.find(f => f.name === name);
-    if (!field || !field.validation) return null;
+    if (!field) return null;
 
-    const { validation } = field;
+    const isHidden = typeof field.hidden === "function"
+      ? field.hidden(currentFormData)
+      : field.hidden;
+    if (isHidden) return null;
 
-    if (field.required && (value === "" || value === null || value === undefined)) {
+    const required = typeof field.required === "function"
+      ? field.required(currentFormData)
+      : field.required;
+
+    if (required && (value === "" || value === null || value === undefined)) {
       return `${field.label} is required`;
     }
+
+    const { validation } = field;
+    if (!validation) return null;
 
     if (validation.minLength && String(value).length < validation.minLength) {
       return `${field.label} must be at least ${validation.minLength} characters`;
@@ -201,7 +215,7 @@ function ReusableModalContent({
     const newErrors: Record<string, string> = {};
     
     allFields.forEach(field => {
-      const error = validateField(field.name, formData[field.name]);
+      const error = validateField(field.name, formData[field.name], formData);
       if (error) {
         newErrors[field.name] = error;
       }
@@ -224,7 +238,7 @@ function ReusableModalContent({
     setFormData(newFormData);
 
     if (validationOnChange) {
-      const error = validateField(name, value);
+      const error = validateField(name, value, newFormData);
       setErrors(prev => ({
         ...prev,
         [name]: error || '',
@@ -233,7 +247,14 @@ function ReusableModalContent({
   };
 
   const renderField = (field: FieldConfig) => {
-    if (field.hidden) return null;
+    const isHidden = typeof field.hidden === "function"
+      ? field.hidden(formData)
+      : field.hidden;
+    if (isHidden) return null;
+
+    const required = typeof field.required === "function"
+      ? field.required(formData)
+      : field.required;
 
     const widthClass = {
       full: "col-span-1 md:col-span-1",
@@ -254,7 +275,7 @@ function ReusableModalContent({
           return (
             <textarea
               id={field.name}
-              required={field.required}
+              required={required}
               className={`${commonClasses} resize-vertical min-h-[100px]`}
               value={fieldValueAsString(formData[field.name])}
               onChange={(e) => handleChange(field.name, e.target.value)}
@@ -268,7 +289,7 @@ function ReusableModalContent({
           return (
             <select
               id={field.name}
-              required={field.required}
+              required={required}
               className={`${commonClasses} bg-white`}
               value={fieldValueAsString(formData[field.name])}
               onChange={(e) => handleChange(field.name, e.target.value)}
@@ -326,7 +347,7 @@ function ReusableModalContent({
             <input
               type={field.type}
               id={field.name}
-              required={field.required}
+              required={required}
               className={commonClasses}
               value={fieldValueAsString(formData[field.name])}
               onChange={(e) => handleChange(field.name, e.target.value)}
@@ -345,7 +366,7 @@ function ReusableModalContent({
         {field.type !== "checkbox" && (
           <label htmlFor={field.name} className="text-sm font-medium text-slate-700">
             {field.label}
-            {field.required && <span className="text-red-500 ml-1">*</span>}
+            {required && <span className="text-red-500 ml-1">*</span>}
           </label>
         )}
         {fieldComponent()}

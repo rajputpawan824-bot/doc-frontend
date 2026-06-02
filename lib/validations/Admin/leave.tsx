@@ -2,20 +2,11 @@
 import type { ValidationRules } from "@/lib/hooks/useFormValidation";
 
 // Leave Types
-export type LeaveType =
-  | "PAID_LEAVE"
-  | "SICK_LEAVE"
-  | "CASUAL_LEAVE"
-  | "EARNED_LEAVE"
-  | "MATERNITY_LEAVE"
-  | "PATERNITY_LEAVE"
-  | "EMERGENCY_LEAVE"
-  | "HALF_DAY"
-  | "OTHER";
+export type LeaveType = "SICK" | "EMERGENCY" | "CASUAL";
 
 export type LeaveStatus = "PENDING" | "APPROVED" | "REJECTED" | "CANCELLED";
 
-export type HalfDayType = "FIRST_HALF" | "SECOND_HALF" | "NOT_APPLICABLE";
+export type HalfDayType = "FIRST_HALF" | "SECOND_HALF";
 
 export type StaffCategory =
   | "DOCTOR"
@@ -30,25 +21,25 @@ export type StaffCategory =
 
 // Form Data Interface
 export interface LeaveFormData {
-  staffId: string;
+  userId?: string;
   leaveType: LeaveType;
-  startDate: string;
-  endDate: string;
+  fromDate: string;
+  toDate: string;
   reason: string;
   emergencyContact?: string;
-  halfDay?: HalfDayType;
+  halfDayType?: HalfDayType;
   isHalfDay: boolean;
 }
 
 // API Request/Response Interfaces
 export interface LeaveRequest {
-  staffId: string;
+  userId?: string;
   leaveType: LeaveType;
-  startDate: string;
-  endDate: string;
+  fromDate: string;
+  toDate: string;
   reason: string;
   emergencyContact?: string;
-  halfDay?: HalfDayType;
+  halfDayType?: HalfDayType;
   isHalfDay: boolean;
 }
 
@@ -59,10 +50,13 @@ export interface LeaveResponse {
   staffName: string;
   staffCode?: string;
   staffCategory?: StaffCategory;
+  userRole?: string;
+  user?: { _id?: string; id?: string; userId?: string; name?: string };
   leaveType: LeaveType;
   fromDate: string;
   toDate: string;
   numberOfDays: number;
+  totalDays?: number;
   halfDay?: HalfDayType;
   reason: string;
   emergencyContact?: string;
@@ -73,6 +67,7 @@ export interface LeaveResponse {
   rejectionReason?: string;
   attachments?: string[];
   isHalfDay: boolean;
+  isPaid?: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -92,6 +87,7 @@ export interface LeaveApprovalPayload {
   status: "APPROVED" | "REJECTED";
   approvedBy?: string;
   rejectionReason?: string;
+  isPaid?: boolean;
 }
 
 // Validation Rules
@@ -99,24 +95,14 @@ export const LEAVE_VALIDATION_RULES: ValidationRules = {
   leaveType: {
     required: "Leave type is required",
     validate: (value: unknown) => {
-      const validTypes = [
-        "PAID_LEAVE",
-        "SICK_LEAVE",
-        "CASUAL_LEAVE",
-        "EARNED_LEAVE",
-        "MATERNITY_LEAVE",
-        "PATERNITY_LEAVE",
-        "EMERGENCY_LEAVE",
-        "HALF_DAY",
-        "OTHER",
-      ];
+      const validTypes = ["SICK", "EMERGENCY", "CASUAL"];
       return (
         (typeof value === "string" && validTypes.includes(value)) ||
         `Leave type must be one of: ${validTypes.join(", ")}`
       );
     },
   },
-  startDate: {
+  fromDate: {
     required: "Start date is required",
     validate: (value: unknown) => {
       if (typeof value !== "string") return "Start date must be a string";
@@ -125,7 +111,7 @@ export const LEAVE_VALIDATION_RULES: ValidationRules = {
       return true;
     },
   },
-  endDate: {
+  toDate: {
     required: "End date is required",
     validate: (value: unknown) => {
       if (typeof value !== "string") return "End date must be a string";
@@ -156,15 +142,9 @@ export const LEAVE_VALIDATION_RULES: ValidationRules = {
 // Helper Functions
 export function getLeaveTypeLabel(type: LeaveType): string {
   const labels: Record<LeaveType, string> = {
-    PAID_LEAVE: "Paid Leave",
-    SICK_LEAVE: "Sick Leave",
-    CASUAL_LEAVE: "Casual Leave",
-    EARNED_LEAVE: "Earned Leave",
-    MATERNITY_LEAVE: "Maternity Leave",
-    PATERNITY_LEAVE: "Paternity Leave",
-    EMERGENCY_LEAVE: "Emergency Leave",
-    HALF_DAY: "Half Day",
-    OTHER: "Other",
+    SICK: "Sick Leave",
+    CASUAL: "Casual Leave",
+    EMERGENCY: "Emergency Leave",
   };
   return labels[type] || type;
 }
@@ -195,11 +175,11 @@ export function getLeaveStatusBgColor(status: LeaveStatus): string {
 }
 
 export function calculateDaysBetween(
-  startDate: string,
-  endDate: string,
+  fromDate: string,
+  toDate: string,
 ): number {
-  const start = new Date(startDate);
-  const end = new Date(endDate);
+  const start = new Date(fromDate);
+  const end = new Date(toDate);
   const timeDiff = end.getTime() - start.getTime();
   return Math.ceil(timeDiff / (1000 * 3600 * 24)) + 1;
 }

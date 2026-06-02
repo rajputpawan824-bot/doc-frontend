@@ -17,17 +17,42 @@ import {
   getLeaveTypeLabel, 
   getLeaveStatusBgColor 
 } from "@/lib/validations/Admin/leave";
+import { useCreateLeave } from "@/services/admin/leave";
 import { format } from "date-fns";
 
 export default function StaffLeavePage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
+
+  const createLeaveMutation = useCreateLeave({
+    onSuccess: (data) => {
+      console.log("[DEBUG] Mutation SUCCESS - Leave created:", data);
+      setIsModalOpen(false);
+    },
+    onError: (error) => {
+      console.error("[DEBUG] Mutation ERROR:", error);
+    },
+  });
+
+  const handleApplyLeave = (data: any) => {
+    console.log("[DEBUG] 1. FORM SUBMIT TRIGGERED - Form data:", data);
+    console.log("[DEBUG] 2. FORM SUBMIT - About to call mutate()");
+    console.log("[DEBUG] 3. Mutation hook status before mutate:", createLeaveMutation.status);
+    console.log("[DEBUG] 4. Payload being sent:", JSON.stringify(data, null, 2));
+
+    try {
+      createLeaveMutation.mutate(data);
+      console.log("[DEBUG] 5. mutate() called successfully");
+    } catch (err) {
+      console.error("[DEBUG] 5. ERROR calling mutate():", err);
+    }
+  };
 
   const mockHistory: LeaveResponse[] = [
     {
       _id: "1",
       staffId: "S001",
       staffName: "Robert Wilson",
-      leaveType: "SICK_LEAVE",
+      leaveType: "SICK",
       fromDate: "2026-05-10",
       toDate: "2026-05-11",
       numberOfDays: 2,
@@ -68,11 +93,17 @@ export default function StaffLeavePage() {
 
   const leaveFields: FieldConfig[] = [
     { name: "leaveType", label: "Type", type: "select", required: true, options: [
-      { label: "Casual", value: "CASUAL_LEAVE" },
-      { label: "Sick", value: "SICK_LEAVE" },
+      { label: "Casual", value: "CASUAL" },
+      { label: "Sick", value: "SICK" },
+      { label: "Emergency", value: "EMERGENCY" },
     ], width: "half" },
-    { name: "startDate", label: "Start Date", type: "date", required: true, width: "half" },
-    { name: "endDate", label: "End Date", type: "date", required: true, width: "half" },
+    { name: "fromDate", label: "Start Date", type: "date", required: true, width: "half" },
+    { name: "toDate", label: "End Date", type: "date", required: true, width: "half" },
+    { name: "isHalfDay", label: "Half Day Leave", type: "checkbox", width: "half", defaultValue: false },
+    { name: "halfDayType", label: "Shift Option", type: "select", options: [
+      { label: "First Half", value: "FIRST_HALF" },
+      { label: "Second Half", value: "SECOND_HALF" },
+    ], width: "half", hidden: (formData) => !Boolean(formData.isHalfDay), required: (formData) => Boolean(formData.isHalfDay) },
     { name: "reason", label: "Reason", type: "textarea", required: true },
   ];
 
@@ -121,7 +152,7 @@ export default function StaffLeavePage() {
       <ReusableModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        onSave={() => setIsModalOpen(false)}
+        onSave={handleApplyLeave}
         title="Apply for Leave"
         fields={leaveFields}
         saveButtonText="Submit Application"

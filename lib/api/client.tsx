@@ -386,7 +386,8 @@ class ClientApiClient {
 }
 
 // Singleton — safe to import anywhere in client components
-export const clientApi = new ClientApiClient();
+export const 
+clientApi = new ClientApiClient();
 export default clientApi;
 
 // Re-export the type so callers can use it without importing from types.ts
