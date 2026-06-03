@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, ReactNode } from "react";
 import {
   Users,
   UserPlus,
@@ -28,6 +28,8 @@ import {
   FileText,
   TrendingUp,
   Activity,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -39,11 +41,24 @@ import {
 } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import DataTable from "@/components/reusable/data-table";
+import { Input } from "@/components/ui/input";
 import ReusableModal, {
   FormSection,
 } from "@/components/reusable/reusable-modal";
-import { ColumnDef } from "@tanstack/react-table";
+import {
+  ColumnDef,
+  flexRender,
+  getCoreRowModel,
+  useReactTable,
+} from "@tanstack/react-table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -77,6 +92,116 @@ interface Doctor extends DoctorResponse {
   updatedAt: string;
 }
 
+interface PaginatedDoctorTableProps {
+  columns: ColumnDef<DoctorResponse>[];
+  data: DoctorResponse[];
+  emptyMessage: ReactNode;
+  currentPage: number;
+  totalPages: number;
+  limit: number;
+  onPageChange: (page: number) => void;
+  onLimitChange: (limit: number) => void;
+}
+
+function PaginatedDoctorTable({
+  columns,
+  data,
+  emptyMessage,
+  currentPage,
+  totalPages,
+  limit,
+  onPageChange,
+  onLimitChange,
+}: PaginatedDoctorTableProps) {
+  const table = useReactTable({
+    data,
+    columns,
+    getCoreRowModel: getCoreRowModel(),
+  });
+
+  return (
+    <div className="space-y-4">
+      <div className="rounded-md border">
+        <Table>
+          <TableHeader>
+            {table.getHeaderGroups().map((headerGroup) => (
+              <TableRow key={headerGroup.id}>
+                {headerGroup.headers.map((header) => (
+                  <TableHead key={header.id}>
+                    {header.isPlaceholder
+                      ? null
+                      : flexRender(header.column.columnDef.header, header.getContext())}
+                  </TableHead>
+                ))}
+              </TableRow>
+            ))}
+          </TableHeader>
+          <TableBody>
+            {table.getRowModel().rows.length ? (
+              table.getRowModel().rows.map((row) => (
+                <TableRow key={row.id}>
+                  {row.getVisibleCells().map((cell) => (
+                    <TableCell key={cell.id}>
+                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                    </TableCell>
+                  ))}
+                </TableRow>
+              ))
+            ) : (
+              <TableRow>
+                <TableCell colSpan={columns.length} className="h-24 text-center">
+                  {emptyMessage}
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </div>
+
+      <div className="flex flex-col sm:flex-row items-center justify-end gap-4">
+        <div className="flex items-center space-x-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => onPageChange(currentPage - 1)}
+            disabled={currentPage <= 1}
+          >
+            <ChevronLeft className="h-4 w-4" />
+            Previous
+          </Button>
+          <div className="flex items-center gap-1 text-sm">
+            <span>Page</span>
+            <strong>
+              {currentPage} of {totalPages}
+            </strong>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => onPageChange(currentPage + 1)}
+            disabled={currentPage >= totalPages}
+          >
+            Next
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+
+          <select
+            className="h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
+            value={limit}
+            onChange={(event) => onLimitChange(Number(event.target.value))}
+          >
+            {[10, 20, 30, 50, 100].map((pageSize) => (
+              <option key={pageSize} value={pageSize}>
+                Show {pageSize}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 const doctorColors = {
   primary: "#1e40af",
   secondary: "#3b82f6",
@@ -98,6 +223,8 @@ const DoctorsPage = ({ initialDoctors }: { initialDoctors?: DoctorResponse[] }) 
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
   const [selectedDoctorId, setSelectedDoctorId] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(10);
   const queryClient = useQueryClient();
 
   // API Hooks
@@ -105,10 +232,25 @@ const {
   data: doctorsResponse,
   isLoading,
   refetch: refetchDoctors,
-} = useDoctors();
+} = useDoctors({
+  status: activeTab === "on-leave" ? "on_leave" : activeTab,
+  page,
+  limit,
+  search: searchQuery,
+});
 
 
   const doctors = doctorsResponse?.data || initialDoctors || [];
+  const doctorPagination = doctorsResponse?.pagination;
+  const totalPages = Math.max(doctorPagination?.totalPages ?? 1, 1);
+  const currentPage = Math.min(
+    Math.max(doctorPagination?.page ?? doctorPagination?.currentPage ?? page, 1),
+    totalPages,
+  );
+  const totalRecords =
+    doctorPagination?.totalRecords ??
+    doctorPagination?.total ??
+    doctors.length;
  const {
   data,
   refetch: refetchDashboardStats,
@@ -1006,6 +1148,19 @@ const {
   toast.success("Data refreshed");
 };
 
+  const handlePageChange = (nextPage: number) => {
+    if (nextPage < currentPage) {
+      setPage((p) => Math.max(1, p - 1));
+      return;
+    }
+    setPage((p) => Math.min(totalPages, p + 1));
+  };
+
+  const handleLimitChange = (nextLimit: number) => {
+    setLimit(nextLimit);
+    setPage(1);
+  };
+
   // ==================== TABLE COLUMNS ====================
   const searchColumn: ColumnDef<DoctorResponse>[] = [
     {
@@ -1340,24 +1495,40 @@ const {
         ))}
       </div>
 
+      <div className="relative max-w-md">
+        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+        <Input
+          placeholder="Search doctors..."
+          className="pl-10"
+          value={searchQuery}
+          onChange={(event) => {
+            setPage(1);
+            setSearchQuery(event.target.value);
+          }}
+        />
+      </div>
+
       {/* Tabs */}
       <Tabs
         value={activeTab}
-        onValueChange={setActiveTab}
+        onValueChange={(value) => {
+          setActiveTab(value);
+          setPage(1);
+        }}
         className="space-y-4"
       >
         <TabsList className="grid grid-cols-3 w-full max-w-lg">
           <TabsTrigger value="active" className="flex items-center gap-2">
             <UserCheck className="h-4 w-4" />
-            Active ({filteredDoctors.active.length})
+            Active ({activeTab === "active" ? totalRecords : filteredDoctors.active.length})
           </TabsTrigger>
           <TabsTrigger value="inactive" className="flex items-center gap-2">
             <UserMinus className="h-4 w-4" />
-            Inactive ({filteredDoctors.inactive.length})
+            Inactive ({activeTab === "inactive" ? totalRecords : filteredDoctors.inactive.length})
           </TabsTrigger>
           <TabsTrigger value="on-leave" className="flex items-center gap-2">
             <Calendar className="h-4 w-4" />
-            On Leave ({filteredDoctors["on-leave"].length})
+            On Leave ({activeTab === "on-leave" ? totalRecords : filteredDoctors["on-leave"].length})
           </TabsTrigger>
         </TabsList>
 
@@ -1367,7 +1538,7 @@ const {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <UserCheck className="h-5 w-5 text-green-600" />
-                Active Doctors ({filteredDoctors.active.length})
+                Active Doctors ({totalRecords})
               </CardTitle>
               <CardDescription>
                 Currently working doctors and their schedules
@@ -1379,11 +1550,14 @@ const {
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
                 </div>
               ) : (
-                <DataTable
+                <PaginatedDoctorTable
                   columns={activeColumns}
                   data={filteredDoctors.active}
-                  searchColumn="searchIndex"
-                  searchPlaceholder="Search active doctors..."
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  limit={limit}
+                  onPageChange={handlePageChange}
+                  onLimitChange={handleLimitChange}
                   emptyMessage={
                     <div className="text-center py-12">
                       <Stethoscope className="mx-auto h-12 w-12 text-gray-400" />
@@ -1407,7 +1581,7 @@ const {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <UserMinus className="h-5 w-5 text-gray-600" />
-                Inactive Doctors ({filteredDoctors.inactive.length})
+                Inactive Doctors ({totalRecords})
               </CardTitle>
               <CardDescription>
                 Doctors who are currently not active
@@ -1419,11 +1593,14 @@ const {
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-600"></div>
                 </div>
               ) : (
-                <DataTable
+                <PaginatedDoctorTable
                   columns={inactiveColumns}
                   data={filteredDoctors.inactive}
-                  searchColumn="searchIndex"
-                  searchPlaceholder="Search inactive doctors..."
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  limit={limit}
+                  onPageChange={handlePageChange}
+                  onLimitChange={handleLimitChange}
                   emptyMessage={
                     <div className="text-center py-12">
                       <UserCheck className="mx-auto h-12 w-12 text-gray-400" />
@@ -1447,7 +1624,7 @@ const {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Calendar className="h-5 w-5 text-yellow-600" />
-                On Leave Doctors ({filteredDoctors["on-leave"].length})
+                On Leave Doctors ({totalRecords})
               </CardTitle>
               <CardDescription>
                 Doctors who are currently on leave
@@ -1459,11 +1636,14 @@ const {
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-yellow-600"></div>
                 </div>
               ) : (
-                <DataTable
+                <PaginatedDoctorTable
                   columns={inactiveColumns}
                   data={filteredDoctors["on-leave"]}
-                  searchColumn="searchIndex"
-                  searchPlaceholder="Search doctors on leave..."
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  limit={limit}
+                  onPageChange={handlePageChange}
+                  onLimitChange={handleLimitChange}
                   emptyMessage={
                     <div className="text-center py-12">
                       <Calendar className="mx-auto h-12 w-12 text-gray-400" />

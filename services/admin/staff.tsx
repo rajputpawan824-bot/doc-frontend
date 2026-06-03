@@ -53,7 +53,10 @@ interface RawStaff {
 
 interface RawStaffListResponse {
   data: RawStaff[];
-  meta?: { page: number; limit: number; total: number; totalPages: number };
+  meta?: { page?: number; currentPage?: number; limit?: number; total?: number; totalRecords?: number; totalPages?: number };
+  pagination?: { page?: number; currentPage?: number; limit?: number; total?: number; totalRecords?: number; totalPages?: number };
+  currentPage?: number;
+  totalPages?: number;
 }
 
 export interface StaffListParams {
@@ -61,6 +64,7 @@ export interface StaffListParams {
   category?: StaffCategory;
   page?: number;
   limit?: number;
+  search?: string;
 }
 
 export interface StaffListResponse {
@@ -220,22 +224,35 @@ export const useActiveStaff = (category?: StaffCategory) => {
 export const useStaff = (params?: StaffListParams) => {
   const status = params?.status ?? "active";
   const category = params?.category;
+  const page = params?.page ?? 1;
+  const limit = params?.limit ?? 10;
+  const search = params?.search ?? "";
 
   return useQuery({
-    queryKey: ["staff", status, category],
+    queryKey: ["staff", status, category, page, limit, search],
     queryFn: async () => {
-      let url: string;
-
-      if (status === "inactive") {
-        url = category ? `/staff/inActive?category=${category}` : "/staff/inActive";
-      } else if (status === "all") {
-        url = category ? `/staff/all-staff?category=${category}` : "/staff/all-staff";
-      } else {
-        // default: active
-        url = category ? `/staff/isActive?category=${category}` : "/staff/isActive";
+      const urlParams = new URLSearchParams();
+      urlParams.append("page", String(page));
+      urlParams.append("limit", String(limit));
+      urlParams.append("search", search);
+      if (category) {
+        urlParams.append("category", category);
       }
 
-      const response = await clientApi.get<RawStaffListResponse>(url);
+      let endpoint: string;
+
+      if (status === "inactive") {
+        endpoint = "/staff/inActive";
+      } else if (status === "all") {
+        endpoint = "/staff/all-staff";
+      } else {
+        // default: active
+        endpoint = "/staff/isActive";
+      }
+
+      const response = await clientApi.get<RawStaffListResponse>(
+        `${endpoint}?${urlParams.toString()}`,
+      );
 
       if (!response.success) {
         throw new Error(response.error || `Failed to fetch ${status} staff`);
@@ -270,6 +287,12 @@ export const useStaff = (params?: StaffListParams) => {
           status: (staff.user?.isActive ?? (status !== "inactive")) ? "active" : "inactive",
           lastLogin: staff.user?.lastLogin ?? null,
         })),
+        pagination: response.data.pagination ?? response.data.meta ?? {
+          page: response.data.currentPage ?? page,
+          limit,
+          totalRecords: list.length,
+          totalPages: response.data.totalPages ?? 1,
+        },
         meta: response.data.meta,
       };
     },

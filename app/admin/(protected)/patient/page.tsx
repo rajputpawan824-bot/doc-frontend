@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, ReactNode } from 'react';
 import { 
   Users, 
   UserPlus, 
@@ -26,18 +26,33 @@ import {
   Upload,
   CheckCircle,
   XCircle,
-  Clock
+  Clock,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import DataTable from '@/components/reusable/data-table';
-import ReusableModal, { FormSection, FieldConfig } from '@/components/reusable/reusable-modal';
-import { ColumnDef } from '@tanstack/react-table';
+import ReusableModal, { FormSection, FieldConfig, ReusableFormData } from '@/components/reusable/reusable-modal';
+import {
+  ColumnDef,
+  flexRender,
+  getCoreRowModel,
+  useReactTable,
+} from '@tanstack/react-table';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
 import { Progress } from '@/components/ui/progress';
+import { usePatients } from '@/services/admin/patient';
 
 // ==================== TYPES AND ENUMS ====================
 export enum Gender {
@@ -121,12 +136,121 @@ export interface PatientFormData {
   bloodGroup?: BloodGroup;
 }
 
+interface PaginatedPatientTableProps {
+  columns: ColumnDef<Patient>[];
+  data: Patient[];
+  emptyMessage: ReactNode;
+  currentPage: number;
+  totalPages: number;
+  limit: number;
+  onPageChange: (page: number) => void;
+  onLimitChange: (limit: number) => void;
+}
+
+function PaginatedPatientTable({
+  columns,
+  data,
+  emptyMessage,
+  currentPage,
+  totalPages,
+  limit,
+  onPageChange,
+  onLimitChange,
+}: PaginatedPatientTableProps) {
+  const table = useReactTable({
+    data,
+    columns,
+    getCoreRowModel: getCoreRowModel(),
+  });
+
+  return (
+    <div className="space-y-4">
+      <div className="rounded-md border">
+        <Table>
+          <TableHeader>
+            {table.getHeaderGroups().map((headerGroup) => (
+              <TableRow key={headerGroup.id}>
+                {headerGroup.headers.map((header) => (
+                  <TableHead key={header.id}>
+                    {header.isPlaceholder
+                      ? null
+                      : flexRender(header.column.columnDef.header, header.getContext())}
+                  </TableHead>
+                ))}
+              </TableRow>
+            ))}
+          </TableHeader>
+          <TableBody>
+            {table.getRowModel().rows.length ? (
+              table.getRowModel().rows.map((row) => (
+                <TableRow key={row.id}>
+                  {row.getVisibleCells().map((cell) => (
+                    <TableCell key={cell.id}>
+                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                    </TableCell>
+                  ))}
+                </TableRow>
+              ))
+            ) : (
+              <TableRow>
+                <TableCell colSpan={columns.length} className="h-24 text-center">
+                  {emptyMessage}
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </div>
+
+      <div className="flex flex-col sm:flex-row items-center justify-end gap-4">
+        <div className="flex items-center space-x-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => onPageChange(currentPage - 1)}
+            disabled={currentPage <= 1}
+          >
+            <ChevronLeft className="h-4 w-4" />
+            Previous
+          </Button>
+          <div className="flex items-center gap-1 text-sm">
+            <span>Page</span>
+            <strong>
+              {currentPage} of {totalPages}
+            </strong>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => onPageChange(currentPage + 1)}
+            disabled={currentPage >= totalPages}
+          >
+            Next
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+
+          <select
+            className="h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
+            value={limit}
+            onChange={(event) => onLimitChange(Number(event.target.value))}
+          >
+            {[10, 20, 30, 50, 100].map((pageSize) => (
+              <option key={pageSize} value={pageSize}>
+                Show {pageSize}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ==================== MAIN COMPONENT ====================
 const PatientManagement = () => {
   const [activeTab, setActiveTab] = useState('view');
   const [searchQuery, setSearchQuery] = useState('');
   const [patients, setPatients] = useState<Patient[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isNotesModalOpen, setIsNotesModalOpen] = useState(false);
@@ -134,7 +258,13 @@ const PatientManagement = () => {
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
   const [selectedPatientForNotes, setSelectedPatientForNotes] = useState<Patient | null>(null);
   const [selectedPatientForReports, setSelectedPatientForReports] = useState<Patient | null>(null);
-  const [refreshKey, setRefreshKey] = useState(0);
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(10);
+  const {
+    data: patientsResponse,
+    isLoading,
+    refetch,
+  } = usePatients({ page, limit, search: searchQuery });
   
   // File upload state
   const [uploadingFile, setUploadingFile] = useState(false);
@@ -267,31 +397,31 @@ const PatientManagement = () => {
 
   // ==================== DATA MANAGEMENT ====================
   useEffect(() => {
-    loadData();
-  }, [searchQuery, refreshKey]);
+    setPatients(patientsResponse?.data ?? []);
+  }, [patientsResponse]);
 
-  const loadData = () => {
-    setIsLoading(true);
-    
-    // Simulate API call delay
-    setTimeout(() => {
-      let filteredPatients = [...initialPatients];
-      
-      // Apply search filter
-      if (searchQuery) {
-        const query = searchQuery.toLowerCase();
-        filteredPatients = filteredPatients.filter(p =>
-          p.name.toLowerCase().includes(query) ||
-          p.patientId.toLowerCase().includes(query) ||
-          p.phoneNumber.includes(query) ||
-          p.email?.toLowerCase().includes(query) ||
-          p.adhar.includes(query)
-        );
-      }
-      
-      setPatients(filteredPatients);
-      setIsLoading(false);
-    }, 300);
+  const patientPagination = patientsResponse?.pagination;
+  const totalPages = Math.max(patientPagination?.totalPages ?? 1, 1);
+  const currentPage = Math.min(
+    Math.max(patientPagination?.page ?? patientPagination?.currentPage ?? page, 1),
+    totalPages,
+  );
+  const totalRecords =
+    patientPagination?.totalRecords ??
+    patientPagination?.total ??
+    patients.length;
+
+  const handlePageChange = (nextPage: number) => {
+    if (nextPage < currentPage) {
+      setPage((p) => Math.max(1, p - 1));
+      return;
+    }
+    setPage((p) => Math.min(totalPages, p + 1));
+  };
+
+  const handleLimitChange = (nextLimit: number) => {
+    setLimit(nextLimit);
+    setPage(1);
   };
 
   // ==================== FORM SECTIONS ====================
@@ -331,7 +461,7 @@ const PatientManagement = () => {
           validation: {
             pattern: /^[0-9]{10}$/,
             custom: (value) => {
-              if (!/^[0-9]{10}$/.test(value)) {
+              if (!/^[0-9]{10}$/.test(String(value))) {
                 return 'Phone number must be 10 digits';
               }
               return null;
@@ -367,7 +497,7 @@ const PatientManagement = () => {
           validation: {
             pattern: /^[0-9]{12}$/,
             custom: (value) => {
-              if (!/^[0-9]{12}$/.test(value)) {
+              if (!/^[0-9]{12}$/.test(String(value))) {
                 return 'Aadhaar number must be 12 digits';
               }
               return null;
@@ -415,7 +545,7 @@ const PatientManagement = () => {
           validation: {
             pattern: /^[0-9]{10}$/,
             custom: (value) => {
-              if (value && !/^[0-9]{10}$/.test(value)) {
+              if (value && !/^[0-9]{10}$/.test(String(value))) {
                 return 'Emergency contact must be 10 digits';
               }
               return null;
@@ -472,7 +602,7 @@ const PatientManagement = () => {
           validation: {
             minLength: 8,
             custom: (value) => {
-              if (value && value.length < 8) {
+              if (value && String(value).length < 8) {
                 return 'Password must be at least 8 characters';
               }
               return null;
@@ -613,7 +743,7 @@ const PatientManagement = () => {
         
         // Refresh data
         setTimeout(() => {
-          setRefreshKey(prev => prev + 1);
+          void refetch();
           setUploadProgress(0);
         }, 500);
       }, 2000);
@@ -628,7 +758,16 @@ const PatientManagement = () => {
   const handleAddPatient = (data: Partial<Patient>) => {
     const newPatient: Patient = {
       id: Date.now().toString(),
-      ...data,
+      name: data.name || "",
+      phoneNumber: data.phoneNumber || "",
+      email: data.email,
+      gender: data.gender || Gender.OTHER,
+      adhar: data.adhar || "",
+      address: data.address || "",
+      emergencyContact: data.emergencyContact,
+      dateOfBirth: data.dateOfBirth,
+      age: data.age,
+      bloodGroup: data.bloodGroup,
       patientId: generatePatientId(),
       status: PatientStatus.ACTIVE,
       medicalNotes: [],
@@ -640,7 +779,7 @@ const PatientManagement = () => {
 
     setPatients(prev => [...prev, newPatient]);
     setIsAddModalOpen(false);
-    setRefreshKey(prev => prev + 1);
+    void refetch();
   };
 
   const handleEditPatient = (data: Partial<Patient>) => {
@@ -658,7 +797,7 @@ const PatientManagement = () => {
     
     setIsEditModalOpen(false);
     setSelectedPatient(null);
-    setRefreshKey(prev => prev + 1);
+    void refetch();
   };
 
   const handleAddMedicalNote = () => {
@@ -692,7 +831,7 @@ const PatientManagement = () => {
     setMedicalNote({ doctorName: '', notes: '' });
     setIsNotesModalOpen(false);
     setSelectedPatientForNotes(null);
-    setRefreshKey(prev => prev + 1);
+    void refetch();
   };
 
   const handleDeleteReport = (reportId: string, patientId: string) => {
@@ -710,7 +849,7 @@ const PatientManagement = () => {
       )
     );
     
-    setRefreshKey(prev => prev + 1);
+    void refetch();
   };
 
   // ==================== TABLE COLUMNS ====================
@@ -886,7 +1025,7 @@ const PatientManagement = () => {
         <div className="flex gap-2">
           <Button 
             variant="outline" 
-            onClick={() => setRefreshKey(prev => prev + 1)}
+            onClick={() => refetch()}
             className="hover:bg-gray-50"
           >
             <RefreshCw className="mr-2 h-4 w-4" />
@@ -902,12 +1041,25 @@ const PatientManagement = () => {
         </div>
       </div>
 
+      <div className="relative max-w-md">
+        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+        <Input
+          placeholder="Search patients..."
+          className="pl-10"
+          value={searchQuery}
+          onChange={(event) => {
+            setPage(1);
+            setSearchQuery(event.target.value);
+          }}
+        />
+      </div>
+
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <TabsList className="grid grid-cols-1 w-full max-w-md">
           <TabsTrigger value="view" className="flex items-center gap-2">
             <Users className="h-4 w-4" />
-            Patient Records ({patients.length})
+            Patient Records ({totalRecords})
           </TabsTrigger>
         </TabsList>       
 
@@ -917,7 +1069,7 @@ const PatientManagement = () => {
             <CardHeader className="">
               <CardTitle className="flex items-center gap-2">
                 <Users className="h-5 w-5 text-blue-600" />
-                Patient Records ({patients.length})
+                Patient Records ({totalRecords})
               </CardTitle>
               <CardDescription>
                 View and manage patient information, medical notes, and reports
@@ -929,11 +1081,14 @@ const PatientManagement = () => {
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
                 </div>
               ) : (
-                <DataTable
+                <PaginatedPatientTable
                   columns={patientColumns}
                   data={patients}
-                  searchColumn="name"
-                  searchPlaceholder="Search patients..."
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  limit={limit}
+                  onPageChange={handlePageChange}
+                  onLimitChange={handleLimitChange}
                   emptyMessage={
                     <div className="text-center py-12">
                       <Users className="mx-auto h-12 w-12 text-gray-400" />
@@ -985,7 +1140,7 @@ const PatientManagement = () => {
             </div>
           }
           sections={editFormSections}
-          initialData={selectedPatient}
+          initialData={selectedPatient as unknown as ReusableFormData}
           isEdit={true}
           size="lg"
           saveButtonText="Update Patient"

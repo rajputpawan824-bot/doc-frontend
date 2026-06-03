@@ -46,7 +46,10 @@ interface RawReceptionist {
 
 interface RawListResponse {
   data: RawReceptionist[];
-  meta?: { page: number; limit: number; total: number; totalPages: number };
+  meta?: { page?: number; currentPage?: number; limit?: number; total?: number; totalRecords?: number; totalPages?: number };
+  pagination?: { page?: number; currentPage?: number; limit?: number; total?: number; totalRecords?: number; totalPages?: number };
+  currentPage?: number;
+  totalPages?: number;
 }
 
 export function useAddReception(options?: {
@@ -91,11 +94,22 @@ export function useAddReception(options?: {
   });
 }
 
-export const useReceptionists = () => {
+export const useReceptionists = (
+  params: { page?: number; limit?: number; search?: string } = {},
+) => {
+  const { page = 1, limit = 10, search = "" } = params;
+
   return useQuery({
-    queryKey: ["receptionists"],
+    queryKey: ["receptionists", page, limit, search],
     queryFn: async () => {
-      const response = await clientApi.get<RawListResponse>("/receptionists/all-receptionists");
+      const urlParams = new URLSearchParams();
+      urlParams.append("page", String(page));
+      urlParams.append("limit", String(limit));
+      urlParams.append("search", search);
+
+      const response = await clientApi.get<RawListResponse>(
+        `/receptionists/all-receptionists?${urlParams.toString()}`,
+      );
 
       if (!response.success) {
         throw new Error(
@@ -111,7 +125,7 @@ export const useReceptionists = () => {
       const list: RawReceptionist[] = response.data.data ?? [];
 
       // Transform API response to UI format
-      return list.map((reception: RawReceptionist) => ({
+      const receptionists = list.map((reception: RawReceptionist) => ({
         id: reception._id || reception.id,
         userId: reception.user?._id || reception.user?.id || reception.userId,
         name: reception.user?.name || "",
@@ -134,6 +148,17 @@ export const useReceptionists = () => {
         updatedAt: new Date(reception.updatedAt ?? reception.createdAt),
         user: reception.user,
       }));
+
+      return {
+        data: receptionists,
+        pagination: response.data.pagination ?? response.data.meta ?? {
+          page: response.data.currentPage ?? page,
+          limit,
+          totalRecords: receptionists.length,
+          totalPages: response.data.totalPages ?? 1,
+        },
+        meta: response.data.meta,
+      };
     },
     retry: 2,
     retryDelay: 1000,

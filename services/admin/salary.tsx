@@ -8,7 +8,8 @@ import type {
   SalaryHistoryResponse,
   SalaryDetailsResponse,
   SalaryListResponse,
-  SalarySummary,
+  //SalarySummary,
+  SalaryDashboardStats,
   UserRole,
 } from "@/lib/validations/Admin/salary";
 
@@ -18,19 +19,116 @@ export interface SalaryListParams {
   limit?: number;
   month?: number;
   year?: number;
+  search?: string;
 }
 
-export interface SalarySummaryParams {
-  userRole?: UserRole;
-  month?: number;
-  year?: number;
-}
+// export interface SalarySummaryParams {
+//   userRole?: UserRole;
+//   month?: number;
+//   year?: number;
+// }
 
 export interface SalaryDetailsParams {
   userId: string;
   userRole: UserRole;
   month: number;
   year: number;
+}
+
+type SalaryDetailsApiResponse =
+  | SalaryDetailsResponse
+  | { data?: SalaryDetailsResponse };
+
+const salaryDetailsExpectedFields = [
+  "baseSalary",
+  "bonus",
+  "penalty",
+  "netSalary",
+  "adjustments",
+] as const;
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function hasSalaryDetailsFields(value: unknown): value is SalaryDetailsResponse {
+  return (
+    isRecord(value) &&
+    salaryDetailsExpectedFields.every((field) => field in value)
+  );
+}
+
+function getSalaryDetailsPayload(
+  payload: SalaryDetailsApiResponse | undefined,
+): SalaryDetailsResponse | null {
+  if (hasSalaryDetailsFields(payload)) {
+    return payload;
+  }
+
+  if (isRecord(payload) && hasSalaryDetailsFields(payload.data)) {
+    return payload.data;
+  }
+
+  return null;
+}
+
+function getSalaryDetailsMismatch(payload: unknown) {
+  const candidate = isRecord(payload) && "data" in payload ? payload.data : payload;
+  const candidateKeys = isRecord(candidate) ? Object.keys(candidate) : [];
+
+  return {
+    expectedFields: salaryDetailsExpectedFields,
+    actualFields: candidateKeys,
+    missingFields: salaryDetailsExpectedFields.filter(
+      (field) => !candidateKeys.includes(field),
+    ),
+    extraFields: candidateKeys.filter(
+      (field) => !salaryDetailsExpectedFields.includes(
+        field as (typeof salaryDetailsExpectedFields)[number],
+      ),
+    ),
+  };
+}
+
+function validateSalaryDetailsParams(params: SalaryDetailsParams | null) {
+  const validRoles: UserRole[] = [
+    "DOCTOR",
+    "NURSE",
+    "RECEPTIONIST",
+    "TECHNICIAN",
+    "PHARMACIST",
+    "ADMIN",
+    "STAFF",
+    "ALL",
+  ];
+
+  const errors: string[] = [];
+
+  if (!params) {
+    errors.push("params are null");
+  } else {
+    if (!params.userId) errors.push("userId is required");
+    if (!params.userRole) errors.push("userRole is required");
+    if (!validRoles.includes(params.userRole)) {
+      errors.push(`userRole must be one of: ${validRoles.join(", ")}`);
+    }
+    if (!Number.isInteger(params.month) || params.month < 1 || params.month > 12) {
+      errors.push("month must be between 1 and 12");
+    }
+    const currentYear = new Date().getFullYear();
+    if (
+      !Number.isInteger(params.year) ||
+      params.year < 2020 ||
+      params.year > currentYear + 1
+    ) {
+      errors.push(`year must be between 2020 and ${currentYear + 1}`);
+    }
+  }
+
+  return {
+    isValid: errors.length === 0,
+    errors,
+  };
 }
 
 export function useAddSalaryAdjustment(options?: {
@@ -40,7 +138,7 @@ export function useAddSalaryAdjustment(options?: {
   return useMutation<SalaryHistoryResponse, Error, SalaryAdjustmentData>({
     mutationFn: async (data: SalaryAdjustmentData) => {
       const response: ApiResponse<{ data: SalaryHistoryResponse }> =
-        await clientApi.post("/salary", data);
+        await clientApi.post("/salary/add-Salary-Entry", data);
 
       if (!response.success || !response.data) {
         throw new Error(
@@ -60,15 +158,17 @@ export function useAddSalaryAdjustment(options?: {
 }
 
 export function useUpdateSalary(options?: {
-  onSuccess?: () => void;
+  onSuccess?: (data: { message?: string } | string) => void;
   onError?: (error: Error) => void;
 }) {
-  return useMutation<void, Error, SalaryUpdateData>({
+  return useMutation<{ message?: string } | string, Error, SalaryUpdateData>({
     mutationFn: async (data: SalaryUpdateData) => {
-      const response: ApiResponse<{ message: string }> = await clientApi.put(
-        "/salary/payslip",
+      const response: ApiResponse<{ message?: string } | string> = await clientApi.put(
+        "/salary/update",
         data,
       );
+
+      console.log("Salary update API response:", response);
 
       if (!response.success) {
         throw new Error(
@@ -78,7 +178,7 @@ export function useUpdateSalary(options?: {
         );
       }
 
-      return;
+      return response.data ?? "Salary updated successfully";
     },
     retry: 1,
     retryDelay: 1000,
@@ -115,6 +215,18 @@ export const useSalaryHistory = (userId: string, userRole: UserRole) => {
 };
 
 export const useSalaryDetails = (params: SalaryDetailsParams | null) => {
+  const validationResult = validateSalaryDetailsParams(params);
+  const enabled = validationResult.isValid;
+
+  console.log("useSalaryDetails params:", {
+    userId: params?.userId,
+    userRole: params?.userRole,
+    month: params?.month,
+    year: params?.year,
+  });
+  console.log("useSalaryDetails validation result:", validationResult);
+  console.log("useSalaryDetails query enabled:", enabled);
+
   return useQuery({
     queryKey: ["salary-details", params],
     queryFn: async () => {
@@ -123,11 +235,14 @@ export const useSalaryDetails = (params: SalaryDetailsParams | null) => {
       }
 
       const { userId, userRole, month, year } = params;
+      const url = `/salary/details?userId=${userId}&userRole=${userRole}&month=${month}&year=${year}`;
 
-      const response: ApiResponse<{ data: SalaryDetailsResponse }> =
-        await clientApi.get(
-          `/salary/details?userId=${userId}&userRole=${userRole}&month=${month}&year=${year}`,
-        );
+      console.log("useSalaryDetails final request URL:", url);
+
+      const response: ApiResponse<SalaryDetailsApiResponse> =
+        await clientApi.get(url);
+
+      console.log("useSalaryDetails actual API response:", response);
 
       if (!response.success || !response.data) {
         throw new Error(
@@ -135,25 +250,58 @@ export const useSalaryDetails = (params: SalaryDetailsParams | null) => {
         );
       }
 
-      return response.data.data;
+      const details = getSalaryDetailsPayload(response.data);
+      const mismatch = getSalaryDetailsMismatch(response.data);
+
+      console.log("useSalaryDetails fields expected by modal:", {
+        expectedFields: salaryDetailsExpectedFields,
+      });
+      console.log("useSalaryDetails exact mismatch:", mismatch);
+      console.log("useSalaryDetails value returned:", details);
+
+      if (!details) {
+        throw new Error("Salary details response shape did not match expected fields");
+      }
+
+      return details;
     },
     retry: 2,
     retryDelay: 1000,
-    enabled: !!params,
+    enabled,
   });
 };
 
 export const useSalaryList = (params: SalaryListParams) => {
-  const { userRole = "ALL", page = 1, limit = 10, month, year } = params;
+  const {
+    userRole = "ALL",
+    page = 1,
+    limit = 10,
+    month,
+    year,
+    search,
+  } = params;
 
   return useQuery({
-    queryKey: ["salary-list", userRole, page, limit, month, year],
+    queryKey: ["salary-list", userRole, page, limit, month, year, search],
     queryFn: async () => {
-      let url = `/dashboard/salary/list?userRole=${userRole}&page=${page}&limit=${limit}`;
+      const urlParams = new URLSearchParams();
 
-      if (month && year) {
-        url += `&month=${month}&year=${year}`;
+      if (userRole && userRole !== "ALL") {
+        urlParams.append("role", userRole);
       }
+      urlParams.append("page", String(page));
+      urlParams.append("limit", String(limit));
+      if (month) {
+        urlParams.append("month", String(month));
+      }
+      if (year) {
+        urlParams.append("year", String(year));
+      }
+      if (search) {
+        urlParams.append("search", search);
+      }
+
+      const url = `/salary/list?${urlParams.toString()}`;
 
       const response: ApiResponse<SalaryListResponse> =
         await clientApi.get(url);
@@ -175,24 +323,58 @@ export const useSalaryList = (params: SalaryListParams) => {
   });
 };
 
-export const useSalarySummary = (params: SalarySummaryParams) => {
+// export const useSalarySummary = (params: SalarySummaryParams) => {
+//   const { userRole = "ALL", month, year } = params;
+
+//   return useQuery({
+//     queryKey: ["salary-summary", userRole, month, year],
+//     queryFn: async () => {
+//       let url = `/dashboard/salary/summary?userRole=${userRole}`;
+
+//       if (month && year) {
+//         url += `&month=${month}&year=${year}`;
+//       }
+
+//       const response: ApiResponse<{ data: SalarySummary }> =
+//         await clientApi.get(url);
+
+//       if (!response.success || !response.data) {
+//         throw new Error(
+//           (response.error as string) || "Failed to fetch salary summary",
+//         );
+//       }
+
+//       return response.data.data;
+//     },
+//     retry: 2,
+//     retryDelay: 1000,
+//   });
+// };
+
+export interface SalaryDashboardStatsParams {
+  userRole?: UserRole;
+  month?: number;
+  year?: number;
+}
+
+export const useSalaryDashboardStats = (params: SalaryDashboardStatsParams) => {
   const { userRole = "ALL", month, year } = params;
 
   return useQuery({
-    queryKey: ["salary-summary", userRole, month, year],
+    queryKey: ["salary-dashboard-stats", userRole, month, year],
     queryFn: async () => {
-      let url = `/dashboard/salary/summary?userRole=${userRole}`;
+      let url = `/salary/dashboard-stats?userRole=${userRole}`;
 
       if (month && year) {
         url += `&month=${month}&year=${year}`;
       }
 
-      const response: ApiResponse<{ data: SalarySummary }> =
+      const response: ApiResponse<{ data: SalaryDashboardStats }> =
         await clientApi.get(url);
 
       if (!response.success || !response.data) {
         throw new Error(
-          (response.error as string) || "Failed to fetch salary summary",
+          (response.error as string) || "Failed to fetch salary dashboard stats",
         );
       }
 

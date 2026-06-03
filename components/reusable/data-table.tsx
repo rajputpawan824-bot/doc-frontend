@@ -67,6 +67,7 @@ export default function DataTable<TData, TValue>({
   });
   const [rowSelection, setRowSelection] = useState({});
   const [globalFilter, setGlobalFilter] = useState("");
+  const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 10 });
 
   // Add a "View" column if showViewButton is true
   const tableColumns = showViewButton
@@ -98,12 +99,14 @@ export default function DataTable<TData, TValue>({
       columnVisibility,
       rowSelection,
       globalFilter,
+      pagination,
     },
     onSortingChange: setSorting,
     onColumnFiltersChange: setColumnFilters,
     onColumnVisibilityChange: setColumnVisibility,
     onRowSelectionChange: setRowSelection,
     onGlobalFilterChange: setGlobalFilter,
+    onPaginationChange: setPagination,
     getCoreRowModel: getCoreRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
     getSortedRowModel: getSortedRowModel(),
@@ -111,6 +114,7 @@ export default function DataTable<TData, TValue>({
   });
 
   const searchColumnObj = searchColumn ? table.getColumn(searchColumn) : null;
+  const paginationRowModel = table.getPaginationRowModel();
 
   return (
     <div className="space-y-4">
@@ -186,8 +190,8 @@ export default function DataTable<TData, TValue>({
             ))}
           </TableHeader>
           <TableBody>
-            {table.getRowModel().rows?.length ? (
-              table.getRowModel().rows.map((row) => (
+            {paginationRowModel.rows?.length ? (
+              paginationRowModel.rows.map((row) => (
                 <TableRow
                   key={row.id}
                   data-state={row.getIsSelected() && "selected"}

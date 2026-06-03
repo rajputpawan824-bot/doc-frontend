@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, ReactNode } from "react";
 import {
   Users,
   UserPlus,
@@ -23,6 +23,8 @@ import {
   Key,
   Eye,
   Loader2,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -34,12 +36,25 @@ import {
 } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import DataTable from "@/components/reusable/data-table";
+import { Input } from "@/components/ui/input";
 import ReusableModal, {
   FormSection,
   ReusableFormData,
 } from "@/components/reusable/reusable-modal";
-import { ColumnDef } from "@tanstack/react-table";
+import {
+  ColumnDef,
+  flexRender,
+  getCoreRowModel,
+  useReactTable,
+} from "@tanstack/react-table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -69,6 +84,116 @@ import {
   useUpdateReceptionistPassword,
 } from "@/services/admin/reception";
 
+interface PaginatedReceptionistTableProps {
+  columns: ColumnDef<Receptionist>[];
+  data: Receptionist[];
+  emptyMessage: ReactNode;
+  currentPage: number;
+  totalPages: number;
+  limit: number;
+  onPageChange: (page: number) => void;
+  onLimitChange: (limit: number) => void;
+}
+
+function PaginatedReceptionistTable({
+  columns,
+  data,
+  emptyMessage,
+  currentPage,
+  totalPages,
+  limit,
+  onPageChange,
+  onLimitChange,
+}: PaginatedReceptionistTableProps) {
+  const table = useReactTable({
+    data,
+    columns,
+    getCoreRowModel: getCoreRowModel(),
+  });
+
+  return (
+    <div className="space-y-4">
+      <div className="rounded-md border">
+        <Table>
+          <TableHeader>
+            {table.getHeaderGroups().map((headerGroup) => (
+              <TableRow key={headerGroup.id}>
+                {headerGroup.headers.map((header) => (
+                  <TableHead key={header.id}>
+                    {header.isPlaceholder
+                      ? null
+                      : flexRender(header.column.columnDef.header, header.getContext())}
+                  </TableHead>
+                ))}
+              </TableRow>
+            ))}
+          </TableHeader>
+          <TableBody>
+            {table.getRowModel().rows.length ? (
+              table.getRowModel().rows.map((row) => (
+                <TableRow key={row.id}>
+                  {row.getVisibleCells().map((cell) => (
+                    <TableCell key={cell.id}>
+                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                    </TableCell>
+                  ))}
+                </TableRow>
+              ))
+            ) : (
+              <TableRow>
+                <TableCell colSpan={columns.length} className="h-24 text-center">
+                  {emptyMessage}
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </div>
+
+      <div className="flex flex-col sm:flex-row items-center justify-end gap-4">
+        <div className="flex items-center space-x-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => onPageChange(currentPage - 1)}
+            disabled={currentPage <= 1}
+          >
+            <ChevronLeft className="h-4 w-4" />
+            Previous
+          </Button>
+          <div className="flex items-center gap-1 text-sm">
+            <span>Page</span>
+            <strong>
+              {currentPage} of {totalPages}
+            </strong>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => onPageChange(currentPage + 1)}
+            disabled={currentPage >= totalPages}
+          >
+            Next
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+
+          <select
+            className="h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
+            value={limit}
+            onChange={(event) => onLimitChange(Number(event.target.value))}
+          >
+            {[10, 20, 30, 50, 100].map((pageSize) => (
+              <option key={pageSize} value={pageSize}>
+                Show {pageSize}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ==================== MAIN COMPONENT ====================
 const ReceptionistManagement = () => {
   const [activeTab, setActiveTab] = useState("view");
@@ -79,12 +204,18 @@ const ReceptionistManagement = () => {
   const [selectedReceptionistId, setSelectedReceptionistId] = useState<
     string | null
   >(null);
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(10);
   const queryClient = useQueryClient();
 
   
 
   // API Hooks
-  const { data: receptionists = [], isLoading, refetch } = useReceptionists();
+  const {
+    data: receptionistsResponse,
+    isLoading,
+    refetch,
+  } = useReceptionists({ page, limit, search: searchQuery });
   const { data: deactivatedReceptionists = [], refetch: refetchDeactivated } =
     useDeactivatedReceptionists();
 
@@ -108,6 +239,21 @@ const ReceptionistManagement = () => {
       receptionist.updatedAt instanceof Date
     );
   };
+
+  const receptionists = receptionistsResponse?.data ?? [];
+  const receptionistPagination = receptionistsResponse?.pagination;
+  const totalPages = Math.max(receptionistPagination?.totalPages ?? 1, 1);
+  const currentPage = Math.min(
+    Math.max(
+      receptionistPagination?.page ?? receptionistPagination?.currentPage ?? page,
+      1,
+    ),
+    totalPages,
+  );
+  const totalRecords =
+    receptionistPagination?.totalRecords ??
+    receptionistPagination?.total ??
+    receptionists.length;
 
   const validReceptionists = receptionists.filter(isReceptionist) as Receptionist[];
   const validDeactivatedReceptionists = deactivatedReceptionists.filter(
@@ -881,6 +1027,19 @@ const filteredActiveReceptionists = activeReceptionists.filter(
     }
   };
 
+  const handlePageChange = (nextPage: number) => {
+    if (nextPage < currentPage) {
+      setPage((p) => Math.max(1, p - 1));
+      return;
+    }
+    setPage((p) => Math.min(totalPages, p + 1));
+  };
+
+  const handleLimitChange = (nextLimit: number) => {
+    setLimit(nextLimit);
+    setPage(1);
+  };
+
   const handleViewDetails = (receptionistId: string) => {
     setSelectedReceptionistId(receptionistId);
     setIsDetailModalOpen(true);
@@ -1184,16 +1343,32 @@ const filteredActiveReceptionists = activeReceptionists.filter(
         </div>
       </div>
 
+      <div className="relative max-w-md">
+        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+        <Input
+          placeholder="Search receptionists..."
+          className="pl-10"
+          value={searchQuery}
+          onChange={(event) => {
+            setPage(1);
+            setSearchQuery(event.target.value);
+          }}
+        />
+      </div>
+
       {/* Tabs */}
       <Tabs
         value={activeTab}
-        onValueChange={setActiveTab}
+        onValueChange={(value) => {
+          setActiveTab(value);
+          setPage(1);
+        }}
         className="space-y-4"
       >
         <TabsList className="grid grid-cols-2 w-full max-w-md">
           <TabsTrigger value="view" className="flex items-center gap-2">
             <Users className="h-4 w-4" />
-            Active Receptionists ({filteredActiveReceptionists.length})
+            Active Receptionists ({totalRecords})
           </TabsTrigger>
           <TabsTrigger value="deactivated" className="flex items-center gap-2">
             <Archive className="h-4 w-4" />
@@ -1207,7 +1382,7 @@ const filteredActiveReceptionists = activeReceptionists.filter(
             <CardHeader className="">
               <CardTitle className="flex items-center gap-2">
                 <Users className="h-5 w-5 text-green-600" />
-                Active Receptionists ({filteredActiveReceptionists.length})
+                Active Receptionists ({totalRecords})
               </CardTitle>
               <CardDescription>
                 Manage receptionist details, patient edit permissions, and
@@ -1220,11 +1395,14 @@ const filteredActiveReceptionists = activeReceptionists.filter(
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600"></div>
                 </div>
               ) : (
-                <DataTable
+                <PaginatedReceptionistTable
                   columns={activeColumns}
                   data={filteredActiveReceptionists}
-                  searchColumn="name"
-                  searchPlaceholder="Search active receptionists..."
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  limit={limit}
+                  onPageChange={handlePageChange}
+                  onLimitChange={handleLimitChange}
                   emptyMessage={
                     <div className="text-center py-12">
                       <Users className="mx-auto h-12 w-12 text-gray-400" />
@@ -1261,11 +1439,14 @@ const filteredActiveReceptionists = activeReceptionists.filter(
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-600"></div>
                 </div>
               ) : (
-                <DataTable
+                <PaginatedReceptionistTable
                   columns={deactivatedColumns}
                   data={filteredDeactivatedReceptionists}
-                  searchColumn="name"
-                  searchPlaceholder="Search deactivated receptionists..."
+                  currentPage={1}
+                  totalPages={1}
+                  limit={10}
+                  onPageChange={() => undefined}
+                  onLimitChange={() => undefined}
                   emptyMessage={
                     <div className="text-center py-12">
                       <UserCheck className="mx-auto h-12 w-12 text-gray-400" />

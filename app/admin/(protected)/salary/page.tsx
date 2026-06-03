@@ -1,7 +1,7 @@
 // components/salary/SalaryManagement.tsx
 "use client";
 
-import { useState, useEffect } from "react";
+import { ReactNode, useState } from "react";
 import {
   IndianRupee,
   Users,
@@ -26,6 +26,8 @@ import {
   Calculator,
   BarChart3,
   Wallet,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -38,11 +40,23 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import DataTable from "@/components/reusable/data-table";
 import ReusableModal, {
   FormSection,
 } from "@/components/reusable/reusable-modal";
-import { ColumnDef } from "@tanstack/react-table";
+import {
+  ColumnDef,
+  flexRender,
+  getCoreRowModel,
+  useReactTable,
+} from "@tanstack/react-table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import {
   Select,
   SelectContent,
@@ -56,9 +70,10 @@ import { useQueryClient } from "@tanstack/react-query";
 // ==================== API HOOKS ====================
 import {
   useSalaryList,
-  useSalarySummary,
+  //useSalarySummary,
   useSalaryHistory,
   useSalaryDetails,
+  useSalaryDashboardStats,
   useAddSalaryAdjustment,
   useUpdateSalary,
   useDownloadPayslip,
@@ -83,6 +98,122 @@ interface MonthYear {
   year: number;
 }
 
+interface SalaryDataTableProps {
+  columns: ColumnDef<EmployeeSalary>[];
+  data: EmployeeSalary[];
+  emptyMessage: ReactNode;
+  currentPage: number;
+  totalPages: number;
+  limit: number;
+  onPageChange: (page: number) => void;
+  onLimitChange: (limit: number) => void;
+}
+
+function SalaryDataTable({
+  columns,
+  data,
+  emptyMessage,
+  currentPage,
+  totalPages,
+  limit,
+  onPageChange,
+  onLimitChange,
+}: SalaryDataTableProps) {
+  const table = useReactTable({
+    data,
+    columns,
+    getCoreRowModel: getCoreRowModel(),
+  });
+
+  return (
+    <div className="space-y-4">
+      <div className="rounded-md border">
+        <Table>
+          <TableHeader>
+            {table.getHeaderGroups().map((headerGroup) => (
+              <TableRow key={headerGroup.id}>
+                {headerGroup.headers.map((header) => (
+                  <TableHead key={header.id}>
+                    {header.isPlaceholder
+                      ? null
+                      : flexRender(
+                          header.column.columnDef.header,
+                          header.getContext(),
+                        )}
+                  </TableHead>
+                ))}
+              </TableRow>
+            ))}
+          </TableHeader>
+          <TableBody>
+            {table.getRowModel().rows.length ? (
+              table.getRowModel().rows.map((row) => (
+                <TableRow key={row.id}>
+                  {row.getVisibleCells().map((cell) => (
+                    <TableCell key={cell.id}>
+                      {flexRender(
+                        cell.column.columnDef.cell,
+                        cell.getContext(),
+                      )}
+                    </TableCell>
+                  ))}
+                </TableRow>
+              ))
+            ) : (
+              <TableRow>
+                <TableCell colSpan={columns.length} className="h-24 text-center">
+                  {emptyMessage}
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </div>
+
+      <div className="flex flex-col sm:flex-row items-center justify-end gap-4">
+        <div className="flex items-center space-x-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => onPageChange(currentPage - 1)}
+            disabled={currentPage <= 1}
+          >
+            <ChevronLeft className="h-4 w-4" />
+            Previous
+          </Button>
+          <div className="flex items-center gap-1 text-sm">
+            <span>Page</span>
+            <strong>
+              {currentPage} of {totalPages}
+            </strong>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => onPageChange(currentPage + 1)}
+            disabled={currentPage >= totalPages}
+          >
+            Next
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+
+          <select
+            className="h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
+            value={limit}
+            onChange={(event) => onLimitChange(Number(event.target.value))}
+          >
+            {[10, 20, 30].map((pageSize) => (
+              <option key={pageSize} value={pageSize}>
+                Show {pageSize}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ==================== MAIN COMPONENT ====================
 const SalaryManagement = () => {
   const queryClient = useQueryClient();
@@ -96,9 +227,10 @@ const SalaryManagement = () => {
   const [selectedEmployee, setSelectedEmployee] =
     useState<EmployeeSalary | null>(null);
   const [selectedEmployeeForHistory, setSelectedEmployeeForHistory] =
+  
     useState<EmployeeSalary | null>(null);
   const [page, setPage] = useState(1);
-  const [limit] = useState(10);
+  const [limit, setLimit] = useState(10);
 
   // Get current month and year
   const currentDate = new Date();
@@ -119,36 +251,66 @@ const SalaryManagement = () => {
     limit,
     month: selectedMonthYear.month,
     year: selectedMonthYear.year,
+    search: searchQuery,
   });
 
-  // Fetch salary summary
-  const {
-    data: salarySummary,
-    isLoading: isLoadingSummary,
-    refetch: refetchSummary,
-  } = useSalarySummary({
-    userRole: selectedRole,
-    month: selectedMonthYear.month,
-    year: selectedMonthYear.year,
-  });
+  // // Fetch salary summary
+  // const {
+  //   data: salarySummary,
+  //   isLoading: isLoadingSummary,
+  //   refetch: refetchSummary,
+  // } = useSalarySummary({
+  //   userRole: selectedRole,
+  //   month: selectedMonthYear.month,
+  //   year: selectedMonthYear.year,
+  // });
 
   // Fetch salary history for selected employee
-  const { data: salaryHistory, isLoading: isLoadingHistory } = useSalaryHistory(
+  const {
+    data: salaryHistory,
+    isLoading: isLoadingHistory,
+    refetch: refetchHistory,
+  } = useSalaryHistory(
     selectedEmployeeForHistory?.userId || "",
     selectedEmployeeForHistory?.role || "ALL",
   );
 
+  const selectedEmployeeForDetails =
+    selectedEmployee ?? selectedEmployeeForHistory;
+
+  const salaryDetailsParams = selectedEmployeeForDetails
+    ? {
+        userId: selectedEmployeeForDetails.userId,
+        userRole: selectedEmployeeForDetails.role,
+        month: selectedMonthYear.month,
+        year: selectedMonthYear.year,
+      }
+    : null;
+
+  console.log("SalaryManagement params passed to useSalaryDetails:", {
+    userId: salaryDetailsParams?.userId,
+    userRole: salaryDetailsParams?.userRole,
+    month: salaryDetailsParams?.month,
+    year: salaryDetailsParams?.year,
+  });
+
   // Fetch salary details for selected employee
-  const { data: salaryDetails, isLoading: isLoadingDetails } = useSalaryDetails(
-    selectedEmployee
-      ? {
-          userId: selectedEmployee.userId,
-          userRole: selectedEmployee.role,
-          month: selectedMonthYear.month,
-          year: selectedMonthYear.year,
-        }
-      : null,
-  );
+  const {
+    data: salaryDetails,
+    isLoading: isLoadingDetails,
+    refetch: refetchDetails,
+  } = useSalaryDetails(salaryDetailsParams);
+
+  // Fetch salary dashboard stats
+  const {
+    data: salaryDashboardStats,
+    isLoading: isLoadingDashboardStats,
+    refetch: refetchDashboardStats,
+  } = useSalaryDashboardStats({
+    userRole: selectedRole,
+    month: selectedMonthYear.month,
+    year: selectedMonthYear.year,
+  });
 
   // ==================== MUTATIONS ====================
   // Add salary adjustment mutation
@@ -168,13 +330,6 @@ const SalaryManagement = () => {
 
   // Update salary mutation
   const updateSalaryMutation = useUpdateSalary({
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["salary-list"] });
-      queryClient.invalidateQueries({ queryKey: ["salary-summary"] });
-      toast.success("Salary updated successfully");
-      setIsSalaryModalOpen(false);
-      setSelectedEmployee(null);
-    },
     onError: (error) => {
       toast.error(`Failed to update salary: ${error.message}`);
     },
@@ -194,29 +349,64 @@ const SalaryManagement = () => {
   }
 
   // Filter employees based on search query
-  const filteredEmployees = (salaryListData?.data || []).filter((employee) => {
-    if (!searchQuery) return true;
-
-    const query = searchQuery.toLowerCase();
-    return (
-      employee.name.toLowerCase().includes(query) ||
-      employee.userId.toLowerCase().includes(query) ||
-      employee.role.toLowerCase().includes(query)
-    );
-  });
+  const salaryEmployees = salaryListData?.data ?? [];
+  const salaryPagination = salaryListData?.pagination;
+  const totalPages = Math.max(
+    salaryPagination?.totalPages ?? salaryListData?.totalPages ?? 1,
+    1,
+  );
+  const currentPage = Math.min(
+    Math.max(salaryPagination?.page ?? salaryListData?.currentPage ?? page, 1),
+    totalPages,
+  );
+  const totalRecords =
+    salaryPagination?.totalRecords ??
+    salaryPagination?.total ??
+    salaryListData?.count ??
+    salaryEmployees.length;
 
   // ==================== HANDLERS ====================
-  const handleSalaryUpdate = (data: Record<string, unknown>) => {
+  const handleSalaryUpdate = async (data: Record<string, unknown>) => {
     if (!selectedEmployee) return;
 
-    updateSalaryMutation.mutate({
-      userId: selectedEmployee.userId,
-      userRole: selectedEmployee.role,
-      newSalary: Number(data.newSalary),
-      reason: String(data.reason || ""),
-      month: selectedMonthYear.month,
-      year: selectedMonthYear.year,
-    });
+    const previousSalary = selectedEmployee.baseSalary;
+    const newSalary = Number(data.newSalary);
+
+    console.log("Salary value before update:", previousSalary);
+
+    try {
+      const response = await updateSalaryMutation.mutateAsync({
+        userId: selectedEmployee.userId,
+        userRole: selectedEmployee.role,
+        newSalary,
+        reason: String(data.reason || ""),
+        month: selectedMonthYear.month,
+        year: selectedMonthYear.year,
+      });
+
+      console.log("Salary update mutation response:", response);
+
+      await queryClient.invalidateQueries({ queryKey: ["salary-list"] });
+      await queryClient.invalidateQueries({
+        queryKey: ["salary-dashboard-stats"],
+      });
+
+      const [salaryListResponse] = await Promise.all([
+        refetchList(),
+        refetchDashboardStats(),
+      ]);
+
+      console.log(
+        "Salary list response after refetch:",
+        salaryListResponse.data,
+      );
+
+      toast.success("Salary updated successfully");
+      setIsSalaryModalOpen(false);
+      setSelectedEmployee(null);
+    } catch {
+      // useUpdateSalary handles the visible toast through onError.
+    }
   };
 
   const handleAdjustmentAdd = (data: Record<string, unknown>) => {
@@ -244,8 +434,24 @@ const SalaryManagement = () => {
 
   const handleRefresh = () => {
     refetchList();
-    refetchSummary();
+   // refetchSummary();
+    if (selectedEmployeeForHistory) {
+      refetchHistory();
+    }
+    if (selectedEmployee) {
+      refetchDetails();
+    }
+    refetchDashboardStats();
     toast.success("Data refreshed");
+  };
+
+  const handlePageChange = (nextPage: number) => {
+    setPage(Math.min(Math.max(nextPage, 1), totalPages));
+  };
+
+  const handleLimitChange = (nextLimit: number) => {
+    setPage(1);
+    setLimit(nextLimit);
   };
 
   // ==================== FORM SECTIONS ====================
@@ -367,7 +573,7 @@ const SalaryManagement = () => {
   // ==================== TABLE COLUMNS ====================
   const employeeColumns: ColumnDef<EmployeeSalary>[] = [
     {
-      accessorKey: "employeeInfo",
+      accessorKey: "name",
       header: "Employee Information",
       cell: ({ row }) => {
         const employee = row.original;
@@ -433,15 +639,16 @@ const SalaryManagement = () => {
       header: "Adjustments",
       cell: ({ row }) => {
         const employee = row.original;
+        const adjustments = employee.adjustments ?? [];
         return (
           <div className="space-y-1">
-            {employee.adjustments.length > 0 ? (
+            {adjustments.length > 0 ? (
               <>
                 <Badge variant="outline" className="text-xs">
-                  {employee.adjustments.length} adjustment(s)
+                  {adjustments.length} adjustment(s)
                 </Badge>
                 <div className="text-xs text-muted-foreground">
-                  Latest: {employee.adjustments[0].type}
+                  Latest: {adjustments[0]?.type}
                 </div>
               </>
             ) : (
@@ -512,7 +719,7 @@ const SalaryManagement = () => {
   ];
 
   // Loading state
-  const isLoading = isLoadingList || isLoadingSummary;
+  const isLoading = isLoadingList ;
 
   // ==================== RENDER ====================
   return (
@@ -553,7 +760,7 @@ const SalaryManagement = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {formatCurrency(salarySummary?.totalMonthlySalary || 0)}
+              {formatCurrency(salaryDashboardStats?.totalMonthlySalary || 0)}
             </div>
           </CardContent>
         </Card>
@@ -566,7 +773,7 @@ const SalaryManagement = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {formatCurrency(salarySummary?.averageSalary || 0)}
+              {formatCurrency(salaryDashboardStats?.averageSalary || 0)}
             </div>
           </CardContent>
         </Card>
@@ -579,7 +786,7 @@ const SalaryManagement = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-green-600">
-              +{formatCurrency(salarySummary?.totalBonus || 0)}
+              +{formatCurrency(salaryDashboardStats?.totalBonuses || 0)}
             </div>
           </CardContent>
         </Card>
@@ -592,7 +799,7 @@ const SalaryManagement = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-red-600">
-              -{formatCurrency(salarySummary?.totalPenalty || 0)}
+              -{formatCurrency(salaryDashboardStats?.totalPenalties || 0)}
             </div>
           </CardContent>
         </Card>
@@ -600,12 +807,12 @@ const SalaryManagement = () => {
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              Pending Adjustments
+              Total Adjustments
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-yellow-600">
-              {formatCurrency(salarySummary?.pendingAdjustment || 0)}
+              {formatCurrency(salaryDashboardStats?.totalAdjustments || 0)}
             </div>
           </CardContent>
         </Card>
@@ -616,7 +823,10 @@ const SalaryManagement = () => {
         <div className="flex-1 max-w-md">
           <Select
             value={selectedRole}
-            onValueChange={(value: UserRole) => setSelectedRole(value)}
+            onValueChange={(value: UserRole) => {
+              setPage(1);
+              setSelectedRole(value);
+            }}
           >
             <SelectTrigger>
               <Filter className="h-4 w-4 mr-2" />
@@ -640,6 +850,7 @@ const SalaryManagement = () => {
             value={`${selectedMonthYear.month}-${selectedMonthYear.year}`}
             onValueChange={(value) => {
               const [month, year] = value.split("-");
+              setPage(1);
               setSelectedMonthYear({
                 month: Number(month),
                 year: Number(year),
@@ -669,7 +880,10 @@ const SalaryManagement = () => {
             placeholder="Search employees..."
             className="pl-10"
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={(e) => {
+              setPage(1);
+              setSearchQuery(e.target.value);
+            }}
           />
         </div>
       </div>
@@ -679,7 +893,7 @@ const SalaryManagement = () => {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Users className="h-5 w-5 text-purple-600" />
-            Employee Salary List ({filteredEmployees.length} employees)
+            Employee Salary List ({totalRecords} employees)
           </CardTitle>
           <CardDescription>
             Manage salaries, add bonuses/penalties, and view history
@@ -691,11 +905,14 @@ const SalaryManagement = () => {
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
             </div>
           ) : (
-            <DataTable
+            <SalaryDataTable
               columns={employeeColumns}
-              data={filteredEmployees}
-              searchColumn="name"
-              searchPlaceholder="Search employees..."
+              data={salaryEmployees}
+              currentPage={currentPage}
+              totalPages={totalPages}
+              limit={limit}
+              onPageChange={handlePageChange}
+              onLimitChange={handleLimitChange}
               emptyMessage={
                 <div className="text-center py-12">
                   <Users className="mx-auto h-12 w-12 text-gray-400" />

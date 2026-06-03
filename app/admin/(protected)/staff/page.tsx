@@ -1,15 +1,28 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
-import { ColumnDef } from "@tanstack/react-table";
-import DataTable from "@/components/reusable/data-table";
+import { useState, useMemo, useEffect, ReactNode } from "react";
+import {
+  ColumnDef,
+  flexRender,
+  getCoreRowModel,
+  useReactTable,
+} from "@tanstack/react-table";
 import ReusableModal, {
   FormSection,
 } from "@/components/reusable/reusable-modal";
 import DeleteModal from "@/components/ui/delete-modal";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -59,6 +72,9 @@ import {
   Home,
   Settings,
   Star,
+  ChevronLeft,
+  ChevronRight,
+  Search,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
@@ -126,6 +142,116 @@ interface StaffMember {
   email?: string;
   phone?: string;
   isActive?: boolean;
+}
+
+interface PaginatedStaffTableProps {
+  columns: ColumnDef<StaffMember, unknown>[];
+  data: StaffMember[];
+  emptyMessage: ReactNode;
+  currentPage: number;
+  totalPages: number;
+  limit: number;
+  onPageChange: (page: number) => void;
+  onLimitChange: (limit: number) => void;
+}
+
+function PaginatedStaffTable({
+  columns,
+  data,
+  emptyMessage,
+  currentPage,
+  totalPages,
+  limit,
+  onPageChange,
+  onLimitChange,
+}: PaginatedStaffTableProps) {
+  const table = useReactTable({
+    data,
+    columns,
+    getCoreRowModel: getCoreRowModel(),
+  });
+
+  return (
+    <div className="space-y-4">
+      <div className="rounded-md border">
+        <Table>
+          <TableHeader>
+            {table.getHeaderGroups().map((headerGroup) => (
+              <TableRow key={headerGroup.id}>
+                {headerGroup.headers.map((header) => (
+                  <TableHead key={header.id}>
+                    {header.isPlaceholder
+                      ? null
+                      : flexRender(header.column.columnDef.header, header.getContext())}
+                  </TableHead>
+                ))}
+              </TableRow>
+            ))}
+          </TableHeader>
+          <TableBody>
+            {table.getRowModel().rows.length ? (
+              table.getRowModel().rows.map((row) => (
+                <TableRow key={row.id}>
+                  {row.getVisibleCells().map((cell) => (
+                    <TableCell key={cell.id}>
+                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                    </TableCell>
+                  ))}
+                </TableRow>
+              ))
+            ) : (
+              <TableRow>
+                <TableCell colSpan={columns.length} className="h-24 text-center">
+                  {emptyMessage}
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </div>
+
+      <div className="flex flex-col sm:flex-row items-center justify-end gap-4">
+        <div className="flex items-center space-x-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => onPageChange(currentPage - 1)}
+            disabled={currentPage <= 1}
+          >
+            <ChevronLeft className="h-4 w-4" />
+            Previous
+          </Button>
+          <div className="flex items-center gap-1 text-sm">
+            <span>Page</span>
+            <strong>
+              {currentPage} of {totalPages}
+            </strong>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => onPageChange(currentPage + 1)}
+            disabled={currentPage >= totalPages}
+          >
+            Next
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+
+          <select
+            className="h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
+            value={limit}
+            onChange={(event) => onLimitChange(Number(event.target.value))}
+          >
+            {[10, 20, 30, 50, 100].map((pageSize) => (
+              <option key={pageSize} value={pageSize}>
+                Show {pageSize}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 // Form sections for staff
@@ -317,6 +443,9 @@ const StaffManagement = () => {
   const [staffToDelete, setStaffToDelete] = useState<StaffMember | null>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [selectedStaffId, setSelectedStaffId] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(10);
+  const [searchQuery, setSearchQuery] = useState("");
 
   const [filterActive, setFilterActive] = useState<
     "active" | "inactive" | "all"
@@ -334,7 +463,7 @@ const StaffManagement = () => {
     data: staffResponse,
     isLoading,
     refetch,
-  } = useStaff({ status: filterActive });
+  } = useStaff({ status: filterActive, page, limit, search: searchQuery });
 
   const {
     data: staffStats,
@@ -396,6 +525,16 @@ const StaffManagement = () => {
 
   // Get staff data from API response
   const staff = staffResponse?.data || [];
+  const staffPagination = staffResponse?.pagination;
+  const totalPages = Math.max(staffPagination?.totalPages ?? 1, 1);
+  const currentPage = Math.min(
+    Math.max(staffPagination?.page ?? staffPagination?.currentPage ?? page, 1),
+    totalPages,
+  );
+  const totalRecords =
+    staffPagination?.totalRecords ??
+    staffPagination?.total ??
+    staff.length;
 
 
 
@@ -985,6 +1124,19 @@ const StaffManagement = () => {
     refetchStaffStats();
   };
 
+  const handlePageChange = (nextPage: number) => {
+    if (nextPage < currentPage) {
+      setPage((p) => Math.max(1, p - 1));
+      return;
+    }
+    setPage((p) => Math.min(totalPages, p + 1));
+  };
+
+  const handleLimitChange = (nextLimit: number) => {
+    setLimit(nextLimit);
+    setPage(1);
+  };
+
   // Get initial form data for editing
   const getInitialData = () => {
     if (!editingStaff) return {};
@@ -1060,7 +1212,10 @@ const StaffManagement = () => {
             <Button
               variant={filterActive === "active" ? "default" : "outline"}
               size="sm"
-              onClick={() => setFilterActive("active")}
+              onClick={() => {
+                setFilterActive("active");
+                setPage(1);
+              }}
             >
               <UserCheck className="h-3 w-3 mr-1" />
               Active
@@ -1068,7 +1223,10 @@ const StaffManagement = () => {
             <Button
               variant={filterActive === "inactive" ? "default" : "outline"}
               size="sm"
-              onClick={() => setFilterActive("inactive")}
+              onClick={() => {
+                setFilterActive("inactive");
+                setPage(1);
+              }}
             >
               <UserX className="h-3 w-3 mr-1" />
               Inactive
@@ -1101,6 +1259,19 @@ const StaffManagement = () => {
         </div>
       </div>
 
+      <div className="relative max-w-md">
+        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+        <Input
+          placeholder="Search staff..."
+          className="pl-10"
+          value={searchQuery}
+          onChange={(event) => {
+            setPage(1);
+            setSearchQuery(event.target.value);
+          }}
+        />
+      </div>
+
       {/* Data Table */}
       <Card className="border shadow-sm">
         <CardContent className="pt-6">
@@ -1109,12 +1280,12 @@ const StaffManagement = () => {
               {viewMode === "other" ? (
                 <>
                   <Users className="h-5 w-5 text-blue-600" />
-                  Other Staff ({filteredStaff.length})
+                  Other Staff ({totalRecords})
                 </>
               ) : (
                 <>
                   <Users className="h-5 w-5 text-blue-600" />
-                  All Staff ({filteredStaff.length})
+                  All Staff ({totalRecords})
                 </>
               )}
             </h3>
@@ -1130,11 +1301,14 @@ const StaffManagement = () => {
               <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
             </div>
           ) : (
-            <DataTable<StaffMember, unknown>
+            <PaginatedStaffTable
               columns={staffColumns}
               data={filteredStaff}
-              searchColumn="name"
-              searchPlaceholder={`Search ${viewMode === "other" ? "staff" : "staff"} by name, category, or skill...`}
+              currentPage={currentPage}
+              totalPages={totalPages}
+              limit={limit}
+              onPageChange={handlePageChange}
+              onLimitChange={handleLimitChange}
               emptyMessage={
                 <div className="text-center py-12">
                   {viewMode === "other" ? (

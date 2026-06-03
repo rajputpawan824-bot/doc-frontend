@@ -11,7 +11,14 @@ import type {
 } from "@/lib/validations/Admin/doctor";
 
 type DoctorAvailability = string | string[];
-type DoctorMeta = { page?: number; limit?: number; total?: number; totalPages?: number };
+type DoctorMeta = {
+  page?: number;
+  currentPage?: number;
+  limit?: number;
+  total?: number;
+  totalRecords?: number;
+  totalPages?: number;
+};
 
 type DoctorApiRecord = Omit<DoctorResponse, "availabilityDays"> & {
   _id?: string;
@@ -132,12 +139,23 @@ export const useDoctorById = (id: string | undefined) => {
   });
 };
 
-export const useDoctors = (params: { status?: string, page?: number, limit?: number } = {}) => {
+export const useDoctors = (
+  params: { status?: string; page?: number; limit?: number; search?: string } = {},
+) => {
+  const { status, page = 1, limit = 10, search = "" } = params;
+
   return useQuery({
-    queryKey: ["doctors", params],
+    queryKey: ["doctors", status, page, limit, search],
     queryFn: async () => {
-      const response: ApiResponse<{ data: DoctorApiRecord[], meta: DoctorMeta }> =
-        await clientApi.get("/doctors/all-doctors", { params });
+      const response: ApiResponse<{
+        data: DoctorApiRecord[];
+        meta?: DoctorMeta;
+        pagination?: DoctorMeta;
+        currentPage?: number;
+        totalPages?: number;
+      }> = await clientApi.get("/doctors/all-doctors", {
+        params: { status, page, limit, search },
+      });
 
       if (!response.success) {
         throw new Error(
@@ -156,6 +174,12 @@ export const useDoctors = (params: { status?: string, page?: number, limit?: num
 
       return {
         data: doctors,
+        pagination: response.data.pagination ?? response.data.meta ?? {
+          page: response.data.currentPage ?? page,
+          limit,
+          totalRecords: doctors.length,
+          totalPages: response.data.totalPages ?? 1,
+        },
         meta: response.data.meta,
       };
     },

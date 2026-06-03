@@ -60,11 +60,15 @@ export interface EmployeeSalary {
 }
 
 export interface SalaryListResponse {
+  count?: number;
+  currentPage?: number;
+  totalPages?: number;
   data: EmployeeSalary[];
   pagination: {
     page: number;
     limit: number;
-    total: number;
+    total?: number;
+    totalRecords?: number;
     totalPages: number;
   };
 }
@@ -75,6 +79,14 @@ export interface SalarySummary {
   totalBonus: number;
   totalPenalty: number;
   pendingAdjustment: number;
+}
+
+export interface SalaryDashboardStats {
+  totalMonthlySalary: number;
+  averageSalary: number;
+  totalBonuses: number;
+  totalPenalties: number;
+  totalAdjustments: number;
 }
 
 export const SALARY_VALIDATION_RULES: ValidationRules = {
