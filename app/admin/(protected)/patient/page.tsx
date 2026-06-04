@@ -52,7 +52,11 @@ import {
 } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
 import { Progress } from '@/components/ui/progress';
-import { usePatients } from '@/services/admin/patient';
+import { 
+  useAddPatient, 
+  usePatients, 
+  useUpdatePatientStatus 
+} from '@/services/admin/patient';
 
 // ==================== TYPES AND ENUMS ====================
 export enum Gender {
@@ -95,6 +99,11 @@ export interface Patient {
   status: PatientStatus;
   medicalNotes: MedicalNote[];
   medicalReports: MedicalReport[];
+  relation?: "SELF" | "FATHER" | "MOTHER" | "CHILD" | "SPOUSE" | "OTHER";
+diseases?: string[] | string;
+  user?: {
+    isActive: boolean;
+  };
   createdAt: Date;
   updatedAt: Date;
   lastPasswordUpdate?: Date;
@@ -248,7 +257,7 @@ function PaginatedPatientTable({
 
 // ==================== MAIN COMPONENT ====================
 const PatientManagement = () => {
-  const [activeTab, setActiveTab] = useState('view');
+  const [activeTab, setActiveTab] = useState('active');
   const [searchQuery, setSearchQuery] = useState('');
   const [patients, setPatients] = useState<Patient[]>([]);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -265,7 +274,24 @@ const PatientManagement = () => {
     isLoading,
     refetch,
   } = usePatients({ page, limit, search: searchQuery });
-  
+  const addPatientMutation = useAddPatient({
+    onSuccess: () => {
+      setIsAddModalOpen(false);
+      void refetch();
+    },
+    onError: (error) => {
+      alert(error.message);
+    },
+  });
+  const updateStatusMutation = useUpdatePatientStatus({
+  onSuccess: () => {
+    void refetch();
+  },
+  onError: (error) => {
+    console.error("Failed to update patient status:", error);
+    alert(error.message);
+  },
+});
   // File upload state
   const [uploadingFile, setUploadingFile] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -277,123 +303,6 @@ const PatientManagement = () => {
     doctorName: '',
     notes: ''
   });
-
-  // ==================== MOCK DATA ====================
-  const initialPatients: Patient[] = [
-    {
-      id: '1',
-      patientId: 'PAT-2024-001',
-      name: 'Rajesh Kumar',
-      phoneNumber: '9876543210',
-      email: 'rajesh.kumar@email.com',
-      gender: Gender.MALE,
-      adhar: '123456789012',
-      address: '123 MG Road, Bangalore - 560001',
-      emergencyContact: '8765432109',
-      dateOfBirth: new Date('1985-05-15'),
-      age: 39,
-      bloodGroup: BloodGroup.B_POSITIVE,
-      status: PatientStatus.ACTIVE,
-      medicalNotes: [
-        {
-          id: 'n1',
-          patientId: '1',
-          doctorName: 'Dr. Sharma',
-          notes: 'Patient reported mild fever and headache. Prescribed paracetamol 500mg twice daily for 3 days.',
-          date: new Date('2024-01-15'),
-          createdAt: new Date('2024-01-15')
-        },
-        {
-          id: 'n2',
-          patientId: '1',
-          doctorName: 'Dr. Gupta',
-          notes: 'Follow-up visit. Fever subsided. Advised to continue medication and rest.',
-          date: new Date('2024-01-18'),
-          createdAt: new Date('2024-01-18')
-        }
-      ],
-      medicalReports: [
-        {
-          id: 'r1',
-          patientId: '1',
-          title: 'Blood Test Report',
-          description: 'Complete Blood Count',
-          fileName: 'blood_test_rajesh.pdf',
-          fileSize: 2457600, // 2.4MB
-          fileType: 'application/pdf',
-          uploadedBy: 'Dr. Sharma',
-          uploadedAt: new Date('2024-01-15')
-        },
-        {
-          id: 'r2',
-          patientId: '1',
-          title: 'X-Ray Report',
-          description: 'Chest X-Ray',
-          fileName: 'xray_chest.jpg',
-          fileSize: 3145728, // 3MB
-          fileType: 'image/jpeg',
-          uploadedBy: 'Dr. Gupta',
-          uploadedAt: new Date('2024-01-16')
-        }
-      ],
-      createdAt: new Date('2024-01-10'),
-      updatedAt: new Date('2024-01-18')
-    },
-    {
-      id: '2',
-      patientId: 'PAT-2024-002',
-      name: 'Priya Sharma',
-      phoneNumber: '8765432109',
-      email: 'priya.sharma@email.com',
-      gender: Gender.FEMALE,
-      adhar: '234567890123',
-      address: '456 Park Street, Mumbai - 400001',
-      emergencyContact: '7654321098',
-      dateOfBirth: new Date('1990-08-22'),
-      age: 33,
-      bloodGroup: BloodGroup.A_POSITIVE,
-      status: PatientStatus.FOLLOW_UP,
-      medicalNotes: [
-        {
-          id: 'n3',
-          patientId: '2',
-          doctorName: 'Dr. Reddy',
-          notes: 'Annual health checkup. All parameters normal. Advised regular exercise.',
-          date: new Date('2024-01-20'),
-          createdAt: new Date('2024-01-20')
-        }
-      ],
-      medicalReports: [
-        {
-          id: 'r3',
-          patientId: '2',
-          title: 'ECG Report',
-          description: 'Electrocardiogram',
-          fileName: 'ecg_priya.pdf',
-          fileSize: 1572864, // 1.5MB
-          fileType: 'application/pdf',
-          uploadedBy: 'Dr. Reddy',
-          uploadedAt: new Date('2024-01-20')
-        }
-      ],
-      createdAt: new Date('2024-01-15'),
-      updatedAt: new Date('2024-01-20')
-    },
-    {
-      id: '3',
-      patientId: 'PAT-2024-003',
-      name: 'Amit Patel',
-      phoneNumber: '7654321098',
-      gender: Gender.MALE,
-      adhar: '345678901234',
-      address: '789 Gandhi Road, Delhi - 110001',
-      status: PatientStatus.ACTIVE,
-      medicalNotes: [],
-      medicalReports: [],
-      createdAt: new Date('2024-01-25'),
-      updatedAt: new Date('2024-01-25')
-    }
-  ];
 
   // ==================== DATA MANAGEMENT ====================
   useEffect(() => {
@@ -536,6 +445,31 @@ const PatientManagement = () => {
             label: group
           }))
         },
+
+        {
+  name: 'relation',
+  label: 'Relation',
+  type: 'select',
+  required: true,
+  width: 'half',
+  defaultValue: 'SELF',
+  options: [
+    { value: 'SELF', label: 'Self' },
+    { value: 'FATHER', label: 'Father' },
+    { value: 'MOTHER', label: 'Mother' },
+    { value: 'CHILD', label: 'Child' },
+    { value: 'SPOUSE', label: 'Spouse' },
+    { value: 'OTHER', label: 'Other' }
+  ]
+},
+{
+  name: 'diseases',
+  label: 'Diseases',
+  type: 'textarea',
+  placeholder: 'Diabetes, BP, Asthma, etc.',
+  width: 'full',
+  rows: 3
+},
         {
           name: 'emergencyContact',
           label: 'Emergency Contact (Optional)',
@@ -755,31 +689,16 @@ const PatientManagement = () => {
   };
 
   // ==================== HANDLERS ====================
-  const handleAddPatient = (data: Partial<Patient>) => {
-    const newPatient: Patient = {
-      id: Date.now().toString(),
-      name: data.name || "",
-      phoneNumber: data.phoneNumber || "",
-      email: data.email,
-      gender: data.gender || Gender.OTHER,
-      adhar: data.adhar || "",
-      address: data.address || "",
-      emergencyContact: data.emergencyContact,
-      dateOfBirth: data.dateOfBirth,
-      age: data.age,
-      bloodGroup: data.bloodGroup,
-      patientId: generatePatientId(),
-      status: PatientStatus.ACTIVE,
-      medicalNotes: [],
-      medicalReports: [],
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      password: Math.random().toString(36).slice(-8) // Auto-generated password
-    };
-
-    setPatients(prev => [...prev, newPatient]);
-    setIsAddModalOpen(false);
-    void refetch();
+  const handleAddPatient = async (data: Partial<Patient>) => {
+   await addPatientMutation.mutateAsync({
+  ...data,
+  diseases: data.diseases
+    ? String(data.diseases)
+        .split(",")
+        .map(item => item.trim())
+        .filter(Boolean)
+    : [],
+});
   };
 
   const handleEditPatient = (data: Partial<Patient>) => {
@@ -834,6 +753,13 @@ const PatientManagement = () => {
     void refetch();
   };
 
+  const handleToggleStatus = async (patientId: string, currentIsActive: boolean) => {
+    const action = currentIsActive ? 'deactivate' : 'reactivate';
+    if (!confirm(`Are you sure you want to ${action} this patient?`)) return;
+
+    updateStatusMutation.mutate({ id: patientId, isActive: !currentIsActive });
+  };
+
   const handleDeleteReport = (reportId: string, patientId: string) => {
     if (!confirm('Are you sure you want to delete this report?')) return;
 
@@ -864,9 +790,7 @@ const PatientManagement = () => {
             <div className="font-medium flex items-center gap-2">
               <User className="h-4 w-4" />
               {patient.name}
-              <Badge variant="outline" className="text-xs">
-                {patient.patientId}
-              </Badge>
+            
             </div>
             <div className="text-sm text-muted-foreground flex items-center gap-2 mt-1">
               <Phone className="h-3 w-3" />
@@ -967,6 +891,7 @@ const PatientManagement = () => {
       header: 'Actions',
       cell: ({ row }) => {
         const patient = row.original;
+        const isActive = patient.user?.isActive !== false;
         return (
           <div className="flex gap-2">
             <Button
@@ -1002,11 +927,30 @@ const PatientManagement = () => {
             >
               <File className="h-4 w-4" />
             </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => handleToggleStatus(patient.id, isActive)}
+              title={isActive ? "Deactivate patient" : "Reactivate patient"}
+              className={isActive 
+                ? "text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200" 
+                : "text-green-600 hover:text-green-700 hover:bg-green-50 border-green-200"}
+            >
+              {isActive ? <Trash2 className="h-4 w-4" /> : <CheckCircle className="h-4 w-4" />}
+            </Button>
           </div>
         );
       }
     }
   ];
+
+  // ==================== FILTERED DATA ====================
+  const filteredPatients = patients.filter((patient) => {
+    const isPatientActive = patient.user?.isActive !== false;
+    return activeTab === 'active' ? isPatientActive : !isPatientActive;
+  });
+  const activeCount = patients.filter(p => p.user?.isActive !== false).length;
+  const inactiveCount = patients.filter(p => p.user?.isActive === false).length;
 
   // ==================== RENDER ====================
   return (
@@ -1056,23 +1000,27 @@ const PatientManagement = () => {
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList className="grid grid-cols-1 w-full max-w-md">
-          <TabsTrigger value="view" className="flex items-center gap-2">
-            <Users className="h-4 w-4" />
-            Patient Records ({totalRecords})
+        <TabsList className="grid grid-cols-2 w-full max-w-md">
+          <TabsTrigger value="active" className="flex items-center gap-2">
+            <CheckCircle className="h-4 w-4" />
+            Active Patients ({activeCount})
+          </TabsTrigger>
+          <TabsTrigger value="inactive" className="flex items-center gap-2">
+            <XCircle className="h-4 w-4" />
+            Deactivated Patients ({inactiveCount})
           </TabsTrigger>
         </TabsList>       
 
         {/* Patient Records Tab */}
-        <TabsContent value="view" className="space-y-4">
+        <TabsContent value={activeTab} className="space-y-4">
           <Card className="border shadow-sm">
             <CardHeader className="">
               <CardTitle className="flex items-center gap-2">
                 <Users className="h-5 w-5 text-blue-600" />
-                Patient Records ({totalRecords})
+                {activeTab === 'active' ? 'Active' : 'Deactivated'} Patient Records ({filteredPatients.length})
               </CardTitle>
               <CardDescription>
-                View and manage patient information, medical notes, and reports
+                View and manage {activeTab === 'active' ? 'active' : 'deactivated'} patient information, medical notes, and reports
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -1083,7 +1031,7 @@ const PatientManagement = () => {
               ) : (
                 <PaginatedPatientTable
                   columns={patientColumns}
-                  data={patients}
+                  data={filteredPatients}
                   currentPage={currentPage}
                   totalPages={totalPages}
                   limit={limit}
@@ -1092,7 +1040,7 @@ const PatientManagement = () => {
                   emptyMessage={
                     <div className="text-center py-12">
                       <Users className="mx-auto h-12 w-12 text-gray-400" />
-                      <h3 className="mt-4 text-lg font-semibold">No patients found</h3>
+                      <h3 className="mt-4 text-lg font-semibold">No {activeTab} patients found</h3>
                       <p className="text-muted-foreground">
                         Add your first patient to get started
                       </p>
