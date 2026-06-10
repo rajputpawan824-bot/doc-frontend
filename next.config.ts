@@ -5,7 +5,7 @@ const nextConfig: NextConfig = {
     return [
       {
         source: "/api/:path*",
-        destination: "http://clinic-managemnet-backend.onrender.com/api/:path*",
+        destination: "https://clinic-managemnet-backend.onrender.com/api/:path*",
       },
     ];
   },

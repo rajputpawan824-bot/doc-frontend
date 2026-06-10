@@ -29,6 +29,7 @@ type DoctorApiRecord = Omit<DoctorResponse, "availabilityDays"> & {
 export interface DoctorDashboardStats {
   totalDoctors: number;
   activeDoctors: number;
+    inactiveDoctors: number;
   onLeaveDoctors: number;
   averageConsultationFee: number;
 }
@@ -54,9 +55,12 @@ function normalizeDoctor(doctor: DoctorApiRecord): DoctorResponse {
     ...doctor,
     id: doctor._id || doctor.id,
     status: doctor.user?.isActive ? "active" : "inactive",
-    availabilityDays: Array.isArray(doctor.availabilityDays)
-      ? doctor.availabilityDays.join(", ")
-      : doctor.availabilityDays,
+    availabilityDays:
+      Array.isArray(doctor.availabilityDays)
+        ? doctor.availabilityDays
+        : typeof doctor.availabilityDays === "string"
+        ? doctor.availabilityDays.split(",").map((s) => s.trim().toUpperCase()).filter(Boolean)
+        : [],
   };
 }
 
@@ -80,7 +84,9 @@ export function useAddDoctor(options?: {
         address: formData.address.trim(),
         experience: Number(formData.experience),
         consultationFee: Number(formData.consultationFee),
-        availabilityDays: formData.availabilityDays.split(",").map(d => d.trim().toUpperCase()),
+       availabilityDays: formData.availabilityDays.map(
+  d => d.toUpperCase()
+),
         password: formData.password,
        workingHours: {
   start: formData.workingHours.start,
@@ -252,9 +258,12 @@ export function useUpdateDoctor(options?: {
         ...data,
       };
       
-      if (typeof payload.availabilityDays === "string") {
-        payload.availabilityDays = payload.availabilityDays.split(",").map((d: string) => d.trim().toUpperCase());
-      }
+    if (Array.isArray(payload.availabilityDays)) {
+  payload.availabilityDays =
+    payload.availabilityDays.map(
+      d => d.toUpperCase()
+    );
+}
       
       const response: ApiResponse<{ data: DoctorResponse }> =
         await clientApi.put(`/doctors/update/${id}`, payload);
@@ -334,7 +343,7 @@ export function useUpdateDoctorPassword() {
       return response.data?.data as DoctorResponse;
     },
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["doctor", data.id] });
+      queryClient.invalidateQueries({ queryKey: ["doctor"] });
     },
   });
 }

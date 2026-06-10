@@ -241,6 +241,9 @@ const {
 
 
   const doctors = doctorsResponse?.data || initialDoctors || [];
+  console.log("Doctors Response:", doctorsResponse);
+console.log("Doctors Data:", doctors);
+console.log("First Doctor:", doctors[0]);
   const doctorPagination = doctorsResponse?.pagination;
   const totalPages = Math.max(doctorPagination?.totalPages ?? 1, 1);
   const currentPage = Math.min(
@@ -509,15 +512,29 @@ const {
         {
           key: "availabilityDays",
           label: "Availability Days",
-          type: "text",
+          type: "tags",
           icon: <Calendar className="w-4 h-4" />,
           width: "half",
         },
+        {
+  key: "workingHours",
+  label: "Working Hours",
+  type: "text",
+  icon: <Clock className="w-4 h-4" />,
+  width: "half",
+  format: (value) => {
+    if (!value) return "-";
+
+    const hours = value as { start?: string; end?: string };
+
+    return `${hours.start || "-"} - ${hours.end || "-"}`;
+  },
+},
       ],
     },
     {
-      id: "financial-details",
-      title: "Financial Details",
+      id: "Fees-details",
+      title: "Fees Details",
       size: 50,
       description: "Salary and consultation fees",
       icon: <IndianRupee className="h-5 w-5 text-yellow-600" />,
@@ -530,7 +547,7 @@ const {
           key: "salary",
           label: "Monthly Salary",
           type: "currency",
-          icon: <IndianRupee className="w-4 h-4" />,
+         
           width: "half",
           important: true,
          format: (value) => `₹${Number(value).toLocaleString()}`,
@@ -539,7 +556,7 @@ const {
           key: "consultationFee",
           label: "Consultation Fee",
           type: "currency",
-          icon: <IndianRupee className="w-4 h-4" />,
+         
           width: "half",
           format: (value) => `₹${String(value ?? "")}`,
         },
@@ -593,13 +610,7 @@ const {
           icon: <Clock className="w-4 h-4" />,
           width: "half",
         },
-        {
-          key: "id",
-          label: "Doctor ID",
-          type: "text",
-          icon: <Key className="w-4 h-4" />,
-          width: "half",
-        },
+   
       ],
     },
   ];
@@ -628,13 +639,13 @@ const {
             ) : (
               <UserCheck className="w-4 h-4" />
             ),
-          onClick: () => {
-            updateDoctorMutationDisabled.mutate({
-      id: selectedDoctor.id,
-      isActive: true,
-    });
-            setIsDetailModalOpen(false);
-          },
+onClick: () => {
+  updateDoctorMutationDisabled.mutate({
+    id: selectedDoctor.id,
+    isActive: selectedDoctor.status !== "active",
+  });
+  setIsDetailModalOpen(false);
+},
         },
         {
           label: "Change Password",
@@ -1036,7 +1047,9 @@ const {
       address: String(data.address || ""),
       experience: Number(data.experience || ""),
       consultationFee: Number(data.consultationFee),
-      availabilityDays: String(data.availabilityDays || ""),
+      availabilityDays: Array.isArray(data.availabilityDays)
+  ? data.availabilityDays
+  : [],
       password: data.password ? String(data.password) : undefined,
       workingHours,
     };
@@ -1094,7 +1107,9 @@ const {
       aadhaar: String(data.aadhaar || ""),
       address: String(data.address || ""),
       experience: Number(data.experience || ""),
-      availabilityDays: String(data.availabilityDays || ""),
+      availabilityDays: Array.isArray(data.availabilityDays)
+  ? data.availabilityDays
+  : [],
       workingHours,
     };
 
@@ -1164,11 +1179,11 @@ const {
   // ==================== TABLE COLUMNS ====================
   const searchColumn: ColumnDef<DoctorResponse>[] = [
     {
-      id: "searchIndex",
+      id: "Index",
       accessorFn: (doctor) =>
         `${doctor.user?.name ?? ""} ${doctor.user?.email ?? ""} ${doctor.user?.phone ?? ""} ${doctor.registrationNo ?? ""} ${doctor.id ?? ""}`.toLowerCase(),
-      header: "Search Index",
-      cell: () => null,
+      header: "Index",
+      cell: ({ row }) => row.index + 1,
       enableSorting: false,
       enableHiding: true,
       filterFn: (row, columnId, filterValue) =>
@@ -1251,18 +1266,18 @@ const {
       },
     },
     {
-      accessorKey: "financial",
-      header: "Financial",
+      accessorKey: "Fees",
+      header: "Fees",
       cell: ({ row }) => {
         const doctor = row.original;
         return (
           <div className="space-y-1">
             <div className="flex items-center gap-2">
-              <IndianRupee className="h-3 w-3 text-green-600" />
-              <span className="text-sm font-medium">₹{doctor.salary}</span>
+              
+             
             </div>
             <div className="flex items-center gap-2">
-              <IndianRupee className="h-3 w-3 text-blue-600" />
+              
               <span className="text-sm">₹{doctor.consultationFee}</span>
             </div>
           </div>
@@ -1379,6 +1394,7 @@ const {
       header: "Last Active",
       cell: ({ row }) => {
         const doctor = row.original;
+        console.log("Inactive Doctor:", doctor);
         return (
           <div className="flex items-center gap-2">
             <Calendar className="h-3 w-3 text-gray-400" />
@@ -1520,15 +1536,15 @@ const {
         <TabsList className="grid grid-cols-3 w-full max-w-lg">
           <TabsTrigger value="active" className="flex items-center gap-2">
             <UserCheck className="h-4 w-4" />
-            Active ({activeTab === "active" ? totalRecords : filteredDoctors.active.length})
+            Active ({dashboardStats?.activeDoctors ?? 0})
           </TabsTrigger>
           <TabsTrigger value="inactive" className="flex items-center gap-2">
             <UserMinus className="h-4 w-4" />
-            Inactive ({activeTab === "inactive" ? totalRecords : filteredDoctors.inactive.length})
+            Inactive ({dashboardStats?.inactiveDoctors ?? 0})
           </TabsTrigger>
           <TabsTrigger value="on-leave" className="flex items-center gap-2">
             <Calendar className="h-4 w-4" />
-            On Leave ({activeTab === "on-leave" ? totalRecords : filteredDoctors["on-leave"].length})
+           On Leave ({dashboardStats?.onLeaveDoctors ?? 0})
           </TabsTrigger>
         </TabsList>
 

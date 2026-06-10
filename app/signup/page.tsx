@@ -1,13 +1,14 @@
 // app/signup/page.tsx
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
+import { State, City } from "country-state-city";
 import {
   Select,
   SelectContent,
@@ -44,36 +45,63 @@ type SignupType = "clinic" | "patient" | null;
 
 export default function SignUpPage() {
   const [signupType, setSignupType] = useState<SignupType>(null);
-  const [currentStep, setCurrentStep] = useState(1);
+const [currentStep, setCurrentStep] = useState(() => {
+  if (typeof window !== "undefined") {
+    return Number(
+      sessionStorage.getItem("clinicSignupCurrentStep") || 1
+    );
+  }
+
+  return 1;
+});
+useEffect(() => {
+  sessionStorage.setItem(
+    "clinicSignupCurrentStep",
+    currentStep.toString()
+  );
+}, [currentStep]);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
+
   // Form state
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState(() => {
+
+      if (typeof window !== "undefined") {
+    const savedData = sessionStorage.getItem("clinicSignupForm");
+
+    if (savedData) {
+      return JSON.parse(savedData);
+    }
+  }
+  return{
     // Clinic Information
-    clinicName: "6-9, city General Clinic",
+    clinicName: "",
     clinicType: "",
-    clinicEmail: "Clinic@gmail.com",
+    clinicEmail: "",
     establishmentYear: "",
-    city: "City",
-    state: "State",
-    address: "Street Address, Building Name",
-    phone: "765412398",
-    zipCode: "100001",
+    city: "",
+    state: "",
+    address: "",
+    phone: "",
+    zipCode: "",
+ 
 
     // Admin Account
-    adminName: "Name",
+    adminName: "",
     adminRole: "",
-    adminPhone: "766432389",
-    adminEmail: "Clinic@gmail.com",
-    password: "Password",
-    confirmPassword: "Confirm Password",
+    adminPhone: "",
+    adminEmail: "",
+    password: "",
+    confirmPassword: "",
 
     // Additional Details
-    workingHours: "Monday to Friday 8:30 am to 9:30 pm",
-    specialities: "Cardiologist, Pediatrics",
-    numberOfDoctors: "2",
-    numberOfStaff: "5",
+      workingDays: [] as string[],
+  openingTime: "",
+  closingTime: "",
+    specialities: "",
+    numberOfDoctors: "",
+    numberOfStaff: "",
 
     // Key Functional Setup
     adminIsDoctor: false,
@@ -85,6 +113,7 @@ export default function SignUpPage() {
 
     // Verification
     agreeToTerms: false,
+  };
   });
 
   const clinicTypes = [
@@ -98,15 +127,25 @@ export default function SignUpPage() {
     "Other",
   ];
 
-  const roles = ["Admin", "Doctor", "Admin & Doctor", "Practice Manager"];
+useEffect(() => {
+  sessionStorage.setItem(
+    "clinicSignupForm",
+    JSON.stringify(formData)
+  );
+}, [formData]);
+  const handleInputChange = (field: string, value: any) => {
+setFormData((prev: any) => ({
+  ...prev,
+  [field]: value,
+}));
+};
+const handleWorkingDayChange = (day: string) => {
+  const updatedDays = formData.workingDays.includes(day)
+    ? formData.workingDays.filter((d: string) => d !== day)
+    : [...formData.workingDays, day];
 
-  const handleInputChange = (field: string, value: string | boolean) => {
-    setFormData((prev) => ({
-      ...prev,
-      [field]: value,
-    }));
-  };
-
+  handleInputChange("workingDays", updatedDays);
+};
   const nextStep = () => {
     setCurrentStep((prev) => prev + 1);
   };
@@ -120,7 +159,15 @@ export default function SignUpPage() {
     // Handle signup logic here
     console.log("Clinic signup:", formData);
   };
+  const states = State.getStatesOfCountry("IN");
+  
+  const selectedState = states.find(
+  (state) => state.name === formData.state
+);
 
+const cities = selectedState
+  ? City.getCitiesOfState("IN", selectedState.isoCode)
+  : [];
   // Initial selection screen
   if (!signupType) {
     return (
@@ -375,6 +422,7 @@ export default function SignUpPage() {
                       <Input
                         id="clinicName"
                         value={formData.clinicName}
+                        placeholder="Enter clinic or hospital name"
                         onChange={(e) =>
                           handleInputChange("clinicName", e.target.value)
                         }
@@ -411,6 +459,7 @@ export default function SignUpPage() {
                           id="clinicEmail"
                           type="email"
                           value={formData.clinicEmail}
+                          placeholder="Enter clinic email address"
                           onChange={(e) =>
                             handleInputChange("clinicEmail", e.target.value)
                           }
@@ -427,6 +476,7 @@ export default function SignUpPage() {
                         <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                         <Input
                           id="establishmentYear"
+                          type="date"
                           placeholder="DD/MM/YY"
                           value={formData.establishmentYear}
                           onChange={(e) =>
@@ -441,27 +491,53 @@ export default function SignUpPage() {
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="city">City</Label>
-                      <Input
-                        id="city"
-                        value={formData.city}
-                        onChange={(e) =>
-                          handleInputChange("city", e.target.value)
-                        }
-                        className="py-3"
-                      />
+                      <Label htmlFor="State">State</Label>
+                     <Select
+  value={formData.state}
+  onValueChange={(value) =>
+    handleInputChange("state", value)
+  }
+>
+  <SelectTrigger>
+    <SelectValue placeholder="Select state" />
+  </SelectTrigger>
+
+  <SelectContent>
+    {states.map((state) => (
+      <SelectItem
+        key={state.isoCode}
+        value={state.name}
+      >
+        {state.name}
+      </SelectItem>
+    ))}
+  </SelectContent>
+</Select>
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="state">State</Label>
-                      <Input
-                        id="state"
-                        value={formData.state}
-                        onChange={(e) =>
-                          handleInputChange("state", e.target.value)
-                        }
-                        className="py-3"
-                      />
+                      <Label htmlFor="city">City</Label>
+                      <Select
+  value={formData.city}
+  onValueChange={(value) =>
+    handleInputChange("city", value)
+  }
+>
+  <SelectTrigger>
+    <SelectValue placeholder="Select city" />
+  </SelectTrigger>
+
+  <SelectContent>
+    {cities.map((city) => (
+      <SelectItem
+        key={city.name}
+        value={city.name}
+      >
+        {city.name}
+      </SelectItem>
+    ))}
+  </SelectContent>
+</Select>
                     </div>
 
                     <div className="space-y-2 md:col-span-2">
@@ -471,6 +547,7 @@ export default function SignUpPage() {
                         <Textarea
                           id="address"
                           value={formData.address}
+                            placeholder="Enter hospital address, building name"
                           onChange={(e) =>
                             handleInputChange("address", e.target.value)
                           }
@@ -486,6 +563,7 @@ export default function SignUpPage() {
                         <Input
                           id="phone"
                           value={formData.phone}
+                          placeholder="Enter clinic phone number"
                           onChange={(e) =>
                             handleInputChange("phone", e.target.value)
                           }
@@ -499,6 +577,7 @@ export default function SignUpPage() {
                       <Input
                         id="zipCode"
                         value={formData.zipCode}
+                          placeholder="Enter ZIP / Postal code"
                         onChange={(e) =>
                           handleInputChange("zipCode", e.target.value)
                         }
@@ -520,6 +599,7 @@ export default function SignUpPage() {
                         <Input
                           id="adminName"
                           value={formData.adminName}
+                            placeholder="Full Name"
                           onChange={(e) =>
                             handleInputChange("adminName", e.target.value)
                           }
@@ -528,26 +608,7 @@ export default function SignUpPage() {
                       </div>
                     </div>
 
-                    <div className="space-y-2">
-                      <Label htmlFor="adminRole">Role</Label>
-                      <Select
-                        value={formData.adminRole}
-                        onValueChange={(value) =>
-                          handleInputChange("adminRole", value)
-                        }
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select role" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {roles.map((role) => (
-                            <SelectItem key={role} value={role}>
-                              {role}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
+                    
 
                     <div className="space-y-2">
                       <Label htmlFor="adminPhone">Phone Number</Label>
@@ -556,6 +617,7 @@ export default function SignUpPage() {
                         <Input
                           id="adminPhone"
                           value={formData.adminPhone}
+                          placeholder="Phone Number"
                           onChange={(e) =>
                             handleInputChange("adminPhone", e.target.value)
                           }
@@ -572,6 +634,7 @@ export default function SignUpPage() {
                           id="adminEmail"
                           type="email"
                           value={formData.adminEmail}
+                            placeholder="Enter Email address"
                           onChange={(e) =>
                             handleInputChange("adminEmail", e.target.value)
                           }
@@ -588,6 +651,7 @@ export default function SignUpPage() {
                           id="password"
                           type={showPassword ? "text" : "password"}
                           value={formData.password}
+                            placeholder="password"
                           onChange={(e) =>
                             handleInputChange("password", e.target.value)
                           }
@@ -615,6 +679,7 @@ export default function SignUpPage() {
                           id="confirmPassword"
                           type={showConfirmPassword ? "text" : "password"}
                           value={formData.confirmPassword}
+                            placeholder="confirm password"
                           onChange={(e) =>
                             handleInputChange("confirmPassword", e.target.value)
                           }
@@ -644,18 +709,69 @@ export default function SignUpPage() {
                 <div className="space-y-6">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-2 md:col-span-2">
-                      <Label htmlFor="workingHours">Clinic Working Hours</Label>
-                      <div className="relative">
-                        <Clock className="absolute left-3 top-3 text-gray-400 w-5 h-5" />
-                        <Input
-                          id="workingHours"
-                          value={formData.workingHours}
-                          onChange={(e) =>
-                            handleInputChange("workingHours", e.target.value)
-                          }
-                          className="pl-10 pr-4 py-3"
-                        />
-                      </div>
+  <Label>Working Days</Label>
+
+  <div className="flex flex-wrap gap-4">
+    {[
+      "Monday",
+      "Tuesday",
+      "Wednesday",
+      "Thursday",
+      "Friday",
+      "Saturday",
+      "Sunday",
+    ].map((day) => (
+      <label
+        key={day}
+        className="flex items-center gap-2 cursor-pointer"
+      >
+       <Checkbox
+  checked={formData.workingDays.includes(day)}
+  onCheckedChange={() => handleWorkingDayChange(day)}
+/>
+        <span>{day}</span>
+      </label>
+    ))}
+  </div>
+
+  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
+    <div className="space-y-2">
+      <Label htmlFor="openingTime">Opening Time</Label>
+
+      <div className="relative">
+        <Clock className="absolute left-3 top-3 text-gray-400 w-5 h-5" />
+
+        <Input
+          id="openingTime"
+          type="time"
+          value={formData.openingTime || ""}
+          onChange={(e) =>
+            handleInputChange("openingTime", e.target.value)
+          }
+          className="pl-10 pr-4 py-3"
+        />
+      </div>
+    </div>
+
+    <div className="space-y-2">
+      <Label htmlFor="closingTime">Closing Time</Label>
+
+      <div className="relative">
+        <Clock className="absolute left-3 top-3 text-gray-400 w-5 h-5" />
+
+        <Input
+          id="closingTime"
+          type="time"
+          value={formData.closingTime || ""}
+          onChange={(e) =>
+            handleInputChange("closingTime", e.target.value)
+          }
+          className="pl-10 pr-4 py-3"
+        />
+      </div>
+    </div>
+  </div>
+</div>
                     </div>
 
                     <div className="space-y-2 md:col-span-2">
@@ -665,6 +781,7 @@ export default function SignUpPage() {
                         <Input
                           id="specialities"
                           value={formData.specialities}
+                          placeholder="e.g. Cardiology, Pediatrics, Orthopedics"
                           onChange={(e) =>
                             handleInputChange("specialities", e.target.value)
                           }
@@ -681,6 +798,7 @@ export default function SignUpPage() {
                           id="numberOfDoctors"
                           type="number"
                           value={formData.numberOfDoctors}
+                          placeholder="Enter number of doctors"
                           onChange={(e) =>
                             handleInputChange("numberOfDoctors", e.target.value)
                           }
@@ -699,6 +817,7 @@ export default function SignUpPage() {
                           id="numberOfStaff"
                           type="number"
                           value={formData.numberOfStaff}
+                          placeholder="Enter number of staff members"
                           onChange={(e) =>
                             handleInputChange("numberOfStaff", e.target.value)
                           }
@@ -707,7 +826,7 @@ export default function SignUpPage() {
                       </div>
                     </div>
                   </div>
-                </div>
+                
               )}
 
               {/* Step 4: Key Functional Setup */}

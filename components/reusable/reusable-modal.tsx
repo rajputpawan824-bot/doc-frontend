@@ -23,6 +23,7 @@ export interface FieldConfig {
   rows?: number; // For textarea
   min?: number; // For number input
   max?: number; // For number input
+  onChange?: (value: unknown) => void;
   step?: number; // For number input
   validation?: {
     pattern?: RegExp;
@@ -278,7 +279,10 @@ function ReusableModalContent({
               required={required}
               className={`${commonClasses} resize-vertical min-h-[100px]`}
               value={fieldValueAsString(formData[field.name])}
-              onChange={(e) => handleChange(field.name, e.target.value)}
+          onChange={(e) => {
+  handleChange(field.name, e.target.value);
+  field.onChange?.(e.target.value);
+}}
               placeholder={field.placeholder}
               disabled={field.disabled}
               rows={field.rows || 4}
@@ -292,7 +296,10 @@ function ReusableModalContent({
               required={required}
               className={`${commonClasses} bg-white`}
               value={fieldValueAsString(formData[field.name])}
-              onChange={(e) => handleChange(field.name, e.target.value)}
+              onChange={(e) => {
+  handleChange(field.name, e.target.value);
+  field.onChange?.(e.target.value);
+}}
               disabled={field.disabled}
             >
               <option value="">Select {field.label.toLowerCase()}</option>
@@ -317,7 +324,10 @@ function ReusableModalContent({
                     name={field.name}
                     value={option.value}
                     checked={formData[field.name] === option.value}
-                    onChange={(e) => handleChange(field.name, e.target.value)}
+                   onChange={(e) => {
+  handleChange(field.name, e.target.value);
+  field.onChange?.(e.target.value);
+}}
                     disabled={field.disabled}
                     className="w-4 h-4 text-blue-600"
                   />
@@ -334,7 +344,10 @@ function ReusableModalContent({
                 type="checkbox"
                 id={field.name}
                 checked={fieldValueAsBoolean(formData[field.name])}
-                onChange={(e) => handleChange(field.name, e.target.checked)}
+               onChange={(e) => {
+  handleChange(field.name, e.target.value);
+  field.onChange?.(e.target.value);
+}}
                 disabled={field.disabled}
                 className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500"
               />
@@ -350,7 +363,10 @@ function ReusableModalContent({
               required={required}
               className={commonClasses}
               value={fieldValueAsString(formData[field.name])}
-              onChange={(e) => handleChange(field.name, e.target.value)}
+              onChange={(e) => {
+  handleChange(field.name, e.target.value);
+  field.onChange?.(e.target.value);
+}}
               placeholder={field.placeholder}
               disabled={field.disabled}
               min={field.min}

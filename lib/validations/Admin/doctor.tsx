@@ -18,7 +18,7 @@ export interface DoctorFormData {
   address: string;
   experience: number;
   consultationFee: number;
-  availabilityDays: string;
+  availabilityDays: string[];
   workingHours: {
     start: string;
     end: string;
@@ -39,7 +39,7 @@ experience: number;
   aadhaar: string;
   address: string;
   consultationFee: number;
-  availabilityDays: string;
+  availabilityDays: string[];
   documentUrl: string[];
   createdAt: string;
   updatedAt: string;
@@ -186,35 +186,21 @@ experience: {
       return true;
     },
   },
-  availabilityDays: {
-    required: "Availability days are required",
-    validate: (value: unknown) => {
-      if (typeof value !== "string") {
-        return "Availability days must be a string";
-      }
+availabilityDays: {
+  required: "Availability days are required",
+  validate: (value: unknown) => {
+    if (!Array.isArray(value)) {
+      return "Availability days must be an array";
+    }
+    if (value.length === 0) {
+      return "At least one availability day is required";
+    }
 
-      const days = value.split(/,\s*/);
-      const validDays = [
-        "MONDAY",
-        "TUESDAY",
-        "WEDNESDAY",
-        "THURSDAY",
-        "FRIDAY",
-        "SATURDAY",
-        "SUNDAY",
-      ];
-      const invalidDays = days.filter((day) => !validDays.includes(day.trim()));
-
-      if (invalidDays.length > 0) {
-        return `Invalid days: ${invalidDays.join(
-          ", "
-        )}. Valid days are: ${validDays.join(", ")}`;
-      }
-      return true;
-    },
+    return true;
   },
+},
 };
-
+      
 export function useDoctorFormValidation() {
   return useFormValidation(DOCTOR_VALIDATION_RULES);
 }
@@ -234,7 +220,7 @@ export interface CreateDoctorPayload {
   address: string;
   experience: number;
   consultationFee: number;
-  availabilityDays: string;
+  availabilityDays: string[];
   password?: string;
   workingHours: {
   start: string;

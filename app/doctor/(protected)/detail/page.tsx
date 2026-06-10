@@ -21,6 +21,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 interface DoctorDetails {
@@ -58,7 +59,7 @@ export default function DoctorDetailsSection({
       email: "john.smith@example.com",
       specialization: "Cardiology",
       consultationDuration: 30,
-      consultationDays: ["Monday", "Wednesday", "Friday"],
+      consultationDays: ["MONDAY", "WEDNESDAY", "FRIDAY", "TUESDAY", "THURSDAY", "SATURDAY", "SUNDAY"],
       consultationFee: 150,
       lastUpdated: new Date(),
       updatedBy: "Admin User",
@@ -315,16 +316,29 @@ export default function DoctorDetailsSection({
                 Consultation Days
               </Label>
               {isEditing ? (
-                <Input
-                  value={doctorData.consultationDays.join(", ")}
-                  onChange={(e) =>
-                    handleInputChange(
-                      "consultationDays",
-                      e.target.value.split(",").map((d) => d.trim())
-                    )
-                  }
-                  placeholder="Monday, Wednesday, Friday"
-                />
+                <div className="grid grid-cols-2 gap-2 mt-2">
+                  {["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"].map((day) => (
+                    <div key={day} className="flex items-center space-x-2">
+                      <Checkbox
+                        id={`cons-${day}`}
+                        checked={doctorData.consultationDays.includes(day)}
+                        onCheckedChange={(checked) => {
+                          const current = doctorData.consultationDays;
+                          const updated = checked
+                            ? [...current, day]
+                            : current.filter((d) => d !== day);
+                          handleInputChange("consultationDays", updated);
+                        }}
+                      />
+                      <Label
+                        htmlFor={`cons-${day}`}
+                        className="text-sm font-normal capitalize"
+                      >
+                        {day.toLowerCase()}
+                      </Label>
+                    </div>
+                  ))}
+                </div>
               ) : (
                 <div className="flex flex-wrap gap-2">
                   {doctorData.consultationDays.map((day, index) => (

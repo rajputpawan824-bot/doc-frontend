@@ -34,8 +34,9 @@ import {
   useCancelLeave,
   useLeaveStats,
   useCreateLeave,
+  useEmployeesForLeave,
 } from "@/services/admin/leave";
-import { useAllStaff } from "@/services/admin/staff";
+
 import type {
   LeaveResponse,
   LeaveStatus,
@@ -66,22 +67,14 @@ const LeaveManagement = () => {
   const [approvalIsPaid, setApprovalIsPaid] = useState<boolean | null>(null);
   const [showApproveDialog, setShowApproveDialog] = useState(false);
   const [isApplyModalOpen, setIsApplyModalOpen] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState<
+  "DOCTOR" | "STAFF" | "RECEPTIONIST" | undefined
+>();
 
-  const { data: allStaff = [] } = useAllStaff();
+const { data: employees = [] } =
+  useEmployeesForLeave(selectedCategory);
 
-  const employeeOptions = allStaff.reduce(
-    (options: { value: string; label: string }[], staff) => {
-      if (!staff.userId) return options;
-      return [
-        ...options,
-        {
-          value: staff.userId,
-          label: `${staff.user?.name || "Unknown"} (${staff.userId})`,
-        },
-      ];
-    },
-    [],
-  );
+
 
   const createLeave = useCreateLeave({
     onSuccess: () => {
@@ -624,18 +617,23 @@ const LeaveManagement = () => {
             name: "category",
             label: "Employee Category",
             type: "select",
+              onChange: (value) => {
+    if (
+      value === "DOCTOR" ||
+      value === "STAFF" ||
+      value === "RECEPTIONIST"
+    ) {
+      setSelectedCategory(value);
+    }
+  },
             required: true,
             options: [
-              { label: "All", value: "ALL" },
+          
               { label: "Doctor", value: "DOCTOR" },
-              { label: "Nurse", value: "NURSE" },
-              { label: "Technician", value: "TECHNICIAN" },
-              { label: "Administrator", value: "ADMINISTRATOR" },
+              
               { label: "Receptionist", value: "RECEPTIONIST" },
-              { label: "Pharmacist", value: "PHARMACIST" },
-              { label: "Cleaning Staff", value: "CLEANING_STAFF" },
-              { label: "Security", value: "SECURITY" },
-              { label: "Other", value: "OTHER" },
+             
+              { label: "Staff", value: "STAFF" },
             ],
             width: "half",
             defaultValue: "ALL",
@@ -645,7 +643,10 @@ const LeaveManagement = () => {
             label: "Select Employee",
             type: "select",
             required: true,
-            options: employeeOptions,
+            options: employees.map((emp) => ({
+  label: emp.name,
+  value: emp.id,
+})),
             width: "half",
           },
           {

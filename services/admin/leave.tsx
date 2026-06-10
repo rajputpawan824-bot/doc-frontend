@@ -371,3 +371,30 @@ export const useLeaveStats = (options?: {
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
 };
+
+
+export const useEmployeesForLeave = (
+  role?: "DOCTOR" | "STAFF" | "RECEPTIONIST"
+) => {
+  return useQuery({
+    queryKey: ["leave-employees", role],
+    queryFn: async () => {
+      const response = await clientApi.get<{
+        data: {
+          id: string;
+          name: string;
+        }[];
+      }>(`/leave/employees?role=${role}`);
+
+      if (!response.success) {
+        throw new Error(
+          response.error || "Failed to fetch employees"
+        );
+      }
+
+      return response.data?.data || [];
+    },
+    enabled: !!role,
+    retry: 2,
+  });
+};

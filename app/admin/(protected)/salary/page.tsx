@@ -835,11 +835,11 @@ const SalaryManagement = () => {
             <SelectContent>
               <SelectItem value="ALL">All Roles</SelectItem>
               <SelectItem value="DOCTOR">Doctor</SelectItem>
-              <SelectItem value="NURSE">Nurse</SelectItem>
+              
               <SelectItem value="RECEPTIONIST">Receptionist</SelectItem>
-              <SelectItem value="TECHNICIAN">Technician</SelectItem>
-              <SelectItem value="PHARMACIST">Pharmacist</SelectItem>
-              <SelectItem value="ADMIN">Admin</SelectItem>
+              
+           
+              
               <SelectItem value="STAFF">Staff</SelectItem>
             </SelectContent>
           </Select>
