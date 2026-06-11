@@ -858,13 +858,13 @@ onClick: () => {
           validation: transformValidation(DOCTOR_VALIDATION_RULES.shift),
         },
         {
-          name: "workingHoursStart",
+          name: "workingHourStart",
           label: "Working Hour Start",
           type: "time",
           width: "half",
         },
         {
-          name: "workingHoursEnd",
+          name: "workingHourEnd",
           label: "Working Hour End",
           type: "time",
           width: "half",
@@ -1081,13 +1081,13 @@ onClick: () => {
   // ==================== HANDLERS ====================
   const handleAddDoctor = (data: Record<string, unknown>) => {
 
-    console.log("EDIT FORM DATA:", data);
+
  const workingHours = {
   start: String(data.workingHourStart || ""),
   end: String(data.workingHourEnd || ""),
 };
 
-console.log("WORKING HOURS:", workingHours);
+
 
 
 
