@@ -43,6 +43,10 @@ experience: number;
   documentUrl: string[];
   createdAt: string;
   updatedAt: string;
+  workingHours?: {
+  start?: string;
+  end?: string;
+};
   user: {
     id: string;
     email: string;
@@ -59,6 +63,7 @@ experience: number;
     lastLogin: string | null;
     createdAt: string;
     updatedAt: string;
+ 
   };
   // Add status field derived from user.isActive
   status?: "active" | "inactive" | "on_leave";

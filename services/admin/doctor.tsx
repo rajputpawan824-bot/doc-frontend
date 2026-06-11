@@ -64,6 +64,25 @@ function normalizeDoctor(doctor: DoctorApiRecord): DoctorResponse {
   };
 }
 
+export interface OnLeaveDoctor {
+  _id: string;
+  leaveType: string;
+  fromDate: string;
+  toDate: string;
+  totalDays: number;
+  status: string;
+  reason: string;
+  isPaid: boolean;
+
+  user: {
+    _id: string;
+    name: string;
+    email: string;
+    phone: string;
+    isActive: boolean;
+  };
+}
+
 export function useAddDoctor(options?: {
   onSuccess?: (data: DoctorResponse) => void;
   onError?: (error: Error) => void;
@@ -120,6 +139,7 @@ export const useDoctorById = (id: string | undefined) => {
       if (!id) {
         throw new Error("Doctor ID is required");
       }
+      console.log("FETCHING DOCTOR DETAILS", id);
 
       const response: ApiResponse<{ data: DoctorApiRecord }> =
         await clientApi.get(`/doctors/${id}`);
@@ -358,6 +378,27 @@ export const useDoctorDashboardStats = () => {
       if (!response.success || !response.data) {
         throw new Error(
           getErrorMessage(response.error, "Failed to fetch dashboard stats"),
+        );
+      }
+
+      return response.data.data;
+    },
+    retry: 2,
+    retryDelay: 1000,
+  });
+};
+
+
+export const useOnLeaveDoctors = () => {
+  return useQuery({
+    queryKey: ["doctors", "on-leave"],
+    queryFn: async (): Promise<OnLeaveDoctor[]> => {
+      const response: ApiResponse<{ data: OnLeaveDoctor[] }> =
+        await clientApi.get("/doctors/on-leave");
+
+      if (!response.success || !response.data) {
+        throw new Error(
+          getErrorMessage(response.error, "Failed to fetch doctors on leave")
         );
       }
 

@@ -83,6 +83,8 @@ import {
   useUpdateDoctorPassword,
   useDoctorDashboardStats,
   type DoctorDashboardStats,
+  useOnLeaveDoctors,
+type OnLeaveDoctor,
 } from "@/services/admin/doctor";
 
 // Types
@@ -93,8 +95,8 @@ interface Doctor extends DoctorResponse {
 }
 
 interface PaginatedDoctorTableProps {
-  columns: ColumnDef<DoctorResponse>[];
-  data: DoctorResponse[];
+ columns: ColumnDef<any>[];
+  data: any[];
   emptyMessage: ReactNode;
   currentPage: number;
   totalPages: number;
@@ -223,9 +225,20 @@ const DoctorsPage = ({ initialDoctors }: { initialDoctors?: DoctorResponse[] }) 
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
   const [selectedDoctorId, setSelectedDoctorId] = useState<string | null>(null);
+   
+  
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(10);
   const queryClient = useQueryClient();
+  const DAYS = [
+    "Monday",
+    "Tuesday",
+    "Wednesday",
+    "Thursday",
+    "Friday",
+    "Saturday",
+    "Sunday",
+  ];
 
   // API Hooks
 const {
@@ -259,6 +272,15 @@ console.log("First Doctor:", doctors[0]);
   refetch: refetchDashboardStats,
 } = useDoctorDashboardStats();
   const dashboardStats = data as DoctorDashboardStats | undefined;
+
+
+  const {
+  data: onLeaveData,
+  isLoading: isOnLeaveLoading,
+  refetch: refetchOnLeaveDoctors,
+} = useOnLeaveDoctors();
+
+console.log("On Leave Data:", onLeaveData);
   const {
     data: selectedDoctor,
     isLoading: isDetailLoading,
@@ -283,8 +305,17 @@ console.log("First Doctor:", doctors[0]);
     onSuccess: () => {
       toast.success("Doctor updated successfully");
       setIsEditModalOpen(false);
-      queryClient.invalidateQueries({ queryKey: ["doctors"] });
-      queryClient.invalidateQueries({ queryKey: ["doctors", "dashboard-stats"] });
+
+         queryClient.invalidateQueries({
+      queryKey: ["doctors"],
+    });
+         queryClient.invalidateQueries({
+      queryKey: ["doctors", "dashboard-stats"],
+    });
+
+    queryClient.invalidateQueries({
+      queryKey: ["doctor", selectedDoctorId],
+    });
     },
     onError: (error) => {
       toast.error(error.message || "Failed to update doctor");
@@ -296,6 +327,7 @@ console.log("First Doctor:", doctors[0]);
       toast.success(`Doctor ${data.status === "active" ? "activated" : "disabled"} successfully`);
       queryClient.invalidateQueries({ queryKey: ["doctors"] });
       queryClient.invalidateQueries({ queryKey: ["doctors", "dashboard-stats"] });
+
     },
     onError: (error) => {
       toast.error(error.message || "Failed to update doctor status");
@@ -306,7 +338,7 @@ console.log("First Doctor:", doctors[0]);
 
   const activeDoctors = doctors.filter((d) => d.status === "active");
   const inactiveDoctors = doctors.filter((d) => d.status === "inactive");
-  const onLeaveDoctors = doctors.filter((d) => d.status === "on_leave");
+const onLeaveDoctors = onLeaveData || [];
 
   const filteredDoctors = {
     active: activeDoctors.filter(
@@ -326,14 +358,14 @@ console.log("First Doctor:", doctors[0]);
         d?.user?.phone.includes(searchQuery) ||
         d.department.toLowerCase().includes(searchQuery.toLowerCase()),
     ),
-    "on-leave": onLeaveDoctors.filter(
-      (d) =>
-        !searchQuery ||
-        d?.user?.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        d?.user?.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        d?.user?.phone.includes(searchQuery) ||
-        d.department.toLowerCase().includes(searchQuery.toLowerCase()),
-    ),
+   "on-leave": onLeaveDoctors.filter(
+    (d) =>
+      !searchQuery ||
+      d.user?.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      d.user?.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      d.user?.phone.includes(searchQuery) ||
+      d.leaveType.toLowerCase().includes(searchQuery.toLowerCase())
+  ),
   };
 
   // ==================== STATS ====================
@@ -614,7 +646,9 @@ console.log("First Doctor:", doctors[0]);
       ],
     },
   ];
-
+console.log("Selected Doctor Status:", selectedDoctor?.status);
+console.log("Selected Doctor:", selectedDoctor);
+console.log("Edit Modal Doctor:", selectedDoctor);
   const detailActions: ActionButton[] = selectedDoctor
     ? [
         {
@@ -824,13 +858,13 @@ onClick: () => {
           validation: transformValidation(DOCTOR_VALIDATION_RULES.shift),
         },
         {
-          name: "workingHours.start",
+          name: "workingHoursStart",
           label: "Working Hour Start",
           type: "time",
           width: "half",
         },
         {
-          name: "workingHours.end",
+          name: "workingHoursEnd",
           label: "Working Hour End",
           type: "time",
           width: "half",
@@ -838,13 +872,22 @@ onClick: () => {
         {
           name: "availabilityDays",
           label: "Availability Days",
-          type: "text",
+          type: "checkbox-group",
           required: true,
-          placeholder: "Monday, Wednesday, Friday",
+          // placeholder: "Monday, Wednesday, Friday",
           width: "full",
           validation: transformValidation(
             DOCTOR_VALIDATION_RULES.availabilityDays,
           ),
+          options: [
+            { value: "MONDAY", label: "Monday" },
+            { value: "TUESDAY", label: "Tuesday" },
+            { value: "WEDNESDAY", label: "Wednesday" },
+            { value: "THURSDAY", label: "Thursday" },
+            { value: "FRIDAY", label: "Friday" },
+            { value: "SATURDAY", label: "Saturday" },
+            { value: "SUNDAY", label: "Sunday" },
+          ],
         },
       ],
     },
@@ -958,13 +1001,13 @@ onClick: () => {
           validation: transformValidation(DOCTOR_VALIDATION_RULES.shift),
         },
         {
-          name: "workingHours.start",
+          name: "workingHourStart",
           label: "Working Hour Start",
           type: "time",
           width: "half",
         },
         {
-          name: "workingHours.end",
+          name: "workingHourEnd",
           label: "Working Hour End",
           type: "time",
           width: "half",
@@ -997,13 +1040,22 @@ onClick: () => {
         {
           name: "availabilityDays",
           label: "Availability Days",
-          type: "text",
+          type: "checkbox-group",
           required: true,
           width: "full",
-          placeholder: "Monday, Wednesday, Friday",
+         // placeholder: "Monday, Wednesday, Friday",
           validation: transformValidation(
             DOCTOR_VALIDATION_RULES.availabilityDays,
           ),
+          options: [
+            { value: "MONDAY", label: "Monday" },
+            { value: "TUESDAY", label: "Tuesday" },
+            { value: "WEDNESDAY", label: "Wednesday" },
+            { value: "THURSDAY", label: "Thursday" },
+            { value: "FRIDAY", label: "Friday" },
+            { value: "SATURDAY", label: "Saturday" },
+            { value: "SUNDAY", label: "Sunday" },
+          ],
         },
       ],
     },
@@ -1028,10 +1080,16 @@ onClick: () => {
 
   // ==================== HANDLERS ====================
   const handleAddDoctor = (data: Record<string, unknown>) => {
-    const workingHours = {
-      start: String(data["workingHours.start"] || ""),
-      end: String(data["workingHours.end"] || ""),
-    };
+
+    console.log("EDIT FORM DATA:", data);
+ const workingHours = {
+  start: String(data.workingHourStart || ""),
+  end: String(data.workingHourEnd || ""),
+};
+
+console.log("WORKING HOURS:", workingHours);
+
+
 
     const formData: DoctorFormData = {
       name: String(data.name || ""),
@@ -1078,6 +1136,13 @@ onClick: () => {
       setSelectedDoctorId(null);
       queryClient.invalidateQueries({ queryKey: ["doctors"] });
       queryClient.invalidateQueries({ queryKey: ["doctor", data.id] });
+      queryClient.refetchQueries({
+      queryKey: ["doctor", data.id],
+      
+    });
+    queryClient.removeQueries({
+  queryKey: ["doctor", data.id],
+});
     },
     onError: (error) => {
       toast.error(error.message || "Failed to update doctor");
@@ -1088,10 +1153,10 @@ onClick: () => {
   const handleEditDoctor = (data: Record<string, unknown>) => {
     if (!selectedDoctor) return;
 
-    const workingHours = {
-      start: String(data["workingHours.start"] || ""),
-      end: String(data["workingHours.end"] || ""),
-    };
+ const workingHours = {
+  start: String(data.workingHourStart || ""),
+  end: String(data.workingHourEnd || ""),
+};
 
     const updateData: Partial<DoctorFormData> = {
       name: String(data.name || ""),
@@ -1137,11 +1202,21 @@ onClick: () => {
       }
     );
   };
+  
+const handleViewDetails = async (doctorId: string) => {
+  setSelectedDoctorId(doctorId);
 
-  const handleViewDetails = (doctorId: string) => {
-    setSelectedDoctorId(doctorId);
-    setIsDetailModalOpen(true);
-  };
+  await queryClient.invalidateQueries({
+    queryKey: ["doctor", doctorId],
+  });
+
+  await queryClient.refetchQueries({
+    queryKey: ["doctor", doctorId],
+  });
+
+  setIsDetailModalOpen(true);
+};
+  
 
   // If needed, transform the data before passing to the modal
   const transformedDoctorData = selectedDoctor
@@ -1353,6 +1428,61 @@ onClick: () => {
       },
     },
   ];
+
+
+  const onLeaveColumns: ColumnDef<any>[] = [
+  {
+    header: "Doctor",
+    cell: ({ row }) => {
+      const leave = row.original;
+
+      return (
+        <div className="flex flex-col">
+          <div className="font-medium">
+            {leave.user?.name}
+          </div>
+          <div className="text-sm text-gray-500">
+            {leave.user?.email}
+          </div>
+          <div className="text-xs text-gray-400">
+            {leave.user?.phone}
+          </div>
+        </div>
+      );
+    },
+  },
+  {
+    header: "Leave Type",
+    cell: ({ row }) => (
+      <Badge variant="outline">
+        {row.original.leaveType}
+      </Badge>
+    ),
+  },
+  {
+    header: "From Date",
+    cell: ({ row }) =>
+      new Date(row.original.fromDate).toLocaleDateString(),
+  },
+  {
+    header: "To Date",
+    cell: ({ row }) =>
+      new Date(row.original.toDate).toLocaleDateString(),
+  },
+  {
+    header: "Days",
+    cell: ({ row }) => row.original.totalDays,
+  },
+  {
+    header: "Status",
+    cell: ({ row }) => (
+      <Badge className="bg-yellow-100 text-yellow-800">
+        {row.original.status}
+      </Badge>
+    ),
+  },
+];
+
 
   const inactiveColumns: ColumnDef<DoctorResponse>[] = [
     {
@@ -1640,7 +1770,7 @@ onClick: () => {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Calendar className="h-5 w-5 text-yellow-600" />
-                On Leave Doctors ({totalRecords})
+                On Leave Doctors ({onLeaveDoctors.length})
               </CardTitle>
               <CardDescription>
                 Doctors who are currently on leave
@@ -1653,7 +1783,7 @@ onClick: () => {
                 </div>
               ) : (
                 <PaginatedDoctorTable
-                  columns={inactiveColumns}
+                  columns={onLeaveColumns}
                   data={filteredDoctors["on-leave"]}
                   currentPage={currentPage}
                   totalPages={totalPages}
@@ -1695,6 +1825,9 @@ onClick: () => {
         // isSubmitting={addDoctorMutation.isPending}
       />
 
+
+
+
       {/* Edit Doctor Modal */}
       <ReusableModal
         isOpen={isEditModalOpen}
@@ -1728,6 +1861,8 @@ onClick: () => {
                 department: selectedDoctor.department,
                 aadhaar: selectedDoctor.aadhaar,
                 experience: selectedDoctor.experience,
+             workingHourStart: selectedDoctor.workingHours?.start,
+  workingHourEnd: selectedDoctor.workingHours?.end,
               }
             : undefined
         }

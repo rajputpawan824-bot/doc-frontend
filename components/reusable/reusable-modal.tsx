@@ -1,11 +1,11 @@
 "use client";
 
-import { FormEvent, ReactNode, useId, useMemo, useState } from "react";
-import { Plus, X } from "lucide-react";
+import { FormEvent, ReactNode, useId, useMemo, useState, useEffect } from "react";
+import { Plus, X ,Eye, EyeOff} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Modal from "../ui/modal";
 
-export type FieldType = "text" | "email" | "tel" | "number" | "password" | "textarea" | "select" | "radio" | "checkbox" | "date" | "time";
+export type FieldType = "text" | "email" | "tel" | "number" | "password" | "textarea" | "select" | "radio" | "checkbox" | "date" | "time"| "checkbox-group";
 export type FormDataValue = unknown;
 export type ReusableFormData = Record<string, FormDataValue>;
 
@@ -125,9 +125,11 @@ function buildInitialFormData(
       acc[field.name] = initialData[field.name];
     } else if (field.defaultValue !== undefined) {
       acc[field.name] = field.defaultValue;
-    } else {
-      acc[field.name] = "";
-    }
+    } else if (field.type === "checkbox-group") {
+  acc[field.name] = [];
+} else {
+  acc[field.name] = "";
+}
 
     return acc;
   }, {});
@@ -167,7 +169,15 @@ function ReusableModalContent({
   const [formData, setFormData] = useState<ReusableFormData>(() =>
     buildInitialFormData(allFields, initialData),
   );
+
+
+  useEffect(() => {
+  setFormData(buildInitialFormData(allFields, initialData));
+}, [initialData, allFields]);
+
+
   const [errors, setErrors] = useState<Record<string, string>>({});
+   const [showPassword, setShowPassword] = useState<Record<string, boolean>>({});
 
   const validateField = (
     name: string,
@@ -182,13 +192,24 @@ function ReusableModalContent({
       : field.hidden;
     if (isHidden) return null;
 
+   
+
     const required = typeof field.required === "function"
       ? field.required(currentFormData)
       : field.required;
 
+
     if (required && (value === "" || value === null || value === undefined)) {
       return `${field.label} is required`;
     }
+
+    if (
+  required &&
+  Array.isArray(value) &&
+  value.length === 0
+) {
+  return `${field.label} is required`;
+}
 
     const { validation } = field;
     if (!validation) return null;
@@ -355,28 +376,103 @@ function ReusableModalContent({
             </label>
           );
 
-        default:
-          return (
-            <input
-              type={field.type}
-              id={field.name}
-              required={required}
-              className={commonClasses}
-              value={fieldValueAsString(formData[field.name])}
-              onChange={(e) => {
-  handleChange(field.name, e.target.value);
-  field.onChange?.(e.target.value);
-}}
-              placeholder={field.placeholder}
-              disabled={field.disabled}
-              min={field.min}
-              max={field.max}
-              step={field.step}
-            />
-          );
-      }
-    };
+case "checkbox-group":
+  return (
+    <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+      {field.options?.map((option) => {
+        const values = Array.isArray(formData[field.name])
+          ? (formData[field.name] as string[])
+          : [];
 
+        const selected = values.includes(option.value);
+
+        return (
+          <label
+            key={option.value}
+            className={`
+              flex items-center justify-center
+              h-11 rounded-lg border
+              cursor-pointer transition-all
+              text-sm font-medium
+              ${
+                selected
+                  ? "bg-blue-50 border-blue-500 text-blue-700"
+                  : "bg-white border-slate-300 text-slate-700 hover:border-blue-300"
+              }
+            `}
+          >
+            <input
+              type="checkbox"
+              className="hidden"
+              checked={selected}
+              onChange={(e) => {
+                const updated = e.target.checked
+                  ? [...values, option.value]
+                  : values.filter((v) => v !== option.value);
+
+                handleChange(field.name, updated);
+              }}
+            />
+            {option.label}
+          </label>
+        );
+      })}
+    </div>
+  );
+  
+
+      default:
+  return field.type === "password" ? (
+    <div className="relative">
+      <input
+        type={showPassword[field.name] ? "text" : "password"}
+        id={field.name}
+        required={required}
+        className={`${commonClasses} pr-10`}
+        value={fieldValueAsString(formData[field.name])}
+        onChange={(e) => {
+          handleChange(field.name, e.target.value);
+          field.onChange?.(e.target.value);
+        }}
+        placeholder={field.placeholder}
+        disabled={field.disabled}
+      />
+
+      <button
+        type="button"
+        onClick={() =>
+          setShowPassword((prev) => ({
+            ...prev,
+            [field.name]: !prev[field.name],
+          }))
+        }
+        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-700"
+      >
+        {showPassword[field.name] ? (
+          <EyeOff className="h-4 w-4" />
+        ) : (
+          <Eye className="h-4 w-4" />
+        )}
+      </button>
+    </div>
+  ) : (
+    <input
+      type={field.type}
+      id={field.name}
+      required={required}
+      className={commonClasses}
+      value={fieldValueAsString(formData[field.name])}
+      onChange={(e) => {
+        handleChange(field.name, e.target.value);
+        field.onChange?.(e.target.value);
+      }}
+      placeholder={field.placeholder}
+      disabled={field.disabled}
+      min={field.min}
+      max={field.max}
+      step={field.step}
+    />
+  );}};
     return (
       <div key={field.name} className={`space-y-2 ${widthClass}`}>
       
@@ -447,4 +543,4 @@ function ReusableModalContent({
       </form>
     </Modal>
   );
-}
+    }
