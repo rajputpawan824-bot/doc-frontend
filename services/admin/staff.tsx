@@ -44,6 +44,10 @@ interface RawStaff {
   department?: string;
   staffCode?: string;
   joiningDate?: string;
+  workingHours?: {
+  start: string;
+  end: string;
+};
   roleBadge?: string;
   createdAt: string;
   updatedAt?: string;
@@ -93,7 +97,9 @@ export function useAddStaff(options?: {
         name: formData.name.trim(),
         email: formData.email.trim().toLowerCase(),
         phone: formData.phone.trim(),
-        skill: formData.skill.trim(),
+       ...(formData.skill && {
+  skill: formData.skill.trim(),
+}),
         category: formData.category,
         // experience sent as number per API spec
         experience: formData.experience ? Number(formData.experience) || formData.experience : undefined,
@@ -103,6 +109,12 @@ export function useAddStaff(options?: {
         aadhaar: formData.aadhaar.replace(/[-\s]/g, ""),
         address: formData.address.trim(),
         ...(formData.joiningDate && { joiningDate: formData.joiningDate }),
+        ...(formData.workingHours && {
+  workingHours: {
+    start: formData.workingHours.start,
+    end: formData.workingHours.end,
+  },
+}),
         ...(formData.staffCode && { staffCode: formData.staffCode.trim() }),
         ...(formData.department && { department: formData.department.trim() }),
         ...(formData.registrationNo && { registrationNo: formData.registrationNo.trim() }),
@@ -425,6 +437,12 @@ export function useUpdateStaff(options?: {
       if (data.aadhaar !== undefined) updatePayload.aadhaar = data.aadhaar.replace(/[-\s]/g, "");
       if (data.address !== undefined) updatePayload.address = data.address.trim();
       if (data.joiningDate !== undefined) updatePayload.joiningDate = data.joiningDate;
+      if (data.workingHours !== undefined) {
+  updatePayload.workingHours = {
+    start: data.workingHours.start,
+    end: data.workingHours.end,
+  };
+}
       if (data.staffCode !== undefined) updatePayload.staffCode = data.staffCode?.trim();
       if (data.department !== undefined) updatePayload.department = data.department?.trim();
       if (data.registrationNo !== undefined) updatePayload.registrationNo = data.registrationNo?.trim();
@@ -462,7 +480,7 @@ export function useUpdateStaffPassword(options?: {
   return useMutation<void, Error, { id: string; newPassword: string }>({
     mutationFn: async ({ id, newPassword }) => {
       const response: ApiResponse<{ message: string }> = await clientApi.put(
-        `/staff/${id}/password`,
+        `/staff/password/${id}`,
         { newPassword },
       );
 
@@ -634,3 +652,25 @@ export function useStaffDashboardStats() {
     retryDelay: 1000,
   });
 }
+
+
+
+export const useNextStaffCode = () => {
+  return useQuery({
+    queryKey: ["next-staff-code"],
+    queryFn: async () => {
+      const response = await clientApi.get<{
+        data: {
+          staffCode: string;
+        };
+      }>("/staff/next-code");
+
+      if (!response.success || !response.data) {
+        throw new Error("Failed to fetch staff code");
+      }
+
+      return response.data.data;
+    },
+    staleTime: 0,
+  });
+};

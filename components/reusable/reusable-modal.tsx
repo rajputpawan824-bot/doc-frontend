@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, ReactNode, useId, useMemo, useState, useEffect } from "react";
+import { FormEvent, ReactNode, useId, useMemo, useState } from "react";
 import { Plus, X ,Eye, EyeOff} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Modal from "../ui/modal";
@@ -29,7 +29,7 @@ export interface FieldConfig {
     pattern?: RegExp;
     minLength?: number;
     maxLength?: number;
-    custom?: (value: FormDataValue) => string | null;
+    custom?: (value: FormDataValue, formData: ReusableFormData) => string | null;
   };
 }
 
@@ -82,6 +82,7 @@ export default function ReusableModal({
     }],
     [sections, fields],
   );
+  const contentKey = useMemo(() => JSON.stringify(initialData), [initialData]);
 
   if (!isOpen) {
     return null;
@@ -89,6 +90,7 @@ export default function ReusableModal({
 
   return (
     <ReusableModalContent
+      key={contentKey}
       cancelButtonText={cancelButtonText}
       formId={formId}
       formSections={formSections}
@@ -169,15 +171,8 @@ function ReusableModalContent({
   const [formData, setFormData] = useState<ReusableFormData>(() =>
     buildInitialFormData(allFields, initialData),
   );
-
-
-  useEffect(() => {
-  setFormData(buildInitialFormData(allFields, initialData));
-}, [initialData, allFields]);
-
-
   const [errors, setErrors] = useState<Record<string, string>>({});
-   const [showPassword, setShowPassword] = useState<Record<string, boolean>>({});
+  const [showPassword, setShowPassword] = useState<Record<string, boolean>>({});
 
   const validateField = (
     name: string,
@@ -222,12 +217,16 @@ function ReusableModalContent({
       return `${field.label} must be at most ${validation.maxLength} characters`;
     }
 
-    if (validation.pattern && !validation.pattern.test(String(value))) {
-      return `${field.label} format is invalid`;
-    }
+if (
+  validation.pattern &&
+  String(value).trim() !== "" &&
+  !validation.pattern.test(String(value))
+) {
+  return `${field.label} format is invalid`;
+}
 
     if (validation.custom) {
-      return validation.custom(value);
+      return validation.custom(value, currentFormData);
     }
 
     return null;

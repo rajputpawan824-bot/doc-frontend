@@ -67,6 +67,7 @@ import {
   Gender,
   getCanEditPatientStatus,
   stringToBoolean,
+  
 } from "@/lib/validations/Admin/reception";
 import DynamicDetailModal, {
   SectionConfig,
@@ -81,6 +82,7 @@ import {
   useAddReception,
   useReceptionistById, // Changed from getReceptionistsById
   useUpdateReceptionist,
+   useNextReceptionistCode,
   useUpdateReceptionistPassword,
 } from "@/services/admin/reception";
 
@@ -200,6 +202,8 @@ const ReceptionistManagement = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
+  const [passwordModalKey, setPasswordModalKey] = useState(0);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [selectedReceptionistId, setSelectedReceptionistId] = useState<
     string | null
@@ -214,6 +218,7 @@ const ReceptionistManagement = () => {
   const {
     data: receptionistsResponse,
     isLoading,
+    isFetching,
     refetch,
   } = useReceptionists({ page, limit, search: searchQuery });
   const { data: deactivatedReceptionists = [], refetch: refetchDeactivated } =
@@ -280,6 +285,8 @@ const ReceptionistManagement = () => {
 
   const toggleStatusMutation = useToggleReceptionistStatus();
   const togglePermissionMutation = useTogglePatientEditPermission();
+  const { data: nextReceptionistCode } =
+  useNextReceptionistCode();
 
   // ==================== DATA MANAGEMENT ====================
   useEffect(() => {
@@ -405,6 +412,8 @@ const filteredActiveReceptionists = activeReceptionists.filter(
               className={
                 value === "MORNING"
                   ? "bg-yellow-100 text-yellow-800"
+                  : value === "AFTERNOON"
+                  ? "bg-yellow-100 text-yellow-800"
                   : value === "EVENING"
                     ? "bg-orange-100 text-orange-800"
                     : "bg-indigo-100 text-indigo-800"
@@ -421,13 +430,41 @@ const filteredActiveReceptionists = activeReceptionists.filter(
           icon: <Building className="w-4 h-4" />,
           width: "half",
         },
-        {
-          key: "shiftTiming",
-          label: "Shift Timing",
-          type: "text",
-          icon: <Clock className="w-4 h-4" />,
-          width: "half",
-        },
+   {
+  key: "receptionistCode",
+  label: "Receptionist Code",
+  type: "text",
+  width: "half",
+},
+
+{
+  key: "registrationNo",
+  label: "Registration Number",
+  type: "text",
+  width: "half",
+},
+
+{
+  key: "joiningDate",
+  label: "Joining Date",
+  type: "date",
+  width: "half",
+},
+
+ {
+  key: "workingHours",
+  label: "Working Hours",
+  type: "text",
+  icon: <Clock className="w-4 h-4" />,
+  width: "half",
+  format: (value) => {
+    if (!value) return "-";
+
+    const hours = value as { start?: string; end?: string };
+
+    return `${hours.start || "-"} - ${hours.end || "-"}`;
+  },
+},
         {
           key: "previousExperience",
           label: "Previous Experience",
@@ -498,20 +535,20 @@ const filteredActiveReceptionists = activeReceptionists.filter(
           icon: <Clock className="w-4 h-4" />,
           width: "half",
         },
-        {
-          key: "userId",
-          label: "User ID",
-          type: "text",
-          icon: <Key className="w-4 h-4" />,
-          width: "half",
-        },
-        {
-          key: "id",
-          label: "Receptionist ID",
-          type: "text",
-          icon: <Key className="w-4 h-4" />,
-          width: "half",
-        },
+        // {
+        //   key: "userId",
+        //   label: "User ID",
+        //   type: "text",
+        //   icon: <Key className="w-4 h-4" />,
+        //   width: "half",
+        // },
+        // {
+        //   key: "id",
+        //   label: "Receptionist ID",
+        //   type: "text",
+        //   icon: <Key className="w-4 h-4" />,
+        //   width: "half",
+        // },
       ],
     },
   ];
@@ -621,6 +658,17 @@ const filteredActiveReceptionists = activeReceptionists.filter(
           validation: transformValidation(RECEPTION_VALIDATION_RULES.phone),
         },
         {
+  name: "password",
+  label: "Password",
+  type: "password",
+  required: true,
+  placeholder: "Enter password",
+  width: "half",
+  validation: transformValidation(
+    RECEPTION_VALIDATION_RULES.password
+  ),
+},
+        {
           name: "gender",
           label: "Gender",
           type: "select",
@@ -669,6 +717,7 @@ const filteredActiveReceptionists = activeReceptionists.filter(
           options: [
             { value: Shift.MORNING, label: "Morning" },
             { value: Shift.EVENING, label: "Evening" },
+            { value: Shift.AFTERNOON, label: "Afternoon" },
           ],
           validation: transformValidation(RECEPTION_VALIDATION_RULES.shift),
         },
@@ -683,15 +732,45 @@ const filteredActiveReceptionists = activeReceptionists.filter(
           ),
         },
         {
-          name: "shiftTiming",
-          label: "Shift Timing (Optional)",
-          type: "text",
-          placeholder: "e.g., 9AM - 5PM",
-          width: "half",
-          validation: transformValidation(
-            RECEPTION_VALIDATION_RULES.shiftTiming,
-          ),
-        },
+  name: "receptionistCode",
+  label: "Receptionist Code",
+  type: "text",
+  width: "half",
+  disabled: true,
+  
+},
+
+{
+  name: "registrationNo",
+  label: "Registration Number (Optional)",
+  type: "text",
+  width: "half",
+  placeholder: "REG-2026-001",
+},
+
+{
+  name: "joiningDate",
+  label: "Joining Date",
+  type: "date",
+  required: true,
+  width: "half",
+},
+
+{
+  name: "workingHourStart",
+  label: "Working Hour Start",
+  type: "time",
+  required: true,
+  width: "half",
+},
+
+{
+  name: "workingHourEnd",
+  label: "Working Hour End",
+  type: "time",
+  required: true,
+  width: "half",
+},
       ],
     },
     {
@@ -769,6 +848,7 @@ const filteredActiveReceptionists = activeReceptionists.filter(
           options: [
             { value: Shift.MORNING, label: "Morning" },
             { value: Shift.EVENING, label: "Evening" },
+             { value: Shift.AFTERNOON, label: "Afternoon" },
           ],
           validation: transformValidation(RECEPTION_VALIDATION_RULES.shift),
         },
@@ -780,14 +860,6 @@ const filteredActiveReceptionists = activeReceptionists.filter(
           width: "half",
           placeholder: "9876543210",
           validation: transformValidation(RECEPTION_VALIDATION_RULES.phone),
-        },
-        {
-          name: "password",
-          label: "Update Password",
-          type: "password",
-          placeholder: "Leave empty to keep current password",
-          width: "half",
-          validation: transformValidation(RECEPTION_VALIDATION_RULES.password),
         },
         {
           name: "gender",
@@ -834,6 +906,44 @@ const filteredActiveReceptionists = activeReceptionists.filter(
           ),
         },
         {
+  name: "receptionistCode",
+  label: "Receptionist Code",
+  type: "text",
+  width: "half",
+  disabled: true,
+},
+
+{
+  name: "registrationNo",
+  label: "Registration Number",
+  type: "text",
+  width: "half",
+},
+
+{
+  name: "joiningDate",
+  label: "Joining Date",
+  type: "date",
+  required: true,
+  width: "half",
+},
+
+{
+  name: "workingHourStart",
+  label: "Working Hour Start",
+  type: "time",
+  required: true,
+  width: "half",
+},
+
+{
+  name: "workingHourEnd",
+  label: "Working Hour End",
+  type: "time",
+  required: true,
+  width: "half",
+},
+        {
           name: "deskNumber",
           label: "Desk Number",
           type: "text",
@@ -842,14 +952,37 @@ const filteredActiveReceptionists = activeReceptionists.filter(
             RECEPTION_VALIDATION_RULES.deskNumber,
           ),
         },
+       
+      ],
+    },
+  ];
+
+  const passwordFormSections: FormSection[] = [
+    {
+      title: "Change Password",
+      icon: <Key className="h-4 w-4" />,
+      fields: [
         {
-          name: "shiftTiming",
-          label: "Shift Timing",
-          type: "text",
-          width: "half",
-          validation: transformValidation(
-            RECEPTION_VALIDATION_RULES.shiftTiming,
-          ),
+          name: "newPassword",
+          label: "New Password",
+          type: "password",
+          required: true,
+          width: "full",
+          validation: {
+            minLength: 6,
+          },
+        },
+        {
+          name: "confirmPassword",
+          label: "Confirm Password",
+          type: "password",
+          required: true,
+          width: "full",
+          validation: {
+            minLength: 6,
+            custom: (value, formData) =>
+              value === formData.newPassword ? null : "Passwords must match",
+          },
         },
       ],
     },
@@ -861,6 +994,7 @@ const filteredActiveReceptionists = activeReceptionists.filter(
       !isString(data.name) ||
       !isString(data.email) ||
       !isString(data.phone) ||
+      !isString(data.password)||
       !isString(data.experience) ||
       !isString(data.shift) ||
       !isString(data.gender) ||
@@ -869,11 +1003,15 @@ const filteredActiveReceptionists = activeReceptionists.filter(
     ) {
       return;
     }
-
+const workingHours = {
+  start: String(data.workingHourStart || ""),
+  end: String(data.workingHourEnd || ""),
+};
     const formData: ReceptionFormData = {
       name: data.name,
       email: data.email,
       phone: data.phone,
+      password: data.password,
       experience: data.experience,
       salary: Number(data.salary),
       shift: data.shift as ReceptionFormData["shift"],
@@ -881,7 +1019,20 @@ const filteredActiveReceptionists = activeReceptionists.filter(
       aadhaar: data.aadhaar,
       address: data.address,
       deskNumber: isString(data.deskNumber) ? data.deskNumber : "",
-      shiftTiming: isString(data.shiftTiming) ? data.shiftTiming : "",
+      registrationNo: isString(data.registrationNo)
+      ? data.registrationNo
+      : "",
+      receptionistCode:
+  nextReceptionistCode?.receptionistCode || "",
+
+joiningDate: isString(data.joiningDate)
+  ? data.joiningDate
+  : "",
+
+workingHours,
+
+        
+      
     };
 
     addReceptionMutation.mutate(formData);
@@ -891,9 +1042,10 @@ const filteredActiveReceptionists = activeReceptionists.filter(
     onSuccess: (data) => {
       toast.success("Receptionist updated successfully");
       setIsEditModalOpen(false);
-      setSelectedReceptionistId(null);
+   
       queryClient.invalidateQueries({ queryKey: ["receptionists"] });
       queryClient.invalidateQueries({ queryKey: ["receptionist", data.id] });
+      refetchDetail();
     },
     onError: (error) => {
       toast.error(error.message || "Failed to update receptionist");
@@ -901,17 +1053,16 @@ const filteredActiveReceptionists = activeReceptionists.filter(
   });
 
   const updateReceptionMutationPassword = useUpdateReceptionistPassword({
-    onSuccess: (data) => {
-      toast.success("Receptionist updated successfully");
-      setIsEditModalOpen(false);
-      setSelectedReceptionistId(null);
-      queryClient.invalidateQueries({ queryKey: ["receptionists"] });
-      queryClient.invalidateQueries({ queryKey: ["receptionist", data.id] });
-    },
     onError: (error) => {
-      toast.error(error.message || "Failed to update receptionist");
+      toast.error(error.message || "Failed to update password");
     },
   });
+
+  const resetAndClosePasswordModal = () => {
+    setPasswordModalKey((currentKey) => currentKey + 1);
+    setIsPasswordModalOpen(false);
+    setSelectedReceptionistId(null);
+  };
 
   const handleEditReceptionist = (data: ReusableFormData) => {
     if (!selectedReceptionist || typeof selectedReceptionist.id !== "string")
@@ -932,19 +1083,47 @@ const filteredActiveReceptionists = activeReceptionists.filter(
     if (isString(data.address)) updateData.address = data.address;
     if (isString(data.experience)) updateData.experience = data.experience;
     if (isString(data.deskNumber)) updateData.deskNumber = data.deskNumber;
-    if (isString(data.shiftTiming)) updateData.shiftTiming = data.shiftTiming;
-    if (isString(data.password)) updateData.password = data.password;
+    if (isString(data.registrationNo)) updateData.registrationNo = data.registrationNo;
+    if (isString(data.joiningDate))     updateData.joiningDate = data.joiningDate;
+      if (
+        isString(data.workingHourStart) &&
+        isString(data.workingHourEnd)
+      ) {updateData.workingHours = {
+    start: data.workingHourStart,
+    end: data.workingHourEnd,
+  };
 
-    if (isString(data.password))
-      updateReceptionMutationPassword.mutate({
-        id: receptionistId,
-        data: { password: data.password },
-      });
+
+ 
+  
+}
+    
 
     updateReceptionMutation.mutate({
       id: receptionistId,
       data: updateData,
     });
+  };
+
+  const handleUpdatePassword = (data: ReusableFormData) => {
+    if (!selectedReceptionistId || !isString(data.newPassword)) return;
+
+    updateReceptionMutationPassword.mutate(
+      {
+        id: selectedReceptionistId,
+        newPassword: data.newPassword,
+      },
+      {
+        onSuccess: () => {
+          toast.success("Password updated successfully");
+          resetAndClosePasswordModal();
+          queryClient.invalidateQueries({ queryKey: ["receptionists"] });
+          queryClient.invalidateQueries({
+            queryKey: ["receptionist", selectedReceptionistId],
+          });
+        },
+      },
+    );
   };
 
   const handleTogglePatientEditMode = (
@@ -1083,7 +1262,7 @@ const filteredActiveReceptionists = activeReceptionists.filter(
         return (
           <div className="space-y-2">
             <div className="flex items-center gap-2">
-              <IndianRupee className="h-3 w-3 text-green-600" />
+             
               <span className="text-sm font-medium">
                 ₹{receptionist.salary.toLocaleString()}
               </span>
@@ -1094,11 +1273,7 @@ const filteredActiveReceptionists = activeReceptionists.filter(
                 {receptionist.shift.toLowerCase()}
               </Badge>
             </div>
-            {receptionist.shiftTiming && (
-              <div className="text-xs text-muted-foreground">
-                {receptionist.shiftTiming}
-              </div>
-            )}
+           
           </div>
         );
       },
@@ -1110,7 +1285,7 @@ const filteredActiveReceptionists = activeReceptionists.filter(
         const receptionist = row.original;
         return (
           <div className="text-sm text-muted-foreground max-w-[200px] truncate">
-            {receptionist.previousExperience.substring(0, 60)}...
+            {receptionist.previousExperience.substring(0, 60)}
           </div>
         );
       },
@@ -1194,6 +1369,17 @@ const filteredActiveReceptionists = activeReceptionists.filter(
             </Button>
             <Button
               size="sm"
+              variant="outline"
+              onClick={() => {
+                setSelectedReceptionistId(receptionist.id);
+                setIsPasswordModalOpen(true);
+              }}
+              title="Change password"
+            >
+              <Key className="h-4 w-4" />
+            </Button>
+            <Button
+              size="sm"
               variant="destructive"
               onClick={() => handleDeactivate(receptionist.id)}
               title="Deactivate receptionist"
@@ -1250,9 +1436,9 @@ const filteredActiveReceptionists = activeReceptionists.filter(
       cell: ({ row }) => {
         const receptionist = row.original;
         return (
-          <div className="text-sm text-gray-500 max-w-[180px] truncate">
-            {receptionist.previousExperience.substring(0, 50)}...
-          </div>
+   <div className="text-sm text-gray-500">
+  {receptionist.previousExperience} Years
+</div>
         );
       },
     },
@@ -1325,12 +1511,13 @@ const filteredActiveReceptionists = activeReceptionists.filter(
             variant="outline"
             onClick={handleRefresh}
             className="hover:bg-gray-50"
-            disabled={isLoading}
+            disabled={isFetching}
           >
             <RefreshCw
-              className={`mr-2 h-4 w-4 ${isLoading ? "animate-spin" : ""}`}
+              className={`mr-2 h-4 w-4 ${isFetching ? "animate-spin" : ""}`}
             />
-            Refresh
+             {isFetching ? "Refreshing..." : "Refresh"}
+            
           </Button>
           <Button
             onClick={() => setIsAddModalOpen(true)}
@@ -1368,7 +1555,7 @@ const filteredActiveReceptionists = activeReceptionists.filter(
         <TabsList className="grid grid-cols-2 w-full max-w-md">
           <TabsTrigger value="view" className="flex items-center gap-2">
             <Users className="h-4 w-4" />
-            Active Receptionists ({totalRecords})
+            Active Receptionists ({filteredActiveReceptionists.length})
           </TabsTrigger>
           <TabsTrigger value="deactivated" className="flex items-center gap-2">
             <Archive className="h-4 w-4" />
@@ -1382,7 +1569,7 @@ const filteredActiveReceptionists = activeReceptionists.filter(
             <CardHeader className="">
               <CardTitle className="flex items-center gap-2">
                 <Users className="h-5 w-5 text-green-600" />
-                Active Receptionists ({totalRecords})
+                Active Receptionists ({filteredActiveReceptionists.length})
               </CardTitle>
               <CardDescription>
                 Manage receptionist details, patient edit permissions, and
@@ -1472,6 +1659,10 @@ const filteredActiveReceptionists = activeReceptionists.filter(
         onSave={handleAddReceptionist}
         title="Add New Receptionist"
         sections={addFormSections}
+        initialData={{
+    receptionistCode:
+      nextReceptionistCode?.receptionistCode || "",
+  }}
         size="xl"
         saveButtonText={
           addReceptionMutation.isPending ? "Adding..." : "Add Receptionist"
@@ -1509,13 +1700,49 @@ const filteredActiveReceptionists = activeReceptionists.filter(
                 aadhaar: selectedReceptionist.aadhaar,
                 address: selectedReceptionist.address,
                 experience:
+
                   selectedReceptionist.experience ??
                   selectedReceptionist.previousExperience,
                 deskNumber: selectedReceptionist.deskNumber,
-                shiftTiming: selectedReceptionist.shiftTiming,
+                receptionistCode:
+  selectedReceptionist.receptionistCode,
+                registrationNo: selectedReceptionist.registrationNo,
+joiningDate: selectedReceptionist.joiningDate
+  ? selectedReceptionist.joiningDate.split("T")[0]
+  : "",
+
+workingHourStart:
+  selectedReceptionist.workingHours?.start,
+
+workingHourEnd:
+  selectedReceptionist.workingHours?.end,
+                
+              
+
+
+
               }
             : undefined
         }
+      />
+
+      {/* Change Password Modal */}
+      <ReusableModal
+        key={passwordModalKey}
+        isOpen={isPasswordModalOpen}
+        onClose={resetAndClosePasswordModal}
+        onSave={handleUpdatePassword}
+        title="Change Receptionist Password"
+        sections={passwordFormSections}
+        size="md"
+        saveButtonText={
+          updateReceptionMutationPassword.isPending
+            ? "Updating..."
+            : "Update Password"
+        }
+        cancelButtonText="Cancel"
+        saveButtonColor="linear-gradient(135deg, #10b981, #059669)"
+        validationOnChange={true}
       />
 
       {/* Detail Modal */}

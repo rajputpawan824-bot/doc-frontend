@@ -13,14 +13,24 @@ export interface ReceptionFormData {
   phone: string;
   experience: number | string;
   salary: number;
-  shift: "MORNING" | "EVENING" | "NIGHT";
+  shift: "MORNING" | "EVENING" | "NIGHT"| "AFTERNOON";
   gender: "MALE" | "FEMALE" | "OTHER";
   aadhaar: string;
   address: string;
   deskNumber: string;
-  shiftTiming: string;
   password?: string;
-  caneditPatient?: boolean;
+  caneditPatient?: boolean;  
+    receptionistCode: string;
+  registrationNo?: string;
+
+  joiningDate: string;
+
+workingHours: {
+  start: string;
+  end: string;
+};
+
+
 }
 
 export interface ReceptionResponse {
@@ -28,12 +38,24 @@ export interface ReceptionResponse {
   userId: string;
   experience: string;
   salary: number;
-  shift: "MORNING" | "EVENING" | "NIGHT";
+  shift: "MORNING" | "EVENING" | "NIGHT" | "AFTERNOON";
+  name: string;
+  phoneNumber: string;
+  email: string
   gender: "MALE" | "FEMALE" | "OTHER";
   aadhaar: string;
   address: string;
   deskNumber: string;
-  shiftTiming: string;
+  receptionistCode: string;
+
+registrationNo?: string;
+
+joiningDate: string;
+
+workingHours: {
+  start: string;
+  end: string;
+};
   createdAt: string;
   updatedAt: string;
   user: {
@@ -124,7 +146,7 @@ export const RECEPTION_VALIDATION_RULES: ValidationRules = {
     required: "Shift is required",
     validate: (value: unknown) =>
       (typeof value === "string" &&
-        ["MORNING", "EVENING", "NIGHT"].includes(value)) ||
+        ["MORNING", "EVENING", "NIGHT","AFTERNOON"].includes(value)) ||
       "Invalid shift selection",
   },
   gender: {
@@ -158,16 +180,24 @@ export const RECEPTION_VALIDATION_RULES: ValidationRules = {
       message: "Desk number must be less than 20 characters",
     },
   },
-  shiftTiming: {
-    minLength: {
-      value: 3,
-      message: "Shift timing must be at least 3 characters",
-    },
-    maxLength: {
-      value: 50,
-      message: "Shift timing must be less than 50 characters",
-    },
+registrationNo: {
+  maxLength: {
+    value: 50,
+    message: "Registration number must be less than 50 characters",
   },
+},
+
+joiningDate: {
+  required: "Joining date is required",
+},
+
+workingHourStart: {
+  required: "Working hour start is required",
+},
+
+workingHourEnd: {
+  required: "Working hour end is required",
+},
   password: {
     minLength: {
       value: 6,
@@ -190,13 +220,23 @@ export interface CreateReceptionPayload {
   phone: string;
   experience: number | string;
   salary: number;
-  shift: "MORNING" | "EVENING" | "NIGHT";
+  shift: "MORNING" | "EVENING" | "NIGHT"|"AFTERNOON";
   gender: "MALE" | "FEMALE" | "OTHER";
   aadhaar: string;
   address: string;
-  deskNumber: string;
-  shiftTiming: string;
-  password?: string;
+ deskNumber: string;
+ receptionistCode: string;
+
+registrationNo?: string;
+
+joiningDate: string;
+
+workingHours: {
+  start: string;
+  end: string;
+};
+
+password?: string;
   caneditPatient?: boolean;
 }
 
@@ -204,6 +244,7 @@ export enum Shift {
   MORNING = "MORNING",
   EVENING = "EVENING",
   NIGHT = "NIGHT",
+  AFTERNOON = "AFTERNOON",
 }
 
 export enum Gender {
@@ -250,7 +291,16 @@ export interface Receptionist {
   aadhaar: string; // Changed from 'adhar' to match API
   address: string;
   deskNumber?: string;
-  shiftTiming?: string;
+  receptionistCode?: string;
+
+registrationNo?: string;
+
+joiningDate?: string;
+
+workingHours?: {
+  start: string;
+  end: string;
+};
   isActive: boolean;
   canEditPatient: string | boolean | undefined; // Can be string, boolean, or undefined from API
   canEditPatients?: string | boolean | undefined; // Can be string, boolean, or undefined from API

@@ -75,6 +75,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Search,
+  
 } from "lucide-react";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
@@ -99,6 +100,8 @@ import {
   useActiveStaff,
   useInactiveStaff,
   useAllStaff,
+  useNextStaffCode,
+  useUpdateStaffPassword,
 } from "@/services/admin/staff";
 
 // Define interface for staff data
@@ -117,6 +120,10 @@ interface StaffMember {
   department?: string;
   staffCode?: string;
   joiningDate?: string;
+  workingHours?: {
+  start: string;
+  end: string;
+};
   roleBadge?: string;
   createdAt: string;
   updatedAt: string;
@@ -301,6 +308,14 @@ const staffFormSections: FormSection[] = [
         validation: transformValidation(STAFF_VALIDATION_RULES.phone),
       },
       {
+  name: "password",
+  label: "Password",
+  type: "password",
+  required: true,
+  placeholder: "Enter password",
+  width: "half",
+},
+      {
         name: "aadhaar",
         label: "Aadhaar Number",
         type: "text",
@@ -332,12 +347,12 @@ const staffFormSections: FormSection[] = [
         required: true,
         width: "half",
         options: [
-          { value: "DOCTOR", label: "Doctor" },
+          
           { value: "NURSE", label: "Nurse" },
-          { value: "RECEPTIONIST", label: "Receptionist" },
+          
           { value: "TECHNICIAN", label: "Technician" },
           { value: "PHARMACIST", label: "Pharmacist" },
-          { value: "ADMIN", label: "Administrator" },
+         
           { value: "LAB_TECHNICIAN", label: "Lab Technician" },
           { value: "WARD_BOY", label: "Ward Boy" },
           { value: "CLEANING_STAFF", label: "Cleaning Staff" },
@@ -349,10 +364,10 @@ const staffFormSections: FormSection[] = [
         name: "skill",
         label: "Skill/Specialization",
         type: "text",
-        required: true,
+        required: false,
         placeholder: "e.g., General Nursing, Lab Testing",
         width: "half",
-        validation: transformValidation(STAFF_VALIDATION_RULES.skill),
+        //validation: transformValidation(STAFF_VALIDATION_RULES.skill),
       },
       {
         name: "experience",
@@ -405,18 +420,18 @@ const staffFormSections: FormSection[] = [
         name: "registrationNo",
         label: "Registration Number",
         type: "text",
+        required: false,
         placeholder: "RN-1234, PH-5678, etc.",
         width: "half",
-        validation: transformValidation(STAFF_VALIDATION_RULES.registrationNo),
+       // validation: transformValidation(STAFF_VALIDATION_RULES.registrationNo),
       },
-      {
-        name: "staffCode",
-        label: "Staff Code",
-        type: "text",
-        placeholder: "STF-001",
-        width: "half",
-        validation: transformValidation(STAFF_VALIDATION_RULES.staffCode),
-      },
+{
+  name: "staffCode",
+  label: "Staff Code",
+  type: "text",
+  disabled: true,
+  width: "half",
+},
       {
         name: "joiningDate",
         label: "Joining Date",
@@ -424,6 +439,23 @@ const staffFormSections: FormSection[] = [
         placeholder: "Select joining date",
         width: "half",
       },
+
+      {
+  name: "workingHourStart",
+  label: "Working Hour Start",
+  type: "time",
+  required: true,
+  width: "half",
+},
+
+{
+  name: "workingHourEnd",
+  label: "Working Hour End",
+  type: "time",
+  required: true,
+  width: "half",
+},
+
       {
         name: "roleBadge",
         label: "Role Badge",
@@ -436,6 +468,42 @@ const staffFormSections: FormSection[] = [
   },
 ];
 
+const editStaffFormSections = staffFormSections.map((section) => ({
+  ...section,
+  fields: section.fields.filter(
+    (field) => field.name !== "password"
+  ),
+}));
+
+const passwordFormSections: FormSection[] = [
+  {
+    title: "Change Password",
+    icon: <Key className="h-4 w-4" />,
+    fields: [
+      {
+        name: "newPassword",
+        label: "New Password",
+        type: "password",
+        required: true,
+        width: "full",
+      },
+      {
+        name: "confirmPassword",
+        label: "Confirm Password",
+        type: "password",
+        required: true,
+        width: "full",
+        validation: {
+          custom: (value, formData) =>
+            value === formData.newPassword
+              ? null
+              : "Passwords must match",
+        },
+      },
+    ],
+  },
+];
+
 const StaffManagement = () => {
   const [modalOpen, setModalOpen] = useState(false);
   const [editingStaff, setEditingStaff] = useState<StaffMember | null>(null);
@@ -443,6 +511,8 @@ const StaffManagement = () => {
   const [staffToDelete, setStaffToDelete] = useState<StaffMember | null>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [selectedStaffId, setSelectedStaffId] = useState<string | null>(null);
+  const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
+const [passwordModalKey, setPasswordModalKey] = useState(0);
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(10);
   const [searchQuery, setSearchQuery] = useState("");
@@ -455,6 +525,7 @@ const StaffManagement = () => {
   const {
     data: selectedStaff,
     isLoading: isDetailLoading,
+    
     refetch: refetchDetail,
   } = useStaffById(selectedStaffId || undefined);
 
@@ -462,6 +533,7 @@ const StaffManagement = () => {
   const {
     data: staffResponse,
     isLoading,
+    isFetching,
     refetch,
   } = useStaff({ status: filterActive, page, limit, search: searchQuery });
 
@@ -470,6 +542,8 @@ const StaffManagement = () => {
     isLoading: isStatsLoading,
     refetch: refetchStaffStats,
   } = useStaffDashboardStats();
+
+  const { data: nextStaffCode } = useNextStaffCode();
 
   const addStaffMutation = useAddStaff({
     onSuccess: (data) => {
@@ -495,6 +569,16 @@ const StaffManagement = () => {
       toast.error(error.message || "Failed to update staff");
     },
   });
+
+  const updateStaffPasswordMutation = useUpdateStaffPassword({
+  onSuccess: () => {
+    toast.success("Password updated successfully");
+    resetAndClosePasswordModal();
+  },
+  onError: (error) => {
+    toast.error(error.message);
+  },
+});
 
   const disableStaffMutation = useDisableStaff({
     onSuccess: (data) => {
@@ -542,9 +626,7 @@ const StaffManagement = () => {
   const filteredStaff = useMemo<StaffMember[]>(() => {
     let result = staffList;
 
-    if (viewMode === "other") {
-      result = result.filter((s) => s.category !== "DOCTOR");
-    }
+    
 
     return result;
   }, [staffList, viewMode]);
@@ -584,12 +666,12 @@ const StaffManagement = () => {
   // Helper function to get category icon
   const getCategoryIcon = (category: StaffCategory) => {
     const icons: Record<StaffCategory, React.ReactNode> = {
-      DOCTOR: <Stethoscope className="h-4 w-4" />,
+     
       NURSE: <HeartPulse className="h-4 w-4" />,
-      RECEPTIONIST: <ClipboardList className="h-4 w-4" />,
+      
       TECHNICIAN: <Settings className="h-4 w-4" />,
       PHARMACIST: <Syringe className="h-4 w-4" />,
-      ADMIN: <UserCog className="h-4 w-4" />,
+      
       LAB_TECHNICIAN: <Microscope className="h-4 w-4" />,
       WARD_BOY: <Home className="h-4 w-4" />,
       CLEANING_STAFF: <Sparkles className="h-4 w-4" />,
@@ -601,12 +683,12 @@ const StaffManagement = () => {
   // Helper function to get category color
   const getCategoryColor = (category: StaffCategory) => {
     const colors: Record<StaffCategory, string> = {
-      DOCTOR: "bg-blue-100 text-blue-800",
+     
       NURSE: "bg-green-100 text-green-800",
-      RECEPTIONIST: "bg-purple-100 text-purple-800",
+     
       TECHNICIAN: "bg-yellow-100 text-yellow-800",
       PHARMACIST: "bg-pink-100 text-pink-800",
-      ADMIN: "bg-gray-100 text-gray-800",
+   
       LAB_TECHNICIAN: "bg-cyan-100 text-cyan-800",
       WARD_BOY: "bg-orange-100 text-orange-800",
       CLEANING_STAFF: "bg-teal-100 text-teal-800",
@@ -645,7 +727,7 @@ const StaffManagement = () => {
     },
     {
       accessorKey: "professional",
-      header: "Professional Details",
+      header: "Details",
       cell: ({ row }) => {
         const staff = row.original;
         return (
@@ -692,14 +774,14 @@ const StaffManagement = () => {
       },
     },
     {
-      accessorKey: "financial",
-      header: "Financial",
+      accessorKey: "fees",
+      header: "Fees",
       cell: ({ row }) => {
         const staff = row.original;
         return (
           <div className="space-y-1">
             <div className="flex items-center gap-2">
-              <IndianRupee className="h-3 w-3 text-green-600" />
+             
               <span className="text-sm font-medium">
                 ₹{staff?.salary?.toLocaleString("en-IN")}
               </span>
@@ -983,6 +1065,20 @@ const StaffManagement = () => {
           icon: <Calendar className="w-4 h-4" />,
           width: "half",
         },
+        {
+  key: "workingHours",
+  label: "Working Hours",
+  type: "text",
+  icon: <Clock className="w-4 h-4" />,
+  width: "half",
+  format: (value) => {
+    if (!value) return "-";
+
+    const hours = value as { start?: string; end?: string };
+
+    return `${hours.start || "-"} - ${hours.end || "-"}`;
+  },
+},
       ],
     },
     {
@@ -1040,6 +1136,47 @@ const StaffManagement = () => {
     },
   ];
 
+
+const detailActions: ActionButton[] =
+  selectedStaff
+    ? [
+        {
+          label: "Edit Details",
+          variant: "outline",
+          icon: <UserCog className="w-4 h-4" />,
+          onClick: () => {
+            setIsDetailModalOpen(false);
+            setEditingStaff(selectedStaff as StaffMember);
+            setModalOpen(true);
+          },
+        },
+        {
+          label: "Change Password",
+          variant: "outline",
+          icon: <Key className="w-4 h-4" />,
+          onClick: () => {
+            setIsDetailModalOpen(false);
+            setIsPasswordModalOpen(true);
+          },
+        },
+        // {
+        //   label: selectedStaff.isActive ? "Deactivate" : "Activate",
+        //   variant: selectedStaff.isActive ? "destructive" : "default",
+        //   icon: selectedStaff.isActive ? (
+        //     <UserMinus className="w-4 h-4" />
+        //   ) : (
+        //     <UserCheck className="w-4 h-4" />
+        //   ),
+        //   onClick: () => {
+        //     if (selectedStaff.isActive) {
+        //       handleDisableStaff(selectedStaff as StaffMember);
+        //     } else {
+        //       handleEnableStaff(selectedStaff as StaffMember);
+        //     }
+        //   },
+        // },
+      ]
+    : [];
   // Event handlers
   const handleViewDetails = (staffId: string) => {
     // You can implement a detail modal here
@@ -1084,6 +1221,7 @@ const StaffManagement = () => {
         salary: Number(data.salary),
         shift: data.shift as StaffFormData["shift"],
         gender: data.gender as StaffFormData["gender"],
+        password: String(data.password || ""),
         aadhaar: String(data.aadhaar || ""),
         address: String(data.address || ""),
        ...(typeof data.department === "string" && {
@@ -1098,6 +1236,10 @@ const StaffManagement = () => {
 ...(typeof data.joiningDate === "string" && {
   joiningDate: data.joiningDate,
 }),
+workingHours: {
+  start: String(data.workingHourStart || ""),
+  end: String(data.workingHourEnd || ""),
+},
 ...(typeof data.roleBadge === "string" && {
   roleBadge: data.roleBadge,
 }),
@@ -1106,6 +1248,25 @@ const StaffManagement = () => {
       addStaffMutation.mutate(formData);
     }
   };
+
+  const handleUpdatePassword = async (
+  data: Record<string, unknown>
+) => {
+  if (!selectedStaffId) {
+    toast.error("No staff selected");
+    return;
+  }
+
+  await updateStaffPasswordMutation.mutateAsync({
+    id: selectedStaffId,
+    newPassword: String(data.newPassword || ""),
+  });
+};
+
+  const resetAndClosePasswordModal = () => {
+  setIsPasswordModalOpen(false);
+  setPasswordModalKey((prev) => prev + 1);
+};
 
   const handleDelete = () => {
     if (staffToDelete) {
@@ -1158,6 +1319,11 @@ const StaffManagement = () => {
       staffCode: editingStaff.staffCode || "",
       joiningDate: editingStaff.joiningDate?.split("T")[0] || "",
       roleBadge: editingStaff.roleBadge || "",
+      workingHourStart:
+  editingStaff.workingHours?.start || "",
+
+workingHourEnd:
+  editingStaff.workingHours?.end || "",
     };
   };
 
@@ -1235,15 +1401,17 @@ const StaffManagement = () => {
         </div>
 
         <div className="flex gap-2">
-          <Button
+        <Button
             variant="outline"
             onClick={handleRefresh}
-            disabled={isLoading}
+            className="hover:bg-gray-50"
+            disabled={isFetching}
           >
             <RefreshCw
-              className={`h-4 w-4 mr-2 ${isLoading ? "animate-spin" : ""}`}
+              className={`mr-2 h-4 w-4 ${isFetching ? "animate-spin" : ""}`}
             />
-            Refresh
+             {isFetching ? "Refreshing..." : "Refresh"}
+            
           </Button>
           <Button
             onClick={() => {
@@ -1335,8 +1503,19 @@ const StaffManagement = () => {
         }}
         onSave={handleSave}
         title={editingStaff ? "Edit Staff Member" : "Add New Staff"}
-        sections={staffFormSections}
-        initialData={getInitialData()}
+      sections={
+  editingStaff
+    ? editStaffFormSections
+    : staffFormSections
+}
+        
+initialData={
+  editingStaff
+    ? getInitialData()
+    : {
+        staffCode: nextStaffCode?.staffCode || "",
+      }
+}
         isEdit={!editingStaff}
         size="xl"
         saveButtonText={
@@ -1400,6 +1579,24 @@ const StaffManagement = () => {
         }
       />
 
+      <ReusableModal
+  key={passwordModalKey}
+  isOpen={isPasswordModalOpen}
+  onClose={resetAndClosePasswordModal}
+  onSave={handleUpdatePassword}
+  title="Change Staff Password"
+  sections={passwordFormSections}
+  size="md"
+  saveButtonText={
+    updateStaffPasswordMutation.isPending
+      ? "Updating..."
+      : "Update Password"
+  }
+  cancelButtonText="Cancel"
+  saveButtonColor="linear-gradient(135deg, #10b981, #059669)"
+  validationOnChange={true}
+/>
+
       <DynamicDetailModal
         isOpen={isDetailModalOpen}
         onClose={() => {
@@ -1410,7 +1607,7 @@ const StaffManagement = () => {
         subtitle={selectedStaff?.category?.replace("_", " ")}
         data={selectedStaff as Record<string, unknown> | undefined}
         sections={detailSections}
-        // actions={detailActions}
+         actions={detailActions}
         size="xl"
         headerColor="#3b82f6"
         showRawData={false}

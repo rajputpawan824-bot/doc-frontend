@@ -6,12 +6,9 @@ import {
 
 // Staff Category Types
 export type StaffCategory =
-  | "DOCTOR"
   | "NURSE"
-  | "RECEPTIONIST"
   | "TECHNICIAN"
   | "PHARMACIST"
-  | "ADMIN"
   | "LAB_TECHNICIAN"
   | "WARD_BOY"
   | "CLEANING_STAFF"
@@ -43,6 +40,10 @@ export interface StaffFormData {
   registrationNo?: string;
   roleBadge?: string;
   password?: string;
+  workingHours?: {
+  start: string;
+  end: string;
+};
 }
 
 export interface StaffResponse {
@@ -93,7 +94,7 @@ export interface CreateStaffPayload {
   name: string;
   email: string;
   phone: string;
-  skill: string;
+  skill?: string;
   category: StaffCategory;
   experience?: number | string;
   salary: number;
@@ -102,6 +103,10 @@ export interface CreateStaffPayload {
   aadhaar: string;
   address: string;
   joiningDate?: string;
+  workingHours?: {
+  start: string;
+  end: string;
+};
   staffCode?: string;
   department?: string;
   registrationNo?: string;
@@ -144,28 +149,20 @@ export const STAFF_VALIDATION_RULES: ValidationRules = {
     },
   },
 
-  skill: {
-    required: "Skill/Specialization is required",
-    minLength: {
-      value: 2,
-      message: "Skill must be at least 2 characters",
-    },
-    maxLength: {
-      value: 100,
-      message: "Skill cannot exceed 100 characters",
-    },
+skill: {
+  maxLength: {
+    value: 100,
+    message: "Skill cannot exceed 100 characters",
   },
+},
 
   category: {
     required: "Staff category is required",
     validate: (value: unknown) => {
       const validCategories: StaffCategory[] = [
-        "DOCTOR",
         "NURSE",
-        "RECEPTIONIST",
         "TECHNICIAN",
         "PHARMACIST",
-        "ADMIN",
         "LAB_TECHNICIAN",
         "WARD_BOY",
         "CLEANING_STAFF",
@@ -313,13 +310,12 @@ export const STAFF_VALIDATION_RULES: ValidationRules = {
     },
   },
 
-  registrationNo: {
-    pattern: {
-      value: /^[A-Za-z0-9\-_\/]{2,30}$/,
-      message:
-        "Registration number must be 2-30 alphanumeric characters with hyphens, underscores or slashes",
-    },
+registrationNo: {
+  maxLength: {
+    value: 30,
+    message: "Registration number cannot exceed 30 characters",
   },
+},
 
   roleBadge: {
     maxLength: {
@@ -370,19 +366,7 @@ export const STAFF_CATEGORY_SPECIFIC_RULES: Record<
   string,
   Partial<ValidationRules>
 > = {
-  DOCTOR: {
-    registrationNo: {
-      required: "Registration number is required for doctors",
-      pattern: {
-        value: /^[A-Z]{2}-[A-Z]{3}-\d{5}$/,
-        message: "Doctor registration must be in format: ST-MED-12345",
-      },
-    },
-    department: {
-      required: "Department is required for doctors",
-    },
-  },
-
+ 
   NURSE: {
     registrationNo: {
       required: "Registration number is required for nurses",

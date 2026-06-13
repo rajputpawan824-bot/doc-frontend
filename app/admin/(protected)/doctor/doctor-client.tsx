@@ -244,6 +244,7 @@ const DoctorsPage = ({ initialDoctors }: { initialDoctors?: DoctorResponse[] }) 
 const {
   data: doctorsResponse,
   isLoading,
+  isFetching,
   refetch: refetchDoctors,
 } = useDoctors({
   status: activeTab === "on-leave" ? "on_leave" : activeTab,
@@ -1585,16 +1586,17 @@ const handleViewDetails = async (doctorId: string) => {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button
+         <Button
             variant="outline"
             onClick={handleRefresh}
             className="hover:bg-gray-50"
-            disabled={isLoading}
+            disabled={isFetching}
           >
             <RefreshCw
-              className={`mr-2 h-4 w-4 ${isLoading ? "animate-spin" : ""}`}
+              className={`mr-2 h-4 w-4 ${isFetching ? "animate-spin" : ""}`}
             />
-            Refresh
+             {isFetching ? "Refreshing..." : "Refresh"}
+            
           </Button>
           <Button
             onClick={() => setIsAddModalOpen(true)}

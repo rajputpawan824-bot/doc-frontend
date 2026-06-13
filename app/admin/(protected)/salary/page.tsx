@@ -244,6 +244,7 @@ const SalaryManagement = () => {
   const {
     data: salaryListData,
     isLoading: isLoadingList,
+    isFetching,
     refetch: refetchList,
   } = useSalaryList({
     userRole: selectedRole,
@@ -740,12 +741,13 @@ const SalaryManagement = () => {
             variant="outline"
             onClick={handleRefresh}
             className="hover:bg-gray-50"
-            disabled={isLoading}
+            disabled={isFetching}
           >
             <RefreshCw
-              className={`mr-2 h-4 w-4 ${isLoading ? "animate-spin" : ""}`}
+              className={`mr-2 h-4 w-4 ${isFetching ? "animate-spin" : ""}`}
             />
-            Refresh
+             {isFetching ? "Refreshing..." : "Refresh"}
+            
           </Button>
         </div>
       </div>

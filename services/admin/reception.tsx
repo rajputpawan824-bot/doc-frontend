@@ -37,7 +37,16 @@ interface RawReceptionist {
   aadhaar: string;
   address: string;
   deskNumber: string;
-  shiftTiming: string;
+ receptionistCode: string;
+
+registrationNo?: string;
+
+joiningDate: string;
+
+workingHours: {
+  start: string;
+  end: string;
+};
   canEditPatient?: boolean | string;
   createdAt: string;
   updatedAt?: string;
@@ -71,7 +80,18 @@ export function useAddReception(options?: {
         aadhaar: formData.aadhaar.trim(),
         address: formData.address.trim(),
         deskNumber: formData.deskNumber.trim(),
-        shiftTiming: formData.shiftTiming.trim(),
+    
+        receptionistCode: formData.receptionistCode?.trim(),
+
+        registrationNo: formData.registrationNo?.trim() || "",
+
+joiningDate: formData.joiningDate,
+
+workingHours: {
+  start: formData.workingHours.start,
+  end: formData.workingHours.end,
+},
+       
         caneditPatient: formData.caneditPatient ?? false,
       };
 
@@ -139,7 +159,13 @@ export const useReceptionists = (
         aadhaar: reception.aadhaar,
         address: reception.address,
         deskNumber: reception.deskNumber,
-        shiftTiming: reception.shiftTiming,
+        receptionistCode: reception.receptionistCode,
+
+registrationNo: reception.registrationNo,
+
+joiningDate: reception.joiningDate,
+
+workingHours: reception.workingHours,
         isActive: reception.user?.isActive ?? true,
         // canEditPatient is at the top-level of each receptionist (not inside user)
         canEditPatient: reception.canEditPatient,
@@ -200,9 +226,21 @@ export function useUpdateReceptionist(options?: {
       if (data.deskNumber !== undefined) {
         updatePayload.deskNumber = data.deskNumber.trim();
       }
-      if (data.shiftTiming !== undefined) {
-        updatePayload.shiftTiming = data.shiftTiming.trim();
-      }
+      if (data.registrationNo !== undefined) {
+  updatePayload.registrationNo = data.registrationNo.trim();
+}
+
+if (data.joiningDate !== undefined) {
+  updatePayload.joiningDate = data.joiningDate;
+}
+
+if (data.workingHours !== undefined) {
+  updatePayload.workingHours = {
+    start: data.workingHours.start,
+    end: data.workingHours.end,
+  };
+}
+     
       if (data.password !== undefined) {
         updatePayload.password = data.password.trim();
       }
@@ -234,37 +272,35 @@ export function useUpdateReceptionist(options?: {
 }
 
 export function useUpdateReceptionistPassword(options?: {
-  onSuccess?: (data: ReceptionResponse) => void;
+  onSuccess?: () => void;
   onError?: (error: Error) => void;
 }) {
   const queryClient = useQueryClient();
 
   return useMutation<
-    ReceptionResponse,
+    void,
     Error,
-    { id: string; data: Partial<ReceptionFormData> }
+    { id: string; newPassword: string }
   >({
-    mutationFn: async ({ id, data }) => {
-      const response: ApiResponse<{ data: ReceptionResponse }> =
-        await clientApi.put(`/receptionists/password/${id}`,  {
-    newPassword: data.password,
-  });
+    mutationFn: async ({ id, newPassword }) => {
+      const response: ApiResponse<{
+        data?: ReceptionResponse;
+        message?: string;
+      }> = await clientApi.put(`/receptionists/password/${id}`, {
+          newPassword,
+        });
 
       if (!response.success) {
         throw new Error(response.error || "Failed to update receptionist");
       }
-      if (!response.data) {
-        throw new Error("No data received for password update");
-      }
-
-      return response.data.data;
+      return;
     },
     retry: 1,
     retryDelay: 1000,
-    onSuccess: (data) => {
+    onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ["receptionists"] });
-      queryClient.invalidateQueries({ queryKey: ["receptionist", data.id] });
-      options?.onSuccess?.(data);
+      queryClient.invalidateQueries({ queryKey: ["receptionist", variables.id] });
+      options?.onSuccess?.();
     },
     onError: options?.onError,
   });
@@ -305,7 +341,13 @@ export const useReceptionistById = (id: string | undefined) => {
         aadhaar: reception.aadhaar,
         address: reception.address,
         deskNumber: reception.deskNumber,
-        shiftTiming: reception.shiftTiming,
+        receptionistCode: reception.receptionistCode,
+
+registrationNo: reception.registrationNo,
+
+joiningDate: reception.joiningDate,
+
+workingHours: reception.workingHours,
         isActive: reception.user?.isActive ?? true,
         // canEditPatient is at the top-level of each receptionist (not inside user)
         canEditPatient: reception.canEditPatient,
@@ -357,7 +399,13 @@ export const useDeactivatedReceptionists = () => {
         aadhaar: reception.aadhaar,
         address: reception.address,
         deskNumber: reception.deskNumber,
-        shiftTiming: reception.shiftTiming,
+  receptionistCode: reception.receptionistCode,
+
+registrationNo: reception.registrationNo,
+
+joiningDate: reception.joiningDate,
+
+workingHours: reception.workingHours,      
         isActive: reception.user?.isActive ?? false,
         canEditPatient: reception.canEditPatient,
         canEditPatients: reception.canEditPatient,
@@ -426,5 +474,31 @@ export const useTogglePatientEditPermission = () => {
       queryClient.invalidateQueries({ queryKey: ["receptionists"] });
       queryClient.invalidateQueries({ queryKey: ["receptionist"] });
     },
+  });
+};
+
+
+
+interface NextReceptionistCodeResponse {
+  receptionistCode: string;
+}
+
+export const useNextReceptionistCode = () => {
+  return useQuery({
+    queryKey: ["next-receptionist-code"],
+    queryFn: async () => {
+      const response = await clientApi.get<{
+        data: NextReceptionistCodeResponse;
+      }>("/receptionists/next-code");
+
+      if (!response.success || !response.data) {
+       throw new Error(
+   "Failed to fetch receptionist code"
+);
+      }
+
+      return response.data.data;
+    },
+    staleTime: 0,
   });
 };
