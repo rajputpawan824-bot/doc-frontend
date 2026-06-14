@@ -52,6 +52,7 @@ interface DoctorFormData {
   government: boolean;
   adjunct: boolean;
   address: string;
+  joiningDate:string;
   consultationFee: string;
   availabilityDays: string[];
   documents: string[];
@@ -102,6 +103,7 @@ export function DoctorForm({
   government: false,
   adjunct: false,
   address: "",
+  joiningDate:"",
   consultationFee: "",
   availabilityDays: [],
   documents: [],
@@ -855,6 +857,7 @@ const [formData, setFormData] = useState<DoctorFormData>({
           government: false,
           adjunct: false,
           address: "",
+          joiningDate:"",
           consultationFee: "",
           availabilityDays: [],
           documents: [],

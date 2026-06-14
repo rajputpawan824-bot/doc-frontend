@@ -98,6 +98,9 @@ export function useAddDoctor(options?: {
         salary: Number(formData.salary),
         shift: formData.shift,
         gender: formData.gender,
+          joiningDate: formData.joiningDate,
+          doctorCode: formData.doctorCode,
+       
         department: formData.department.trim(),
         aadhaar: formData.aadhaar.replace(/[-\s]/g, ""), // Remove hyphens/spaces
         address: formData.address.trim(),
@@ -406,5 +409,28 @@ export const useOnLeaveDoctors = () => {
     },
     retry: 2,
     retryDelay: 1000,
+  });
+};
+
+
+export const useDoctorNextCode = () => {
+  return useQuery({
+    queryKey: ["doctor-next-code"],
+    queryFn: async () => {
+      const response = await clientApi.get<{
+        data: {
+          doctorCode: string;
+        };
+      }>("/doctors/next-code");
+
+      if (!response.success || !response.data) {
+        throw new Error(
+           "Failed to fetch doctors code"
+        );
+      }
+
+      return response.data.data.doctorCode;
+    },
+    staleTime: 0,
   });
 };

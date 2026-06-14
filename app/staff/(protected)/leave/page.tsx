@@ -100,6 +100,13 @@ export default function StaffLeavePage() {
     { name: "fromDate", label: "Start Date", type: "date", required: true, width: "half" },
     { name: "toDate", label: "End Date", type: "date", required: true, width: "half" },
     { name: "isHalfDay", label: "Half Day Leave", type: "checkbox", width: "half", defaultValue: false },
+    {
+  name: "isPaid",
+  label: "Paid Leave",
+  type: "checkbox",
+  width: "half",
+  defaultValue: true
+},
     { name: "halfDayType", label: "Shift Option", type: "select", options: [
       { label: "First Half", value: "FIRST_HALF" },
       { label: "Second Half", value: "SECOND_HALF" },

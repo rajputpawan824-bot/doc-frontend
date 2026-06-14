@@ -434,12 +434,19 @@ export default function TokenManagementClient({
               <Label>Slot</Label>
               <div className="relative">
                 <Input
-                  placeholder={!appointmentForm.doctorId || !appointmentForm.date ? "Select doctor and date first" : "Enter time (e.g., 10:30 AM)"}
-                  value={appointmentForm.slot}
-                  onChange={(e) => setAppointmentForm({ ...appointmentForm, slot: e.target.value })}
-                  disabled={!appointmentForm.doctorId || !appointmentForm.date}
-                  list="available-slots-list"
-                />
+  type="time"
+  value={appointmentForm.slot}
+  onChange={(e) =>
+    setAppointmentForm({
+      ...appointmentForm,
+      slot: e.target.value,
+    })
+  }
+  disabled={
+    !appointmentForm.doctorId ||
+    !appointmentForm.date
+  }
+/>
                 <datalist id="available-slots-list">
                   {availableSlots.map((s: string) => (
                     <option key={s} value={s} />

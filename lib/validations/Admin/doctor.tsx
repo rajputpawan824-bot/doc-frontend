@@ -17,6 +17,8 @@ export interface DoctorFormData {
   aadhaar: string;
   address: string;
   experience: number;
+  joiningDate: string;
+  doctorCode: string;
   consultationFee: number;
   availabilityDays: string[];
   workingHours: {
@@ -38,6 +40,8 @@ experience: number;
   department: string;
   aadhaar: string;
   address: string;
+  doctorCode: string;
+joiningDate: string;
   consultationFee: number;
   availabilityDays: string[];
   documentUrl: string[];
@@ -223,6 +227,8 @@ export interface CreateDoctorPayload {
   department: string;
   aadhaar: string;
   address: string;
+   doctorCode: string;      
+  joiningDate: string; 
   experience: number;
   consultationFee: number;
   availabilityDays: string[];

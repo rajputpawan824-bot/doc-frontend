@@ -106,6 +106,7 @@ export const useCreateLeave = (options?: {
         leaveType: formData.leaveType,
         fromDate: formData.fromDate,
         toDate: formData.toDate,
+         isPaid: formData.isPaid,
         reason: formData.reason.trim(),
         emergencyContact: formData.emergencyContact?.trim(),
         isHalfDay: formData.isHalfDay,
@@ -369,6 +370,58 @@ export const useLeaveStats = (options?: {
     retry: 2,
     retryDelay: 1000,
     staleTime: 5 * 60 * 1000, // 5 minutes
+  });
+};
+
+export const useOnLeave = (options?: {
+  userRole?: "DOCTOR" | "STAFF" | "RECEPTIONIST" | "ADMIN";
+  date?: string;
+  onError?: (error: Error) => void;
+}) => {
+  return useQuery({
+    queryKey: [
+  "leaves",
+  "on-leave",
+  options?.userRole,
+  options?.date,
+],
+   queryFn: async () => {
+  try {
+    const params = new URLSearchParams();
+
+    if (options?.userRole) {
+      params.append("userRole", options.userRole);
+    }
+
+    if (options?.date) {
+      params.append("date", options.date);
+    }
+
+    const queryString = params.toString();
+    const url = `/leave/on-leave${queryString ? `?${queryString}` : ""}`;
+        const response = await clientApi.get<
+          { data: LeaveResponse[] } | LeaveResponse[]
+        >(url);
+
+        if (!response.success) {
+          throw new Error(response.error || "Failed to fetch on leave employees");
+        }
+        if (!response.data) {
+          throw new Error("No data received from server");
+        }
+
+        return Array.isArray(response.data)
+          ? response.data
+          : response.data.data || [];
+      } catch (error) {
+        const err = error instanceof Error ? error : new Error(String(error));
+        options?.onError?.(err);
+        throw err;
+      }
+    },
+    retry: 2,
+    retryDelay: 1000,
+    staleTime: 5 * 60 * 1000,
   });
 };
 

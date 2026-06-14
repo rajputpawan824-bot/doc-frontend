@@ -11,7 +11,6 @@ import {
   Search,
   Loader2,
   Eye,
-  Trash2,
   Plus,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -26,15 +25,30 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { format } from "date-fns";
 import {
   useAllLeaves,
   useApproveLeave,
   useRejectLeave,
-  useCancelLeave,
   useLeaveStats,
   useCreateLeave,
   useEmployeesForLeave,
+  useOnLeave,
 } from "@/services/admin/leave";
 
 import type {
@@ -44,7 +58,7 @@ import type {
   HalfDayType,
   LeaveFormData,
 } from "@/lib/validations/Admin/leave";
-import ReusableModal, { FieldConfig } from "@/components/reusable/reusable-modal";
+import ReusableModal from "@/components/reusable/reusable-modal";
 import {
   Dialog,
   DialogContent,
@@ -55,17 +69,28 @@ import {
 
 const LeaveManagement = () => {
   const [activeTab, setActiveTab] = useState<
-    "pending" | "approved" | "rejected"
+    "pending" | "approved" | "rejected" | "on-leave"
   >("pending");
   const [searchQuery, setSearchQuery] = useState("");
+  const today = format(new Date(), "yyyy-MM-dd");
+  const [onLeaveRole, setOnLeaveRole] = useState<
+    "ALL" | "DOCTOR" | "STAFF" | "RECEPTIONIST" | "ADMIN"
+  >("ALL");
+  const [onLeaveDate, setOnLeaveDate] = useState(
+  new Date().toISOString().split("T")[0]
+);
+
   const [selectedLeave, setSelectedLeave] = useState<LeaveResponse | null>(
     null,
   );
+  const [isPaid, setIsPaid] = useState(true);
   const [rejectionReason, setRejectionReason] = useState("");
   const [showRejectDialog, setShowRejectDialog] = useState(false);
   const [approveTargetLeave, setApproveTargetLeave] = useState<LeaveResponse | null>(null);
   const [approvalIsPaid, setApprovalIsPaid] = useState<boolean | null>(null);
   const [showApproveDialog, setShowApproveDialog] = useState(false);
+  const [viewLeave, setViewLeave] = useState<LeaveResponse | null>(null);
+
   const [isApplyModalOpen, setIsApplyModalOpen] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<
   "DOCTOR" | "STAFF" | "RECEPTIONIST" | undefined
@@ -81,6 +106,8 @@ const { data: employees = [] } =
       toast.success("Leave applied successfully");
       setIsApplyModalOpen(false);
       refetch();
+      refetchOnLeave();
+      refetchOnLeaveToday();
     },
     onError: (error) => {
       toast.error(error.message || "Failed to apply leave");
@@ -91,6 +118,7 @@ const { data: employees = [] } =
   const {
     data: allLeaves = [],
     isLoading,
+    isFetching,
     refetch,
   } = useAllLeaves({
     onError: (error) => {
@@ -105,6 +133,29 @@ const { data: employees = [] } =
     },
   });
 
+  const {
+    data: onLeaveToday = [],
+    isFetching: isOnLeaveTodayFetching,
+    refetch: refetchOnLeaveToday,
+  } = useOnLeave({
+    onError: (error) => {
+      toast.error(error.message || "Failed to fetch employees on leave today");
+    },
+  });
+
+const {
+  data: onLeaveLeaves = [],
+  isLoading: isOnLeaveLoading,
+  isFetching: isOnLeaveFetching,
+  refetch: refetchOnLeave,
+} = useOnLeave({
+  userRole: onLeaveRole === "ALL" ? undefined : onLeaveRole,
+  date: onLeaveDate,
+  onError: (error) => {
+    toast.error(error.message || "Failed to fetch employees on leave");
+  },
+});
+
   const approveLeave = useApproveLeave({
     onSuccess: () => {
       toast.success("Leave approved successfully");
@@ -113,6 +164,8 @@ const { data: employees = [] } =
       setApproveTargetLeave(null);
       setApprovalIsPaid(null);
       refetch();
+      refetchOnLeave();
+      refetchOnLeaveToday();
     },
     onError: (error) => {
       toast.error(error.message || "Failed to approve leave");
@@ -126,19 +179,11 @@ const { data: employees = [] } =
       setRejectionReason("");
       setShowRejectDialog(false);
       refetch();
+      refetchOnLeave();
+      refetchOnLeaveToday();
     },
     onError: (error) => {
       toast.error(error.message || "Failed to reject leave");
-    },
-  });
-
-  const cancelLeave = useCancelLeave({
-    onSuccess: () => {
-      toast.success("Leave cancelled successfully");
-      refetch();
-    },
-    onError: (error) => {
-      toast.error(error.message || "Failed to cancel leave");
     },
   });
 
@@ -149,15 +194,29 @@ const { data: employees = [] } =
         ? leave.status === "PENDING"
         : activeTab === "approved"
           ? leave.status === "APPROVED"
-          : leave.status === "REJECTED";
+          : activeTab === "rejected"
+            ? leave.status === "REJECTED"
+            : false;
 
     const matchesSearch =
       !searchQuery ||
       leave.staffName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      leave.user?.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       leave.staffCode?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       leave.reason?.toLowerCase().includes(searchQuery.toLowerCase());
 
     return matchesTab && matchesSearch;
+  });
+
+  const filteredOnLeave = onLeaveLeaves.filter((leave) => {
+    const matchesSearch =
+      !searchQuery ||
+      leave.staffName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      leave.user?.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      leave.staffCode?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      leave.reason?.toLowerCase().includes(searchQuery.toLowerCase());
+
+    return matchesSearch;
   });
 
   const getStatusBadge = (status: LeaveStatus) => {
@@ -183,6 +242,110 @@ const { data: employees = [] } =
     };
     return colors[type] || "bg-gray-100 text-gray-800";
   };
+
+  const getEmployeeName = (leave: LeaveResponse) =>
+    leave.user?.name || leave.staffName || "N/A";
+
+  const getEmployeeRole = (leave: LeaveResponse) =>
+    leave.userRole || leave.staffCategory || "N/A";
+
+  const getTotalDays = (leave: LeaveResponse) =>
+    leave.totalDays ?? leave.numberOfDays ?? "N/A";
+
+  const getPaidStatus = (leave: LeaveResponse) =>
+    leave.status === "APPROVED"
+      ? leave.isPaid
+        ? "Paid"
+        : "Unpaid"
+      : "Pending Decision";
+
+  const renderLeaveTable = (
+    leaves: LeaveResponse[],
+    actions: "pending" | "view-only",
+    showStatus = true,
+  ) => (
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead>Employee Name</TableHead>
+          <TableHead>Role</TableHead>
+          <TableHead>Leave Type</TableHead>
+          <TableHead>From Date</TableHead>
+          <TableHead>To Date</TableHead>
+          <TableHead>Total Days</TableHead>
+          <TableHead>Paid/Unpaid</TableHead>
+          {showStatus && <TableHead>Status</TableHead>}
+          <TableHead>Reason</TableHead>
+          <TableHead className="text-right">Actions</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {leaves.map((leave) => (
+          <TableRow key={leave._id}>
+            <TableCell className="font-medium">{getEmployeeName(leave)}</TableCell>
+            <TableCell>{getEmployeeRole(leave)}</TableCell>
+            <TableCell>
+              <Badge className={getLeaveTypeColor(leave.leaveType)}>
+                {leave.leaveType.replace("_", " ")}
+              </Badge>
+            </TableCell>
+            <TableCell>{format(new Date(leave.fromDate), "dd MMM yyyy")}</TableCell>
+            <TableCell>{format(new Date(leave.toDate), "dd MMM yyyy")}</TableCell>
+            <TableCell>{getTotalDays(leave)}</TableCell>
+            <TableCell>{getPaidStatus(leave)}</TableCell>
+            {showStatus && <TableCell>{getStatusBadge(leave.status)}</TableCell>}
+            <TableCell className="max-w-xs whitespace-normal">
+              {leave.reason || "N/A"}
+            </TableCell>
+            <TableCell>
+              <div className="flex justify-end gap-2">
+                <Button
+  size="sm"
+  variant="outline"
+  onClick={() => setViewLeave(leave)}
+>
+  <Eye className="h-4 w-4 mr-1" />
+  View
+</Button>
+                {actions === "pending" && (
+                  <>
+                    <Button
+                      size="sm"
+                      className="bg-green-600 hover:bg-green-700"
+                      onClick={() => {
+                        setApproveTargetLeave(leave);
+                        setApprovalIsPaid(null);
+                        setShowApproveDialog(true);
+                      }}
+                      disabled={approveLeave.isPending}
+                    >
+                      {approveLeave.isPending ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <CheckCircle className="h-4 w-4 mr-1" />
+                      )}
+                      Approve
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      onClick={() => {
+                        setSelectedLeave(leave);
+                        setShowRejectDialog(true);
+                      }}
+                    >
+                      <XCircle className="h-4 w-4 mr-1" />
+                      Reject
+                    </Button>
+                  </>
+                )}
+              </div>
+            </TableCell>
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
+  );
 
   const stats = statsData || {
     totalLeaves: allLeaves.length,
@@ -219,19 +382,28 @@ const { data: employees = [] } =
             onClick={() => {
               refetch();
               refetchStats();
+              refetchOnLeave();
+              refetchOnLeaveToday();
             }}
-            disabled={isLoading}
+            disabled={isFetching || isOnLeaveFetching || isOnLeaveTodayFetching}
+             className="hover:bg-gray-50"
           >
             <RefreshCw
-              className={`h-4 w-4 mr-2 ${isLoading ? "animate-spin" : ""}`}
+              className={`mr-2 h-4 w-4 ${
+                isFetching || isOnLeaveFetching || isOnLeaveTodayFetching
+                  ? "animate-spin"
+                  : ""
+              }`}
             />
-            Refresh
+             {isFetching || isOnLeaveFetching || isOnLeaveTodayFetching
+              ? "Refreshing..."
+              : "Refresh"}
           </Button>
         </div>
       </div>
 
       {/* Stats Cards */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-6">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Leaves</CardTitle>
@@ -289,13 +461,27 @@ const { data: employees = [] } =
             </div>
           </CardContent>
         </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">On Leave Today</CardTitle>
+            <Calendar className="h-4 w-4 text-blue-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-blue-600">
+              {onLeaveToday.length}
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Tabs Section */}
       <Tabs
         value={activeTab}
         onValueChange={(value) =>
-          setActiveTab(value as "pending" | "approved" | "rejected")
+          setActiveTab(
+            value as "pending" | "approved" | "rejected" | "on-leave",
+          )
         }
       >
         <TabsList>
@@ -315,6 +501,12 @@ const { data: employees = [] } =
             Rejected
             <span className="ml-2 rounded-full bg-red-100 px-2 py-0.5 text-xs text-red-800">
               {allLeaves.filter((l) => l.status === "REJECTED").length}
+            </span>
+          </TabsTrigger>
+          <TabsTrigger value="on-leave">
+            On Leave
+            <span className="ml-2 rounded-full bg-blue-100 px-2 py-0.5 text-xs text-blue-800">
+              {onLeaveToday.length}
             </span>
           </TabsTrigger>
         </TabsList>
@@ -357,67 +549,7 @@ const { data: employees = [] } =
                   </p>
                 </div>
               ) : (
-                <div className="space-y-4">
-                  {filteredLeaves.map((leave) => (
-                    <div
-                      key={leave._id}
-                      className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50"
-                    >
-                      <div className="flex-1">
-                        <div className="flex items-center gap-3">
-                          <div className="font-semibold">{leave.staffName}</div>
-                          <Badge className={getLeaveTypeColor(leave.leaveType)}>
-                            {leave.leaveType.replace("_", " ")}
-                          </Badge>
-                        </div>
-                        <div className="text-sm text-muted-foreground mt-1">
-                          {leave.staffCode} •{" "}
-                          {format(new Date(leave.fromDate), "dd MMM yyyy")} to{" "}
-                          {format(new Date(leave.toDate), "dd MMM yyyy")}
-                        </div>
-                        <div className="text-sm mt-2">{leave.reason}</div>
-                      </div>
-                      <div className="flex gap-2">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => setSelectedLeave(leave)}
-                        >
-                          <Eye className="h-4 w-4 mr-1" />
-                          View
-                        </Button>
-                        <Button
-                          size="sm"
-                          className="bg-green-600 hover:bg-green-700"
-                          onClick={() => {
-                            setApproveTargetLeave(leave);
-                            setApprovalIsPaid(null);
-                            setShowApproveDialog(true);
-                          }}
-                          disabled={approveLeave.isPending}
-                        >
-                          {approveLeave.isPending ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <CheckCircle className="h-4 w-4 mr-1" />
-                          )}
-                          Approve
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="destructive"
-                          onClick={() => {
-                            setSelectedLeave(leave);
-                            setShowRejectDialog(true);
-                          }}
-                        >
-                          <XCircle className="h-4 w-4 mr-1" />
-                          Reject
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                renderLeaveTable(filteredLeaves, "pending")
               )}
             </CardContent>
           </Card>
@@ -448,66 +580,7 @@ const { data: employees = [] } =
                   </p>
                 </div>
               ) : (
-                <div className="space-y-4">
-                  {filteredLeaves.map((leave) => (
-                    <div
-                      key={leave._id}
-                      className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50"
-                    >
-                      <div className="flex-1">
-                        <div className="flex items-center gap-3">
-                          <div className="font-semibold">{leave.staffName}</div>
-                          <Badge className={getLeaveTypeColor(leave.leaveType)}>
-                            {leave.leaveType.replace("_", " ")}
-                          </Badge>
-                          {getStatusBadge(leave.status)}
-                        </div>
-                        <div className="text-sm text-muted-foreground mt-1">
-                          {leave.staffCode} •{" "}
-                          {format(new Date(leave.fromDate), "dd MMM yyyy")} to{" "}
-                          {format(new Date(leave.toDate), "dd MMM yyyy")}
-                        </div>
-                        <div className="text-sm mt-2">{leave.reason}</div>
-                        {leave.approvedOn && (
-                          <div className="text-xs text-green-600 mt-2">
-                            Approved on{" "}
-                            {format(new Date(leave.approvedOn), "dd MMM yyyy")}
-                          </div>
-                        )}
-                      </div>
-                      <div className="flex gap-2">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => setSelectedLeave(leave)}
-                        >
-                          <Eye className="h-4 w-4 mr-1" />
-                          View
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="destructive"
-                          onClick={() => {
-                            if (
-                              confirm(
-                                "Are you sure you want to cancel this leave?",
-                              )
-                            ) {
-                              cancelLeave.mutate(leave._id);
-                            }
-                          }}
-                          disabled={cancelLeave.isPending}
-                        >
-                          {cancelLeave.isPending ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <Trash2 className="h-4 w-4" />
-                          )}
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                renderLeaveTable(filteredLeaves, "view-only")
               )}
             </CardContent>
           </Card>
@@ -538,43 +611,77 @@ const { data: employees = [] } =
                   </p>
                 </div>
               ) : (
-                <div className="space-y-4">
-                  {filteredLeaves.map((leave) => (
-                    <div
-                      key={leave._id}
-                      className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50"
-                    >
-                      <div className="flex-1">
-                        <div className="flex items-center gap-3">
-                          <div className="font-semibold">{leave.staffName}</div>
-                          <Badge className={getLeaveTypeColor(leave.leaveType)}>
-                            {leave.leaveType.replace("_", " ")}
-                          </Badge>
-                          {getStatusBadge(leave.status)}
-                        </div>
-                        <div className="text-sm text-muted-foreground mt-1">
-                          {leave.staffCode} •{" "}
-                          {format(new Date(leave.fromDate), "dd MMM yyyy")} to{" "}
-                          {format(new Date(leave.toDate), "dd MMM yyyy")}
-                        </div>
-                        <div className="text-sm mt-2">{leave.reason}</div>
-                        {leave.rejectionReason && (
-                          <div className="text-sm text-red-600 mt-2">
-                            Reason: {leave.rejectionReason}
-                          </div>
-                        )}
-                      </div>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => setSelectedLeave(leave)}
-                      >
-                        <Eye className="h-4 w-4 mr-1" />
-                        View
-                      </Button>
-                    </div>
-                  ))}
+                renderLeaveTable(filteredLeaves, "view-only")
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* On Leave Tab */}
+        <TabsContent value="on-leave" className="space-y-4 mt-4">
+          <div className="flex flex-col gap-3 md:flex-row md:items-end">
+            <div className="space-y-2">
+              <div className="text-sm font-medium">Role</div>
+              <Select
+                value={onLeaveRole}
+                onValueChange={(value) =>
+                  setOnLeaveRole(
+                    value as
+                      | "ALL"
+                      | "DOCTOR"
+                      | "STAFF"
+                      | "RECEPTIONIST"
+                    
+                  )
+                }
+              >
+                <SelectTrigger className="w-full md:w-[180px]">
+                  <SelectValue placeholder="All Roles" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALL">All Roles</SelectItem>
+                  <SelectItem value="DOCTOR">Doctor</SelectItem>
+                  <SelectItem value="STAFF">Staff</SelectItem>
+                  <SelectItem value="RECEPTIONIST">Receptionist</SelectItem>
+                  <SelectItem value="ADMIN">Admin</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+  <div className="text-sm font-medium">Date</div>
+  <Input
+    type="date"
+    value={onLeaveDate}
+    onChange={(e) => setOnLeaveDate(e.target.value)}
+    className="w-full md:w-[180px]"
+  />
+</div>
+          </div>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>On Leave</CardTitle>
+              <CardDescription>
+                Employees currently on approved leave
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {isOnLeaveLoading ? (
+                <div className="flex justify-center items-center h-64">
+                  <Loader2 className="h-8 w-8 animate-spin" />
                 </div>
+              ) : filteredOnLeave.length === 0 ? (
+                <div className="text-center py-12">
+                  <Calendar className="mx-auto h-12 w-12 text-gray-400" />
+                  <h3 className="mt-4 text-lg font-semibold">
+                    No employees on leave
+                  </h3>
+                  <p className="text-muted-foreground">
+                    No employees are on approved leave for the selected filters
+                  </p>
+                </div>
+              ) : (
+                renderLeaveTable(filteredOnLeave, "view-only", false)
               )}
             </CardContent>
           </Card>
@@ -600,6 +707,7 @@ const { data: employees = [] } =
               typeof data.emergencyContact === "string"
                 ? data.emergencyContact.trim()
                 : undefined,
+                isPaid: Boolean(data.ispaid),
             isHalfDay: Boolean(data.isHalfDay),
             halfDayType:
               typeof data.halfDayType === "string"
@@ -683,6 +791,13 @@ const { data: employees = [] } =
             width: "half",
           },
           {
+  name: "isPaid",
+  label: "Paid Leave",
+  type: "checkbox",
+  width: "half",
+  defaultValue: true,
+},
+          {
             name: "isHalfDay",
             label: "Half Day Leave",
             type: "checkbox",
@@ -713,6 +828,10 @@ const { data: employees = [] } =
         open={!!selectedLeave}
         onOpenChange={() => setSelectedLeave(null)}
       >
+        <Dialog
+  open={!!viewLeave}
+  onOpenChange={() => setViewLeave(null)}
+></Dialog>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Leave Details</DialogTitle>

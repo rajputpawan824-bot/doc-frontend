@@ -84,6 +84,7 @@ import {
   useDoctorDashboardStats,
   type DoctorDashboardStats,
   useOnLeaveDoctors,
+  useDoctorNextCode,
 type OnLeaveDoctor,
 } from "@/services/admin/doctor";
 
@@ -274,6 +275,7 @@ console.log("First Doctor:", doctors[0]);
 } = useDoctorDashboardStats();
   const dashboardStats = data as DoctorDashboardStats | undefined;
 
+const { data: nextDoctorCode } = useDoctorNextCode();
 
   const {
   data: onLeaveData,
@@ -528,6 +530,21 @@ const onLeaveDoctors = onLeaveData || [];
           icon: <FileText className="w-4 h-4" />,
           width: "half",
         },
+{
+  key: "doctorCode",
+  label: "Doctor Code",
+  type: "text",
+  icon: <FileText className="w-4 h-4" />,
+  width: "half",
+},
+{
+  key: "joiningDate",
+  label: "Joining Date",
+  type: "date",
+  icon: <Calendar className="w-4 h-4" />,
+  width: "half",
+},
+        
         {
           key: "department",
           label: "Department",
@@ -785,16 +802,25 @@ onClick: () => {
             DOCTOR_VALIDATION_RULES.qualification,
           ),
         },
+
+        {
+  name: "doctorCode",
+  label: "Doctor Code",
+  type: "text",
+  disabled: true,
+  width: "half",
+}
+,
         {
           name: "registrationNo",
           label: "Registration Number",
           type: "text",
-          required: true,
+          required: false,
           placeholder: "DL-MED-45879",
           width: "half",
-          validation: transformValidation(
-            DOCTOR_VALIDATION_RULES.registrationNo,
-          ),
+          // validation: transformValidation(
+          //   DOCTOR_VALIDATION_RULES.registrationNo,
+          // ),
         },
         {
           name: "department",
@@ -858,6 +884,15 @@ onClick: () => {
           ],
           validation: transformValidation(DOCTOR_VALIDATION_RULES.shift),
         },
+
+        {
+  name: "joiningDate",
+  label: "Joining Date",
+  type: "date",
+  width: "half",
+},
+
+
         {
           name: "workingHourStart",
           label: "Working Hour Start",
@@ -938,7 +973,7 @@ onClick: () => {
           name: "registrationNo",
           label: "Registration Number",
           type: "text",
-          required: true,
+          required: false,
           width: "half",
           validation: transformValidation(
             DOCTOR_VALIDATION_RULES.registrationNo,
@@ -965,6 +1000,15 @@ onClick: () => {
           ],
           validation: transformValidation(DOCTOR_VALIDATION_RULES.gender),
         },
+
+        {
+  name: "doctorCode",
+  label: "Doctor Code",
+  type: "text",
+  disabled: true,
+  width: "half",
+},
+
         {
           name: "salary",
           label: "Salary (₹)",
@@ -987,6 +1031,13 @@ onClick: () => {
             DOCTOR_VALIDATION_RULES.consultationFee,
           ),
         },
+
+        {
+  name: "joiningDate",
+  label: "Joining Date",
+  type: "date",
+  width: "half",
+},
         {
           name: "shift",
           label: "Shift",
@@ -1106,7 +1157,10 @@ onClick: () => {
       address: String(data.address || ""),
       experience: Number(data.experience || ""),
       consultationFee: Number(data.consultationFee),
+      joiningDate: String(data.joiningDate || ""),
+      doctorCode: String(data.doctorCode || ""),
       availabilityDays: Array.isArray(data.availabilityDays)
+      
   ? data.availabilityDays
   : [],
       password: data.password ? String(data.password) : undefined,
@@ -1173,6 +1227,7 @@ onClick: () => {
       aadhaar: String(data.aadhaar || ""),
       address: String(data.address || ""),
       experience: Number(data.experience || ""),
+      joiningDate: String(data.joiningDate || ""),
       availabilityDays: Array.isArray(data.availabilityDays)
   ? data.availabilityDays
   : [],
@@ -1817,6 +1872,9 @@ const handleViewDetails = async (doctorId: string) => {
         onSave={handleAddDoctor}
         title="Add New Doctor"
         sections={addFormSections}
+          initialData={{
+    doctorCode: nextDoctorCode || "",
+  }}
         size="xl"
         saveButtonText={
           addDoctorMutation.isPending ? "Adding..." : "Add Doctor"
@@ -1860,11 +1918,18 @@ const handleViewDetails = async (doctorId: string) => {
                 qualification: selectedDoctor.qualification,
                 registrationNo: selectedDoctor.registrationNo,
                 gender: selectedDoctor.gender,
+                 doctorCode: selectedDoctor.doctorCode,
                 department: selectedDoctor.department,
                 aadhaar: selectedDoctor.aadhaar,
                 experience: selectedDoctor.experience,
+              
+
+joiningDate: selectedDoctor.joiningDate
+  ? selectedDoctor.joiningDate.split("T")[0]
+  : "",
              workingHourStart: selectedDoctor.workingHours?.start,
   workingHourEnd: selectedDoctor.workingHours?.end,
+
               }
             : undefined
         }

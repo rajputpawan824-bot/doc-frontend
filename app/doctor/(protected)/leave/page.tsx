@@ -211,6 +211,13 @@ export default function DoctorLeavePage() {
       width: "half",
     },
     {
+  name: "isPaid",
+  label: "Paid Leave",
+  type: "checkbox",
+  width: "half",
+  defaultValue: true,
+},
+    {
       name: "isHalfDay",
       label: "Half Day Leave",
       type: "checkbox",

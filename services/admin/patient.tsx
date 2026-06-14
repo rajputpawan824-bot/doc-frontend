@@ -28,6 +28,7 @@ type RawPatient = Partial<Patient> & {
   phoneNumber?: string;
   aadhaar?: string;
   adhar?: string;
+  emergencyContact?: string;
   relation?: string;
   otherRelation?: string;
   diseases?: string | string[];
@@ -73,11 +74,15 @@ export type PatientCreateData = Partial<Patient> & {
 };
 
 export interface PatientCreatePayload {
+  patientCode?: string;
   name: string;
   phone: string;
+  email?: string;
   age?: number;
   gender?: Patient["gender"];
   bloodGroup?: Patient["bloodGroup"];
+  aadhaar?: string;
+  address?: string;
   relation?: string;
   otherRelation?: string;
   diseases?: string | string[];
@@ -150,21 +155,36 @@ function normalizeStringArray(value: string[] | string | undefined) {
 }
 
 function buildCreatePatientPayload(data: PatientCreateData): PatientCreatePayload {
-  const medicalHistory =
-    data.medicalHistory ??
-    (Array.isArray(data.diseases) ? data.diseases.join(", ") : data.diseases);
+  const age = data.age;
 
   return {
+    patientCode: String(data.patientCode || "").trim() || undefined,
     name: String(data.name || "").trim(),
     phone: String(data.phoneNumber || "").trim(),
-    age: data.age !== undefined ? Number(data.age) : undefined,
+    email: String(data.email || "").trim() || undefined,
+    age: age !== undefined && age !== null && String(age) !== "" ? Number(age) : undefined,
     gender: data.gender,
     bloodGroup: data.bloodGroup,
-    relation: data.relation ?? data.emergencyContact,
-    otherRelation: data.otherRelation ?? "",
-    diseases: data.diseases ?? medicalHistory ?? "",
-    allergies: data.allergies ?? [],
-    medicalHistory: medicalHistory ?? "",
+    aadhaar: String(data.adhar || "").replace(/[-\s]/g, "") || undefined,
+    address: String(data.address || "").trim() || undefined,
+    relation: data.relation ?? "SELF",
+    otherRelation: String(data.otherRelation || "").trim() || undefined,
+   diseases:
+  typeof data.diseases === "string"
+    ? data.diseases
+        .split(",")
+        .map((item) => item.trim())
+        .filter(Boolean)
+    : data.diseases || [],
+
+allergies:
+  typeof data.allergies === "string"
+    ? data.allergies
+        .split(",")
+        .map((item) => item.trim())
+        .filter(Boolean)
+    : data.allergies || [],
+    medicalHistory: data.medicalHistory ?? "",
   };
 }
 
@@ -179,19 +199,19 @@ function normalizePatient(patient: RawPatient): Patient {
   return {
     ...patient,
     id,
-    patientId: patient.patientId || id,
+    patientCode: patient.patientCode || id,
     name: patient.name || patient.user?.name || "",
     phoneNumber: patient.phoneNumber || patient.phone || patient.user?.phone || "",
     email: patient.email || patient.user?.email,
     gender: normalizeGender(patient.gender),
     adhar: patient.adhar || patient.aadhaar || "",
-    emergencyContact:
-      patient.emergencyContact ||
-      patient.relation ||
-      patient.otherRelation ||
-      "",
+    address: patient.address || "",
+    emergencyContact: patient.emergencyContact || "",
+    relation: patient.relation || "SELF",
+    otherRelation: patient.otherRelation || "",
+    diseases: patient.diseases ?? [],
+    allergies: patient.allergies ?? [],
     status: (isActive ? "ACTIVE" : "INACTIVE") as Patient["status"],
-    medicalNotes: patient.medicalNotes || [],
     medicalReports: patient.medicalReports || [],
     createdAt,
     updatedAt,
@@ -238,6 +258,35 @@ export const usePatients = (params: PatientListParams = {}) => {
   });
 };
 
+export const usePatientById = (patientId?: string) => {
+  return useQuery({
+    queryKey: ["patient", patientId],
+    enabled: Boolean(patientId),
+    queryFn: async () => {
+      if (!patientId) {
+        throw new Error("Patient ID is required");
+      }
+
+      const response: ApiResponse<RawPatientResponse> =
+        await clientApi.get(`/patient/${patientId}`);
+
+      if (!response.success) {
+        throw new Error(response.error || "Failed to fetch patient details");
+      }
+      if (!response.data) {
+        throw new Error("No data received from server");
+      }
+
+      const patient = getRawPatient(response.data);
+      if (!patient) {
+        throw new Error("No patient data received from server");
+      }
+
+      return normalizePatient(patient);
+    },
+  });
+};
+
 export function useAddPatient(options?: {
   onSuccess?: (data: Patient) => void;
   onError?: (error: Error) => void;
@@ -275,6 +324,47 @@ export function useAddPatient(options?: {
   });
 }
 
+export function useUpdatePatient(options?: {
+  onSuccess?: (data: Patient) => void;
+  onError?: (error: Error) => void;
+}) {
+  const queryClient = useQueryClient();
+
+  return useMutation<Patient, Error, { id: string; data: PatientCreateData }>({
+    mutationFn: async ({ id, data }) => {
+      if (!id) {
+        throw new Error("Patient ID is required for update");
+      }
+
+      const payload = buildCreatePatientPayload(data);
+      const response: ApiResponse<RawPatientResponse> =
+        await clientApi.put(`/patient/update/${id}`, payload);
+
+      if (!response.success) {
+        throw new Error(response.error || "Failed to update patient");
+      }
+      if (!response.data) {
+        throw new Error("No data received from server");
+      }
+
+      const patient = getRawPatient(response.data);
+      if (!patient) {
+        throw new Error("No patient data received from server");
+      }
+
+      return normalizePatient(patient);
+    },
+    retry: 1,
+    retryDelay: 1000,
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["patients"] });
+      queryClient.invalidateQueries({ queryKey: ["patient", data.id] });
+      options?.onSuccess?.(data);
+    },
+    onError: options?.onError,
+  });
+}
+
 export function useUpdatePatientStatus(options?: {
   onSuccess?: (data: Patient | null) => void;
   onError?: (error: Error) => void;
@@ -283,11 +373,7 @@ export function useUpdatePatientStatus(options?: {
 
   return useMutation<Patient | null, Error, PatientStatusPayload>({
     mutationFn: async (payload) => {
-      console.log("[DEBUG] Patient toggle status called with payload:", payload);
-
-      // Defensive check to prevent runtime destructuring errors
       if (!payload || typeof payload !== "object") {
-        console.error("[DEBUG] Invalid payload provided to mutation:", payload);
         throw new Error("Invalid request: payload must be an object containing id and isActive");
       }
 
@@ -296,7 +382,6 @@ export function useUpdatePatientStatus(options?: {
         throw new Error("Patient ID is required for status update");
       }
 
-      // Updated URL to match specified requirement: /patient-status/:id
       const response: ApiResponse<RawPatientResponse> =
         await clientApi.put(`/patient/patient-status/${id}`, { isActive });
 
@@ -316,3 +401,23 @@ export function useUpdatePatientStatus(options?: {
     onError: options?.onError,
   });
 }
+interface NextPatientCodeResponse {
+  patientCode: string;
+}
+
+export const useNextPatientCode = () => {
+  return useQuery({
+    queryKey: ["next-patient-code"],
+    queryFn: async () => {
+      const response = await clientApi.get<{
+        data: NextPatientCodeResponse;
+      }>("/patient/next-code");
+
+      if (!response.success || !response.data) {
+        throw new Error("Failed to fetch patient code");
+      }
+
+      return response.data.data.patientCode;
+    },
+  });
+};

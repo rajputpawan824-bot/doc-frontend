@@ -365,8 +365,8 @@ if (
                 id={field.name}
                 checked={fieldValueAsBoolean(formData[field.name])}
                onChange={(e) => {
-  handleChange(field.name, e.target.value);
-  field.onChange?.(e.target.value);
+  handleChange(field.name, e.target.checked);
+  field.onChange?.(e.target.checked);
 }}
                 disabled={field.disabled}
                 className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500"

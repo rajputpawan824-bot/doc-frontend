@@ -29,6 +29,7 @@ export interface LeaveFormData {
   emergencyContact?: string;
   halfDayType?: HalfDayType;
   isHalfDay: boolean;
+  isPaid?: boolean;
 }
 
 // API Request/Response Interfaces
@@ -41,6 +42,7 @@ export interface LeaveRequest {
   emergencyContact?: string;
   halfDayType?: HalfDayType;
   isHalfDay: boolean;
+  isPaid?: boolean;
 }
 
 export interface LeaveResponse {
