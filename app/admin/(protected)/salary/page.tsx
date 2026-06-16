@@ -587,9 +587,9 @@ const SalaryManagement = () => {
             <div className="text-sm text-muted-foreground">
               {employee.role.replace("_", " ")}
             </div>
-            <div className="text-xs text-muted-foreground">
+            {/* <div className="text-xs text-muted-foreground">
               ID: {employee.userId.slice(0, 8)}...
-            </div>
+            </div> */}
             <Badge
               variant={employee.isActive ? "default" : "secondary"}
               className="mt-1 w-fit text-xs"
@@ -1022,7 +1022,7 @@ const SalaryManagement = () => {
           initialData={{}}
           isEdit={false}
           size="xl"
-          saveButtonText=""
+          saveButtonText="Close"
           cancelButtonText="Close"
         >
           <div className="space-y-4 max-h-[500px] overflow-y-auto">

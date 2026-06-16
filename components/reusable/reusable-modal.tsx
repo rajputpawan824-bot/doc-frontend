@@ -72,6 +72,7 @@ export default function ReusableModal({
   cancelButtonText,
   saveButtonColor,
   validationOnChange = false,
+   children,
 }: ReusableModalProps) {
   const formId = useId();
   const formSections = useMemo(
@@ -104,7 +105,9 @@ export default function ReusableModal({
       size={size}
       title={title}
       validationOnChange={validationOnChange}
-    />
+    >
+     {children}
+  </ReusableModalContent>
   );
 }
 
@@ -163,7 +166,10 @@ function ReusableModalContent({
   size,
   title,
   validationOnChange,
-}: ReusableModalContentProps) {
+  children,
+}: ReusableModalContentProps & {
+  children?: ReactNode;
+}) {
   const allFields = useMemo(
     () => formSections.flatMap((section) => section.fields),
     [formSections],
@@ -540,6 +546,7 @@ case "checkbox-group":
           </div>
         ))}
       </form>
+        {children}
     </Modal>
   );
     }
