@@ -77,7 +77,6 @@ export default function ReceptionistSalaryPage() {
         const variants: Record<string, "default" | "secondary" | "outline" | "destructive"> = {
           BONUS: "default",
           PENALTY: "destructive",
-          REVISION: "secondary",
           INCREMENT: "outline",
           DEDUCTION: "destructive",
         };

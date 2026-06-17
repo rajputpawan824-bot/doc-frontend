@@ -4,7 +4,7 @@ import {
   ValidationRules,
 } from "@/lib/hooks/useFormValidation";
 
-export type SalaryType = "BONUS" | "PENALTY" | "REVISION" | "INCREMENT" | "DEDUCTION";
+export type SalaryType = "BONUS" | "PENALTY" | "INCREMENT" | "DEDUCTION";
 export type UserRole = "DOCTOR" | "NURSE" | "RECEPTIONIST" | "TECHNICIAN" | "PHARMACIST" | "ADMIN" | "STAFF" | "ALL";
 
 export interface SalaryAdjustmentData {
@@ -104,7 +104,7 @@ export const SALARY_VALIDATION_RULES: ValidationRules = {
   type: {
     required: "Adjustment type is required",
     validate: (value: unknown) => {
-      const validTypes: SalaryType[] = ["BONUS", "PENALTY", "REVISION", "INCREMENT", "DEDUCTION"];
+      const validTypes: SalaryType[] = ["BONUS", "PENALTY", "INCREMENT", "DEDUCTION"];
       return (typeof value === "string" && validTypes.includes(value as SalaryType)) ||
         `Type must be one of: ${validTypes.join(", ")}`;
     },

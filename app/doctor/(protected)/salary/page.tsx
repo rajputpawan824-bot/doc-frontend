@@ -6,7 +6,6 @@ import {
   TrendingUp, 
   TrendingDown, 
   Download, 
-  Filter, 
   History,
   Calendar,
   AlertCircle
@@ -14,73 +13,56 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import DataTable from "@/components/reusable/data-table";
 import { ColumnDef } from "@tanstack/react-table";
 import { SalaryHistoryResponse, formatCurrency, getMonthName } from "@/lib/validations/Admin/salary";
+import {
+  useDownloadPayslip,
+  useSalaryDetails,
+  useSalaryHistory,
+} from "@/services/admin/salary";
 
 export default function DoctorSalaryPage() {
-  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
-  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  const currentDate = new Date();
+  const currentYear = currentDate.getFullYear();
+  const [selectedMonth, setSelectedMonth] = useState(currentDate.getMonth() + 1);
+  const [selectedYear, setSelectedYear] = useState(currentYear);
 
-  // Mock Summary Data
-  const summary = {
-    baseSalary: 120000,
-    bonus: 15000,
-    penalty: 2000,
-    netSalary: 133000,
+  const salaryParams = {
+    month: selectedMonth,
+    year: selectedYear,
   };
 
-  // Mock History Data
-  const history: SalaryHistoryResponse[] = [
-    {
-      id: "1",
-      userId: "D001",
-      userRole: "DOCTOR",
-      type: "BONUS",
-      amount: 10000,
-      reason: "Excellent patient feedback",
-      month: 5,
-      year: 2026,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    },
-    {
-      id: "2",
-      userId: "D001",
-      userRole: "DOCTOR",
-      type: "PENALTY",
-      amount: 2000,
-      reason: "Late for shift (3 times)",
-      month: 5,
-      year: 2026,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    },
-    {
-      id: "3",
-      userId: "D001",
-      userRole: "DOCTOR",
-      type: "INCREMENT",
-      amount: 5000,
-      reason: "Annual performance review",
-      month: 4,
-      year: 2026,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    },
-    {
-      id: "4",
-      userId: "D001",
-      userRole: "DOCTOR",
-      type: "BONUS",
-      amount: 5000,
-      reason: "Overtime hours",
-      month: 4,
-      year: 2026,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    },
-  ];
+  const {
+    data: salaryDetails,
+    isLoading: isLoadingDetails,
+    isError: isDetailsError,
+  } = useSalaryDetails(salaryParams);
+  const {
+    data: salaryHistory,
+    isLoading: isLoadingHistory,
+    isError: isHistoryError,
+  } = useSalaryHistory(salaryParams);
+  const downloadPayslipMutation = useDownloadPayslip();
+
+  const summary = {
+    baseSalary: salaryDetails?.baseSalary ?? 0,
+    bonus: salaryDetails?.bonus ?? 0,
+    penalty: salaryDetails?.penalty ?? 0,
+    netSalary: salaryDetails?.netSalary ?? 0,
+  };
+  const history = salaryHistory?.data ?? [];
+  const years = Array.from({ length: 7 }, (_, index) => currentYear + 1 - index);
+  const handleDownloadPayslip = () => {
+    downloadPayslipMutation.mutate(salaryParams);
+  };
 
   const columns: ColumnDef<SalaryHistoryResponse>[] = [
     {
@@ -104,7 +86,6 @@ export default function DoctorSalaryPage() {
         const variants: Record<string, "default" | "secondary" | "outline" | "destructive"> = {
           BONUS: "default",
           PENALTY: "destructive",
-          REVISION: "secondary",
           INCREMENT: "outline",
           DEDUCTION: "destructive",
         };
@@ -142,7 +123,13 @@ export default function DoctorSalaryPage() {
       id: "actions",
       header: "Actions",
       cell: () => (
-        <Button variant="ghost" size="sm" className="gap-2 text-blue-600 hover:text-blue-700 hover:bg-blue-50">
+        <Button
+          variant="ghost"
+          size="sm"
+          className="gap-2 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+          onClick={handleDownloadPayslip}
+          disabled={downloadPayslipMutation.isPending}
+        >
           <Download className="h-4 w-4" />
           Payslip
         </Button>
@@ -157,14 +144,45 @@ export default function DoctorSalaryPage() {
           <h1 className="text-2xl font-bold text-slate-900">Salary Section</h1>
           <p className="text-slate-500">View your earnings, bonuses, and penalties</p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" className="gap-2">
-            <Filter className="h-4 w-4" />
-            Filter
-          </Button>
-          <Button className="gap-2 bg-blue-600 hover:bg-blue-700">
+        <div className="flex flex-col sm:flex-row gap-2">
+          <Select
+            value={String(selectedMonth)}
+            onValueChange={(value) => setSelectedMonth(Number(value))}
+          >
+            <SelectTrigger className="w-full sm:w-[160px]">
+              <Calendar className="h-4 w-4 mr-2" />
+              <SelectValue placeholder="Month" />
+            </SelectTrigger>
+            <SelectContent>
+              {Array.from({ length: 12 }, (_, index) => index + 1).map((month) => (
+                <SelectItem key={month} value={String(month)}>
+                  {getMonthName(month)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select
+            value={String(selectedYear)}
+            onValueChange={(value) => setSelectedYear(Number(value))}
+          >
+            <SelectTrigger className="w-full sm:w-[120px]">
+              <SelectValue placeholder="Year" />
+            </SelectTrigger>
+            <SelectContent>
+              {years.map((year) => (
+                <SelectItem key={year} value={String(year)}>
+                  {year}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button
+            className="gap-2 bg-blue-600 hover:bg-blue-700"
+            onClick={handleDownloadPayslip}
+            disabled={downloadPayslipMutation.isPending}
+          >
             <Download className="h-4 w-4" />
-            Download Summary
+            Download Payslip
           </Button>
         </div>
       </div>
@@ -176,7 +194,9 @@ export default function DoctorSalaryPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-slate-500">Base Salary</p>
-                <h3 className="text-2xl font-bold text-slate-900">{formatCurrency(summary.baseSalary)}</h3>
+                <h3 className="text-2xl font-bold text-slate-900">
+                  {isLoadingDetails ? "..." : formatCurrency(summary.baseSalary)}
+                </h3>
               </div>
               <div className="p-3 bg-blue-50 rounded-xl">
                 <Banknote className="h-6 w-6 text-blue-600" />
@@ -190,7 +210,9 @@ export default function DoctorSalaryPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-slate-500">Total Bonuses</p>
-                <h3 className="text-2xl font-bold text-green-600">{formatCurrency(summary.bonus)}</h3>
+                <h3 className="text-2xl font-bold text-green-600">
+                  {isLoadingDetails ? "..." : formatCurrency(summary.bonus)}
+                </h3>
               </div>
               <div className="p-3 bg-green-50 rounded-xl">
                 <TrendingUp className="h-6 w-6 text-green-600" />
@@ -204,7 +226,9 @@ export default function DoctorSalaryPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-slate-500">Total Penalties</p>
-                <h3 className="text-2xl font-bold text-red-600">{formatCurrency(summary.penalty)}</h3>
+                <h3 className="text-2xl font-bold text-red-600">
+                  {isLoadingDetails ? "..." : formatCurrency(summary.penalty)}
+                </h3>
               </div>
               <div className="p-3 bg-red-50 rounded-xl">
                 <TrendingDown className="h-6 w-6 text-red-600" />
@@ -218,7 +242,9 @@ export default function DoctorSalaryPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-blue-100">Net Payable</p>
-                <h3 className="text-2xl font-bold">{formatCurrency(summary.netSalary)}</h3>
+                <h3 className="text-2xl font-bold">
+                  {isLoadingDetails ? "..." : formatCurrency(summary.netSalary)}
+                </h3>
               </div>
               <div className="p-3 bg-white/20 rounded-xl">
                 <Banknote className="h-6 w-6 text-white" />
@@ -234,9 +260,11 @@ export default function DoctorSalaryPage() {
           <div className="space-y-1">
             <CardTitle className="flex items-center gap-2">
               <History className="h-5 w-5 text-blue-600" />
-              Salary History / Revisions
+              Salary History
             </CardTitle>
-            <CardDescription>A detailed list of all salary adjustments and revisions</CardDescription>
+            <CardDescription>
+              A detailed list of salary adjustments for {getMonthName(selectedMonth)} {selectedYear}
+            </CardDescription>
           </div>
         </CardHeader>
         <CardContent>
@@ -245,9 +273,25 @@ export default function DoctorSalaryPage() {
             data={history} 
             searchColumn="reason"
             searchPlaceholder="Search by reason..."
+            emptyMessage={
+              isLoadingHistory
+                ? "Loading salary history..."
+                : isHistoryError
+                  ? "Unable to load salary history."
+                  : "No salary history available."
+            }
           />
         </CardContent>
       </Card>
+
+      {isDetailsError && (
+        <Card className="border-red-200 bg-red-50">
+          <CardContent className="py-4 flex gap-3 text-sm text-red-800">
+            <AlertCircle className="h-5 w-5 flex-shrink-0" />
+            Unable to load salary details for the selected month.
+          </CardContent>
+        </Card>
+      )}
 
       {/* Info Alert */}
       <Card className="bg-blue-50 border-blue-200">
@@ -255,7 +299,7 @@ export default function DoctorSalaryPage() {
           <AlertCircle className="h-5 w-5 text-blue-600 flex-shrink-0" />
           <div className="text-sm text-blue-800">
             <p className="font-semibold">Note on Salary Calculation</p>
-            <p>Your net salary is calculated after adding all bonuses and deducting penalties for the current month. Payslips are usually available for download after the 1st of every month.</p>
+            <p>Your net salary is calculated after adding bonuses and increments, then deducting penalties and deductions for the current month. Payslips are usually available for download after the 1st of every month.</p>
           </div>
         </CardContent>
       </Card>

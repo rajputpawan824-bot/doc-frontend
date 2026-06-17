@@ -29,11 +29,20 @@ export interface SalaryListParams {
 // }
 
 export interface SalaryDetailsParams {
-  userId: string;
-  userRole: UserRole;
+  userId?: string;
+  userRole?: UserRole;
   month: number;
   year: number;
 }
+
+export interface SalaryHistoryParams {
+  userId?: string;
+  userRole?: UserRole;
+  month: number;
+  year: number;
+}
+
+export type PayslipParams = SalaryDetailsParams;
 
 type SalaryDetailsApiResponse =
   | SalaryDetailsResponse
@@ -90,6 +99,21 @@ function getSalaryDetailsMismatch(payload: unknown) {
   };
 }
 
+function buildSalaryQueryString(params: SalaryDetailsParams | SalaryHistoryParams) {
+  const urlParams = new URLSearchParams();
+
+  if (params.userId) {
+    urlParams.append("userId", params.userId);
+  }
+  if (params.userRole) {
+    urlParams.append("userRole", params.userRole);
+  }
+  urlParams.append("month", String(params.month));
+  urlParams.append("year", String(params.year));
+
+  return urlParams.toString();
+}
+
 function validateSalaryDetailsParams(params: SalaryDetailsParams | null) {
   const validRoles: UserRole[] = [
     "DOCTOR",
@@ -107,9 +131,13 @@ function validateSalaryDetailsParams(params: SalaryDetailsParams | null) {
   if (!params) {
     errors.push("params are null");
   } else {
-    if (!params.userId) errors.push("userId is required");
-    if (!params.userRole) errors.push("userRole is required");
-    if (!validRoles.includes(params.userRole)) {
+    if (params.userId && !params.userRole) {
+      errors.push("userRole is required when userId is provided");
+    }
+    if (params.userRole && !params.userId) {
+      errors.push("userId is required when userRole is provided");
+    }
+    if (params.userRole && !validRoles.includes(params.userRole)) {
       errors.push(`userRole must be one of: ${validRoles.join(", ")}`);
     }
     if (!Number.isInteger(params.month) || params.month < 1 || params.month > 12) {
@@ -129,6 +157,10 @@ function validateSalaryDetailsParams(params: SalaryDetailsParams | null) {
     isValid: errors.length === 0,
     errors,
   };
+}
+
+function validateSalaryHistoryParams(params: SalaryHistoryParams | null) {
+  return validateSalaryDetailsParams(params);
 }
 
 export function useAddSalaryAdjustment(options?: {
@@ -187,18 +219,21 @@ export function useUpdateSalary(options?: {
   });
 }
 
-export const useSalaryHistory = (userId: string, userRole: UserRole) => {
+export const useSalaryHistory = (params: SalaryHistoryParams | null) => {
+  const validationResult = validateSalaryHistoryParams(params);
+  const enabled = validationResult.isValid;
+
   return useQuery({
-    queryKey: ["salary-history", userId, userRole],
+    queryKey: ["salary-history", params],
     queryFn: async () => {
-      if (!userId || !userRole) {
-        throw new Error("User ID and role are required");
+      if (!params) {
+        throw new Error("Salary history params are required");
       }
 
       const response: ApiResponse<{
         data: SalaryHistoryResponse[];
         count: number;
-      }> = await clientApi.get(`/salary/history/${userId}/${userRole}`);
+      }> = await clientApi.get(`/salary/history?${buildSalaryQueryString(params)}`);
 
       if (!response.success) {
         throw new Error(
@@ -210,7 +245,7 @@ export const useSalaryHistory = (userId: string, userRole: UserRole) => {
     },
     retry: 2,
     retryDelay: 1000,
-    enabled: !!userId && !!userRole,
+    enabled,
   });
 };
 
@@ -234,8 +269,7 @@ export const useSalaryDetails = (params: SalaryDetailsParams | null) => {
         throw new Error("Salary details params are required");
       }
 
-      const { userId, userRole, month, year } = params;
-      const url = `/salary/details?userId=${userId}&userRole=${userRole}&month=${month}&year=${year}`;
+      const url = `/salary/details?${buildSalaryQueryString(params)}`;
 
       console.log("useSalaryDetails final request URL:", url);
 
@@ -386,12 +420,12 @@ export const useSalaryDashboardStats = (params: SalaryDashboardStatsParams) => {
 };
 
 export const useDownloadPayslip = () => {
-  return useMutation<void, Error, SalaryDetailsParams>({
-    mutationFn: async (params: SalaryDetailsParams) => {
-      const { userId, userRole, month, year } = params;
+  return useMutation<void, Error, PayslipParams>({
+    mutationFn: async (params: PayslipParams) => {
+      const { userId, month, year } = params;
 
       const response = await clientApi.get<Blob>(
-        `/salary/payslip?userId=${userId}&userRole=${userRole}&month=${month}&year=${year}`,
+        `/salary/payslip?${buildSalaryQueryString(params)}`,
         { responseType: "blob" },
       );
 
@@ -404,7 +438,7 @@ export const useDownloadPayslip = () => {
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `payslip-${userId}-${month}-${year}.pdf`;
+      a.download = `payslip-${userId ?? "me"}-${month}-${year}.pdf`;
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);

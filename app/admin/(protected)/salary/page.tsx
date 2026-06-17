@@ -272,8 +272,14 @@ const SalaryManagement = () => {
     isLoading: isLoadingHistory,
     refetch: refetchHistory,
   } = useSalaryHistory(
-    selectedEmployeeForHistory?.userId || "",
-    selectedEmployeeForHistory?.role || "ALL",
+    selectedEmployeeForHistory
+      ? {
+          userId: selectedEmployeeForHistory.userId,
+          userRole: selectedEmployeeForHistory.role,
+          month: selectedMonthYear.month,
+          year: selectedMonthYear.year,
+        }
+      : null,
   );
 
   const selectedEmployeeForDetails =
@@ -541,11 +547,6 @@ const SalaryManagement = () => {
               value: "INCREMENT",
               label: "Increment",
               color: "bg-blue-100 text-blue-800",
-            },
-            {
-              value: "REVISION",
-              label: "Revision",
-              color: "bg-purple-100 text-purple-800",
             },
           ],
         },
