@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   User,
   Phone,
@@ -9,12 +9,20 @@ import {
   Calendar,
   Clock,
   DollarSign,
+  IndianRupee,
   Stethoscope,
   Eye,
   Edit,
   Save,
   X,
+  Loader2,
+  FileText,
+  BriefcaseMedical,
 } from "lucide-react";
+
+import { useDoctorById, useUpdateDoctor } from "@/services/admin/doctor";
+
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -28,15 +36,17 @@ interface DoctorDetails {
   id: string;
   name: string;
   image?: string;
+  registrationNo: string;
+  qualification: string;
   location: string;
   mobileNumber: string;
-  password: string;
   email: string;
   specialization: string;
-  consultationDuration: number;
+  experience: number;
+  workingHours: { start: string; end: string };
   consultationDays: string[];
   consultationFee?: number;
-  lastUpdated: Date;
+  lastUpdated: string;
   updatedBy: string;
 }
 
@@ -48,44 +58,118 @@ export default function DoctorDetailsSection({
   initialData,
 }: DoctorDetailsSectionProps) {
   const [isEditing, setIsEditing] = useState(false);
-  const [doctorData, setDoctorData] = useState<DoctorDetails>(
-    initialData || {
-      id: "1",
-      name: "Dr. John Smith",
-      image: "",
-      location: "New York, NY",
-      mobileNumber: "+1 (555) 123-4567",
-      password: "********",
-      email: "john.smith@example.com",
-      specialization: "Cardiology",
-      consultationDuration: 30,
-      consultationDays: ["MONDAY", "WEDNESDAY", "FRIDAY", "TUESDAY", "THURSDAY", "SATURDAY", "SUNDAY"],
-      consultationFee: 150,
-      lastUpdated: new Date(),
-      updatedBy: "Admin User",
+
+  
+const [userId, setUserId] = useState<string>();
+
+useEffect(() => {
+  const token = localStorage.getItem("access_token");
+
+  if (token) {
+    try {
+      const payload = JSON.parse(atob(token.split(".")[1]));
+      setUserId(payload.id);
+    } catch (error) {
+      console.error("Failed to decode token", error);
     }
-  );
+  }
+}, []);
+
+const {
+  data: doctor,
+  isLoading,
+  error,
+  refetch,
+} = useDoctorById(userId);
+
+  const updateDoctorMutation = useUpdateDoctor({
+    onSuccess: () => {
+      toast.success("Profile updated successfully");
+      setIsEditing(false);
+      refetch();
+    },
+    onError: (err) => {
+      toast.error(err.message || "Failed to update profile");
+    },
+  });
+
+  const [doctorData, setDoctorData] = useState<DoctorDetails | null>(null);
+
+  useEffect(() => {
+    if (doctor) {
+      setDoctorData({
+        id: doctor.id,
+        name: doctor.user?.name || "",
+        registrationNo: doctor.registrationNo || "",
+        qualification: doctor.qualification || "",
+        location: doctor.address || "",
+        mobileNumber: doctor.user?.phone || "",
+        email: doctor.user?.email || "",
+        specialization: doctor.department || "",
+        experience: doctor.experience || 0,
+        workingHours: {
+          start: doctor.workingHours?.start || "-",
+          end: doctor.workingHours?.end || "-",
+        },
+        consultationDays: doctor.availabilityDays || [],
+        consultationFee: doctor.consultationFee || 0,
+        lastUpdated: doctor.updatedAt,
+        updatedBy: "System",
+      });
+    }
+  }, [doctor]);
 
   const handleInputChange = (
     field: keyof DoctorDetails,
     value: string | number | string[]
   ) => {
+    if (!doctorData) return;
+    
     setDoctorData((prev) => ({
-      ...prev,
+      ...prev!,
       [field]: value,
     }));
   };
+  
+  const handleSave = async () => {
+    if (!doctorData || !doctor) return;
 
-  const handleSave = () => {
-    // Add save logic here (API call, etc.)
-    console.log("Saving data:", doctorData);
-    setIsEditing(false);
+    updateDoctorMutation.mutate({
+      id: doctor.id,
+      data: {
+        name: doctorData.name,
+        phone: doctorData.mobileNumber,
+        address: doctorData.location,
+        experience: doctorData.experience,
+      },
+    });
   };
 
   const handleCancel = () => {
     setIsEditing(false);
-    // Optionally reset to initial data
+    refetch();
   };
+
+  if (isLoading || !doctorData) {
+    return (
+      <div className="flex h-[400px] w-full items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <Card className="mx-auto w-full max-w-4xl border-red-200 bg-red-50">
+        <CardContent className="flex flex-col items-center justify-center py-10">
+          <p className="text-red-600">Failed to load doctor profile. Please try again later.</p>
+          <Button variant="outline" className="mt-4" onClick={() => refetch()}>
+            Retry
+          </Button>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card className="w-full max-w-4xl mx-auto">
@@ -98,13 +182,14 @@ export default function DoctorDetailsSection({
           {!isEditing ? (
             <Button onClick={() => setIsEditing(true)} className="gap-2">
               <Edit className="h-4 w-4" />
-              Edit
+              Edit Profile
             </Button>
           ) : (
             <div className="flex gap-2">
               <Button
                 onClick={handleSave}
                 className="gap-2 bg-green-600 hover:bg-green-700"
+                disabled={updateDoctorMutation.isPending}
               >
                 <Save className="h-4 w-4" />
                 Save
@@ -140,7 +225,7 @@ export default function DoctorDetailsSection({
                 </Button>
               )}
             </div>
-
+            </div>
             {/* Basic Info */}
             <div className="flex-1 space-y-4">
               {/* Name */}
@@ -216,23 +301,34 @@ export default function DoctorDetailsSection({
                 </div>
               </div>
 
-              {/* Password - Only show in edit mode */}
-              {isEditing && (
+              {/* Professional IDs */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="password" className="text-sm font-medium">
-                    Password
+                  <Label className="text-sm font-medium flex items-center gap-2">
+                    <FileText className="h-4 w-4" />
+                    Registration Number
                   </Label>
-                  <Input
-                    id="password"
-                    type="password"
-                    value={doctorData.password}
-                    onChange={(e) =>
-                      handleInputChange("password", e.target.value)
-                    }
-                    placeholder="Enter new password"
-                  />
+                  <p className="font-medium text-muted-foreground">{doctorData.registrationNo}</p>
                 </div>
-              )}
+
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium flex items-center gap-2">
+                    <Clock className="h-4 w-4" />
+                    Shift
+                  </Label>
+                  <Badge variant="outline" className="capitalize">
+                    {doctor?.shift?.toLowerCase()}
+                  </Badge>
+                </div>
+              </div>
+              
+              {/* Qualification */}
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Qualification</Label>
+                <div className="flex items-center gap-2 text-muted-foreground">
+                   {doctorData.qualification}
+                </div>
+              
             </div>
           </div>
         </div>
@@ -265,48 +361,39 @@ export default function DoctorDetailsSection({
             <div className="space-y-2">
               <Label className="text-sm font-medium flex items-center gap-2">
                 <Clock className="h-4 w-4" />
-                Consultation Duration
+                Working Hours
+              </Label>
+              <p className="text-lg">
+                {doctorData.workingHours.start} - {doctorData.workingHours.end}
+              </p>
+            </div>
+
+            {/* Experience */}
+            <div className="space-y-2">
+              <Label className="text-sm font-medium flex items-center gap-2">
+                <BriefcaseMedical className="h-4 w-4" />
+                Experience (Years)
               </Label>
               {isEditing ? (
                 <Input
                   type="number"
-                  value={doctorData.consultationDuration}
+                  value={doctorData.experience}
                   onChange={(e) =>
-                    handleInputChange(
-                      "consultationDuration",
-                      parseInt(e.target.value)
-                    )
+                    handleInputChange("experience", parseInt(e.target.value))
                   }
-                  // suffix="mins"
                 />
               ) : (
-                <p className="text-lg">
-                  {doctorData.consultationDuration} mins
-                </p>
+                <p className="text-lg">{doctorData.experience} years</p>
               )}
             </div>
 
             {/* Consultation Fee */}
             <div className="space-y-2">
               <Label className="text-sm font-medium flex items-center gap-2">
-                <DollarSign className="h-4 w-4" />
+                <IndianRupee className="h-4 w-4" />
                 Consultation Fee
               </Label>
-              {isEditing ? (
-                <Input
-                  type="number"
-                  value={doctorData.consultationFee}
-                  onChange={(e) =>
-                    handleInputChange(
-                      "consultationFee",
-                      parseInt(e.target.value)
-                    )
-                  }
-                  prefix="$"
-                />
-              ) : (
-                <p className="text-lg">${doctorData.consultationFee}</p>
-              )}
+              <p className="text-lg">₹{doctorData.consultationFee}</p>
             </div>
 
             {/* Consultation Days */}
@@ -357,7 +444,7 @@ export default function DoctorDetailsSection({
         {/* Audit Information */}
         <div className="text-sm text-muted-foreground">
           <p className="flex items-center gap-2">
-            Last updated: {doctorData.lastUpdated.toLocaleDateString()}
+            Last updated: {new Date(doctorData.lastUpdated).toLocaleDateString()}
           </p>
           <p>Updated by: {doctorData.updatedBy}</p>
         </div>
