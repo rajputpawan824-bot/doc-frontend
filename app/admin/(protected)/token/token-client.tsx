@@ -470,16 +470,28 @@ export default function TokenManagementClient({
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsModalOpen(false)}>Cancel</Button>
-            <Button 
-              onClick={() => createAppointmentMutation.mutate({
-                doctor: appointmentForm.doctorId,
-                patient: appointmentForm.patientId,
-                date: appointmentForm.date,
-                slot: appointmentForm.slot,
-                reason: appointmentForm.reason,
-              })}
-              disabled={createAppointmentMutation.isPending || !appointmentForm.patientId || !appointmentForm.doctorId || !appointmentForm.date || !appointmentForm.slot}
-            >
+          <Button
+  onClick={() => {
+    const [hours, minutes] = appointmentForm.slot.split(":");
+
+    let hour = parseInt(hours, 10);
+    const ampm = hour >= 12 ? "PM" : "AM";
+
+    hour = hour % 12;
+    if (hour === 0) hour = 12;
+
+    const formattedSlot =
+      `${String(hour).padStart(2, "0")}:${minutes} ${ampm}`;
+
+    createAppointmentMutation.mutate({
+      doctor: appointmentForm.doctorId,
+      patient: appointmentForm.patientId,
+      date: appointmentForm.date,
+      slot: formattedSlot,
+      reason: appointmentForm.reason,
+    });
+  }}
+>
               {createAppointmentMutation.isPending ? "Creating..." : "Create Appointment"}
             </Button>
           </DialogFooter>

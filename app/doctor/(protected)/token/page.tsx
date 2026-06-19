@@ -1,66 +1,145 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
+import { format } from "date-fns";
 import { 
   Ticket, 
   Plus, 
   Minus, 
   RotateCcw, 
-  Settings2, 
   Clock, 
-  CheckCircle2,
-  AlertCircle,
-  Hash
+  Hash,
+  Loader2,
 } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
-import ReusableModal, { FieldConfig } from "@/components/reusable/reusable-modal";
+import { useDoctorById } from "@/services/admin/doctor";
+import {
+  useCurrentToken,
+  useDecrementToken,
+  useIncrementToken,
+  useResetToken,
+  useTokenAppointments,
+} from "@/services/admin/token";
 
 export default function DoctorTokenPage() {
-  const [tokenCount, setTokenCount] = useState(1);
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [tokenSettings, setTokenSettings] = useState({
-    prefix: "DR-J",
-    autoReset: true,
-    lastReset: new Date().toLocaleDateString(),
+const [selectedDate, setSelectedDate] = useState(
+  format(new Date(), "yyyy-MM-dd")
+);
+
+  const {
+    data: doctor,
+    isLoading: isDoctorLoading,
+    isError: isDoctorError,
+  } = useDoctorById("me");
+
+  const doctorId = doctor?.id;
+
+  const {
+    data: currentTokenData,
+    isLoading: isTokenLoading,
+    isError: isTokenError,
+    error: tokenError,
+  } = useCurrentToken(
+  doctorId,
+  selectedDate
+);
+
+  const {
+    data: appointments,
+    isLoading: appointmentsLoading,
+    isError: isAppointmentsError,
+    error: appointmentsError,
+  } = useTokenAppointments(
+  doctorId,
+  selectedDate
+);
+
+  console.log("appointments", appointments);
+
+  const incrementMutation = useIncrementToken({
+    onSuccess: () => toast.success("Token incremented successfully"),
+    onError: (error) => toast.error(error.message || "Failed to increment token"),
   });
 
-  const handleIncrement = () => setTokenCount(prev => prev + 1);
-  const handleDecrement = () => setTokenCount(prev => (prev > 0 ? prev - 1 : 0));
-  const handleReset = () => {
-    if (confirm("Are you sure you want to reset the token count to 1?")) {
-      setTokenCount(1);
+  const decrementMutation = useDecrementToken({
+    onSuccess: () => toast.success("Token decremented successfully"),
+    onError: (error) => toast.error(error.message || "Failed to decrement token"),
+  });
+
+  const resetMutation = useResetToken({
+    onSuccess: () => toast.success("Token queue reset successfully"),
+    onError: (error) => toast.error(error.message || "Failed to reset token"),
+  });
+
+  useEffect(() => {
+    if (isTokenError) {
+      toast.error(tokenError?.message || "Failed to load current token");
     }
+  }, [isTokenError, tokenError]);
+
+  useEffect(() => {
+    if (isAppointmentsError) {
+      toast.error(appointmentsError?.message || "Failed to load token appointments");
+    }
+  }, [isAppointmentsError, appointmentsError]);
+
+  useEffect(() => {
+    if (isDoctorError) {
+      toast.error("Failed to load doctor profile");
+    }
+  }, [isDoctorError]);
+
+  const currentToken = currentTokenData?.currentToken ?? 0;
+const tokenAppointments = Array.isArray(
+  (appointments as any)?.data
+)
+  ? (appointments as any).data
+  : [];
+  const isMutating =
+    incrementMutation.isPending ||
+    decrementMutation.isPending ||
+    resetMutation.isPending;
+  const isActionDisabled = !doctorId || isTokenLoading || isMutating;
+
+  const handleIncrement = () => {
+    if (!doctorId) {
+      toast.error("Doctor profile is still loading");
+      return;
+    }
+
+    incrementMutation.mutate({
+      doctorId,
+     date: selectedDate
+    });
   };
 
-  const settingsFields: FieldConfig[] = [
-    {
-      name: "prefix",
-      label: "Token Prefix",
-      type: "text",
-      placeholder: "e.g., DR-A",
-      width: "half",
-      defaultValue: tokenSettings.prefix,
-    },
-    {
-      name: "autoReset",
-      label: "Auto-reset daily",
-      type: "checkbox",
-      width: "half",
-      defaultValue: tokenSettings.autoReset,
-    },
-  ];
+  const handleDecrement = () => {
+    if (!doctorId) {
+      toast.error("Doctor profile is still loading");
+      return;
+    }
 
-  const handleSaveSettings = (data: any) => {
-    setTokenSettings(prev => ({
-      ...prev,
-      prefix: data.prefix,
-      autoReset: data.autoReset,
-    }));
-    setIsSettingsOpen(false);
+    decrementMutation.mutate({
+      doctorId,
+      date: selectedDate
+    });
+  };
+
+  const handleReset = () => {
+    if (!doctorId) {
+      toast.error("Doctor profile is still loading");
+      return;
+    }
+
+    if (confirm("Are you sure you want to reset the token count for today?")) {
+      resetMutation.mutate({
+        doctorId,
+       date: selectedDate
+      });
+    }
   };
 
   return (
@@ -69,11 +148,17 @@ export default function DoctorTokenPage() {
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Visit Token Management</h1>
           <p className="text-slate-500">Manage the queue and issuance of patient visit tokens</p>
+          <div className="mt-4">
+  <input
+    type="date"
+    value={selectedDate}
+    onChange={(e) =>
+      setSelectedDate(e.target.value)
+    }
+    className="border rounded px-3 py-2"
+  />
+</div>
         </div>
-        <Button variant="outline" className="gap-2" onClick={() => setIsSettingsOpen(true)}>
-          <Settings2 className="h-4 w-4" />
-          Queue Settings
-        </Button>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -89,8 +174,14 @@ export default function DoctorTokenPage() {
           <CardContent className="pt-12 pb-12 flex flex-col items-center">
             <div className="relative">
               <div className="text-8xl md:text-9xl font-black text-slate-900 tracking-tighter flex items-center">
-                <span className="text-3xl text-slate-300 font-medium mr-2">{tokenSettings.prefix}-</span>
-                {tokenCount.toString().padStart(3, "0")}
+                {isDoctorLoading || isTokenLoading ? (
+                  <div className="flex items-center gap-3 text-2xl font-semibold tracking-normal text-slate-500">
+                    <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+                    Loading token...
+                  </div>
+                ) : (
+                  currentToken.toString().padStart(3, "0")
+                )}
               </div>
               <Badge className="absolute -top-4 -right-4 bg-green-500 hover:bg-green-600 px-3 py-1">
                 ACTIVE
@@ -103,6 +194,7 @@ export default function DoctorTokenPage() {
                 size="icon" 
                 className="h-16 w-16 rounded-full border-2 border-slate-200 text-slate-400 hover:text-red-600 hover:border-red-200 hover:bg-red-50 transition-all"
                 onClick={handleDecrement}
+                disabled={isActionDisabled}
               >
                 <Minus className="h-8 w-8" />
               </Button>
@@ -110,8 +202,13 @@ export default function DoctorTokenPage() {
               <Button 
                 className="h-24 w-24 rounded-full bg-blue-600 hover:bg-blue-700 shadow-xl shadow-blue-200 hover:scale-105 transition-all"
                 onClick={handleIncrement}
+                disabled={isActionDisabled}
               >
-                <Plus className="h-12 w-12" />
+                {incrementMutation.isPending ? (
+                  <Loader2 className="h-10 w-10 animate-spin" />
+                ) : (
+                  <Plus className="h-12 w-12" />
+                )}
               </Button>
 
               <Button 
@@ -119,6 +216,7 @@ export default function DoctorTokenPage() {
                 size="icon" 
                 className="h-16 w-16 rounded-full border-2 border-slate-200 text-slate-400 hover:text-blue-600 hover:border-blue-200 hover:bg-blue-50 transition-all"
                 onClick={handleReset}
+                disabled={isActionDisabled}
               >
                 <RotateCcw className="h-7 w-7" />
               </Button>
@@ -138,27 +236,17 @@ export default function DoctorTokenPage() {
             <CardContent className="space-y-4">
               <div className="flex justify-between items-center text-sm">
                 <span className="text-slate-500">Tokens Issued Today</span>
-                <span className="font-bold">{tokenCount}</span>
+                <span className="font-bold">
+                  {appointmentsLoading ? "..." : tokenAppointments.length}
+                </span>
               </div>
               <div className="flex justify-between items-center text-sm">
                 <span className="text-slate-500">Average Wait Time</span>
-                <span className="font-bold">12 mins</span>
+                <span className="font-bold">N/A</span>
               </div>
               <div className="flex justify-between items-center text-sm">
                 <span className="text-slate-500">Last Reset</span>
-                <span className="font-bold">{tokenSettings.lastReset}</span>
-              </div>
-              <div className="pt-4 border-t">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="space-y-0.5">
-                    <Label className="text-xs">Auto-reset daily</Label>
-                    <p className="text-[10px] text-slate-400">Resets at 12:00 AM</p>
-                  </div>
-                  <Switch 
-                    checked={tokenSettings.autoReset} 
-                    onCheckedChange={(val) => setTokenSettings(prev => ({ ...prev, autoReset: val }))}
-                  />
-                </div>
+                <span className="font-bold">{selectedDate}</span>
               </div>
             </CardContent>
           </Card>
@@ -171,7 +259,11 @@ export default function DoctorTokenPage() {
                 </div>
                 <div>
                   <p className="text-xs text-slate-400 font-medium">NEXT UP</p>
-                  <p className="text-lg font-bold">{tokenSettings.prefix}-{(tokenCount + 1).toString().padStart(3, "0")}</p>
+                  <p className="text-lg font-bold">
+                    {isDoctorLoading || isTokenLoading
+                      ? "Loading..."
+                      : (currentToken + 1).toString().padStart(3, "0")}
+                  </p>
                 </div>
               </div>
               <p className="text-[10px] text-slate-500">
@@ -179,25 +271,91 @@ export default function DoctorTokenPage() {
               </p>
             </CardContent>
           </Card>
-          
-          <div className="flex items-start gap-3 p-4 bg-yellow-50 rounded-xl border border-yellow-100 text-yellow-800">
-            <AlertCircle className="h-5 w-5 flex-shrink-0" />
-            <p className="text-xs">
-              <strong>Tip:</strong> You can set a custom prefix like "OPD-1" in settings to distinguish between different departments.
-            </p>
-          </div>
         </div>
       </div>
 
-      <ReusableModal
-        isOpen={isSettingsOpen}
-        onClose={() => setIsSettingsOpen(false)}
-        onSave={handleSaveSettings}
-        title="Queue & Token Configuration"
-        fields={settingsFields}
-        saveButtonText="Update Settings"
-        size="md"
-      />
+      <Card>
+  <CardHeader>
+    <CardTitle>
+      Appointments
+    </CardTitle>
+  </CardHeader>
+
+  <CardContent>
+    <table className="w-full border-collapse">
+      <thead>
+        <tr className="border-b">
+          <th className="text-left p-2">
+            Patient
+          </th>
+
+          <th className="text-left p-2">
+            Token
+          </th>
+
+          <th className="text-left p-2">
+            Date
+          </th>
+
+          <th className="text-left p-2">
+            Time
+          </th>
+
+          <th className="text-left p-2">
+            Status
+          </th>
+        </tr>
+      </thead>
+
+      <tbody>
+        {tokenAppointments.length === 0 ? (
+          <tr>
+            <td
+              colSpan={5}
+              className="text-center py-6"
+            >
+              No appointments found
+            </td>
+          </tr>
+        ) : (
+          tokenAppointments.map(
+            (appointment: any) => (
+              <tr
+                key={appointment._id}
+                className="border-b"
+              >
+                <td className="p-2">
+                  {appointment.patient?.name}
+                </td>
+
+                <td className="p-2">
+                  {appointment.tokenNumber}
+                </td>
+
+                <td className="p-2">
+                  {format(
+                    new Date(
+                      appointment.date
+                    ),
+                    "dd/MM/yyyy"
+                  )}
+                </td>
+
+                <td className="p-2">
+                  {appointment.slot}
+                </td>
+
+                <td className="p-2">
+                  {appointment.status}
+                </td>
+              </tr>
+            )
+          )
+        )}
+      </tbody>
+    </table>
+  </CardContent>
+</Card>
     </div>
   );
 }

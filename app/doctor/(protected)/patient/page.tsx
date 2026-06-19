@@ -2,6 +2,11 @@
 "use client";
 
 import { useState, useEffect } from "react";
+
+import { toast } from "sonner";
+import { Toaster } from "@/components/ui/sonner";
+import { usePatients, useUpdatePatient } from "@/services/admin/patient";
+
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -66,6 +71,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label"; // Add this import
+
 import {
   Plus,
   Search,
@@ -97,27 +103,50 @@ import {
 } from "lucide-react";
 
 // ==================== TYPES & SCHEMAS ====================
-interface Patient {
+export interface Patient {
   id: string;
   name: string;
   phoneNumber: string;
   email?: string;
-  password: string;
-  gender: "male" | "female" | "other";
-  age: number;
-  address: string;
-  emergencyContactName: string;
-  emergencyContactPhone: string;
-  emergencyContactRelationship: string;
-  adhar: string;
-  adher?: "excellent" | "good" | "fair" | "poor";
+
+  gender?: "MALE" | "FEMALE" | "OTHER";
+  age?: number;
+  address?: string;
+
+  emergencyContactName?: string;
+  emergencyContactPhone?: string;
+  emergencyContactRelationship?: string;
+
+  adhar?: string;
+
   medicalHistory?: string;
-  allergies: string[];
-  bloodGroup?: "A+" | "A-" | "B+" | "B-" | "AB+" | "AB-" | "O+" | "O-";
+  allergies?: string[];
+
+  bloodGroup?:
+    | "A+"
+    | "A-"
+    | "B+"
+    | "B-"
+    | "AB+"
+    | "AB-"
+    | "O+"
+    | "O-";
+
   occupation?: string;
-  createdAt: Date;
-  lastUpdated: Date;
-  updatedBy: string;
+
+  adher?: "excellent" | "good" | "fair" | "poor";
+
+  createdAt?: Date;
+  updatedAt?: Date;
+
+  updatedBy?: string;
+  status?: "ACTIVE" | "INACTIVE";
+patientCode?: string;
+relation?: string;
+otherRelation?: string;
+diseases?: string[];
+medicalReports?: any[];
+dateOfBirth?: Date;
 }
 
 const patientFormSchema = z.object({
@@ -128,7 +157,11 @@ const patientFormSchema = z.object({
     .email("Please enter a valid email")
     .optional()
     .or(z.literal("")),
-  gender: z.enum(["male", "female", "other"]),
+gender: z.enum([
+  "MALE",
+  "FEMALE",
+  "OTHER",
+]),
   age: z.coerce
     .number()
     .min(0, "Age must be positive")
@@ -154,7 +187,7 @@ const patientFormSchema = z.object({
     .optional(),
 });
 
-type PatientFormValues = z.infer<typeof patientFormSchema>;
+type PatientFormValues = z.input<typeof patientFormSchema>;
 
 // ==================== TABLE COLUMNS ====================
 const columns: ColumnDef<Patient>[] = [
@@ -227,7 +260,7 @@ const columns: ColumnDef<Patient>[] = [
       return (
         <div className="space-y-1">
           <div className="flex items-center gap-2">
-            <span className="font-medium">{patient.age} years</span>
+            <span className="font-medium">{patient.age ?? "-"} years</span>
           </div>
           <Badge variant="outline" className="capitalize">
             {patient.gender}
@@ -267,20 +300,20 @@ const columns: ColumnDef<Patient>[] = [
               Blood: {patient.bloodGroup}
             </Badge>
           )}
-          {patient.allergies.length > 0 && (
+          {((patient.allergies  ?? []).length > 0 && (
             <div className="flex flex-wrap gap-1 mt-1">
-              {patient.allergies.slice(0, 2).map((allergy, index) => (
+              {(patient.allergies ?? []).map((allergy, index) => (
                 <Badge key={index} variant="outline" className="text-xs">
                   {allergy}
                 </Badge>
               ))}
-              {patient.allergies.length > 2 && (
+              {(patient.allergies ?? []).length > 2 && (
                 <Badge variant="outline" className="text-xs">
-                  +{patient.allergies.length - 2} more
+                  +{(patient.allergies ?? []).length - 2} more
                 </Badge>
               )}
             </div>
-          )}
+          ))}
         </div>
       );
     },
@@ -300,7 +333,7 @@ const columns: ColumnDef<Patient>[] = [
           <div className="flex items-center gap-2">
             <Calendar className="h-3 w-3 text-gray-500" />
             <span className="text-sm">
-              {patient.lastUpdated.toLocaleDateString()}
+              {patient.updatedAt?.toLocaleDateString() ?? "-"}
             </span>
           </div>
           <p className="text-xs text-gray-500">By: {patient.updatedBy}</p>
@@ -580,7 +613,7 @@ function PatientForm({ patient, onSave, onCancel, mode }: PatientFormProps) {
 
 // Replace the useForm line with this:
 const form = useForm<PatientFormValues>({
-  resolver: zodResolver(patientFormSchema),
+  resolver: zodResolver(patientFormSchema) as any,
   defaultValues: patient
     ? {
         name: patient.name,
@@ -593,7 +626,7 @@ const form = useForm<PatientFormValues>({
         emergencyContactPhone: patient.emergencyContactPhone,
         emergencyContactRelationship: patient.emergencyContactRelationship,
         adhar: patient.adhar || "",
-        adher: patient.adher,
+        // adher: patient.adher,
         medicalHistory: patient.medicalHistory || "",
         allergies: patient.allergies || [],
         bloodGroup: patient.bloodGroup,
@@ -605,7 +638,7 @@ const form = useForm<PatientFormValues>({
         name: "",
         phoneNumber: "",
         email: "",
-        gender: "male",
+        gender: "MALE",
         age: 0,
         address: "",
         emergencyContactName: "",
@@ -707,7 +740,12 @@ const form = useForm<PatientFormValues>({
                         Age *
                       </FormLabel>
                       <FormControl>
-                        <Input type="number" placeholder="30" {...field} />
+                       <Input
+  type="number"
+  placeholder="30"
+ value={typeof field.value === "number" ? field.value : ""}
+  onChange={(e) => field.onChange(Number(e.target.value))}
+/>
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -732,9 +770,9 @@ const form = useForm<PatientFormValues>({
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="male">Male</SelectItem>
-                          <SelectItem value="female">Female</SelectItem>
-                          <SelectItem value="other">Other</SelectItem>
+                        <SelectItem value="MALE">Male</SelectItem>
+<SelectItem value="FEMALE">Female</SelectItem>
+<SelectItem value="OTHER">Other</SelectItem>
                         </SelectContent>
                       </Select>
                       <FormMessage />
@@ -1126,187 +1164,59 @@ const form = useForm<PatientFormValues>({
 }
 
 // ==================== MAIN PAGE COMPONENT ====================
+
 export default function PatientsPage() {
-  const [patients, setPatients] = useState<Patient[]>([]);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
   const [activeTab, setActiveTab] = useState("all");
-  const [isLoading, setIsLoading] = useState(true);
 
-  // Mock data - Replace with API call
-  const mockPatients: Patient[] = [
-    {
-      id: "PAT001",
-      name: "John Smith",
-      phoneNumber: "+1 (555) 123-4567",
-      email: "john.smith@example.com",
-      password: "AutoGenerated123",
-      gender: "male",
-      age: 35,
-      address: "123 Main St, New York, NY 10001",
-      emergencyContactName: "Jane Smith",
-      emergencyContactPhone: "+1 (555) 987-6543",
-      emergencyContactRelationship: "spouse",
-      adher: "excellent",
-      medicalHistory: "Hypertension controlled with medication",
-      allergies: ["Penicillin", "Shellfish"],
-      bloodGroup: "O+",
-      occupation: "Software Engineer",
-      createdAt: new Date("2024-01-15"),
-      lastUpdated: new Date("2024-11-20"),
-      updatedBy: "Dr. Johnson",
-    },
-    {
-      id: "PAT002",
-      name: "Emma Johnson",
-      phoneNumber: "+1 (555) 234-5678",
-      email: "emma.j@example.com",
-      password: "AutoGenerated456",
-      gender: "female",
-      age: 28,
-      address: "456 Oak Ave, Los Angeles, CA 90001",
-      emergencyContactName: "Michael Johnson",
-      emergencyContactPhone: "+1 (555) 876-5432",
-      emergencyContactRelationship: "parent",
-      adher: "good",
-      medicalHistory: "Asthma, seasonal allergies",
-      allergies: ["Aspirin", "Pollen"],
-      bloodGroup: "A-",
-      occupation: "Teacher",
-      createdAt: new Date("2024-02-20"),
-      lastUpdated: new Date("2024-11-18"),
-      updatedBy: "Dr. Johnson",
-    },
-  ];
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(10);
+  const [search, setSearch] = useState("");
 
-  // Fetch patients - Replace with API call
+  const { data, isLoading, error } = usePatients({ page, limit, search });
+const patients: any[] = data?.data ?? [];
+  const pagination = data?.pagination;
+
+  const updatePatientMutation = useUpdatePatient();
+
   useEffect(() => {
-    const fetchPatients = async () => {
-      setIsLoading(true);
-      try {
-        // Replace with actual API call
-        // const response = await fetch('/api/patients');
-        // const data = await response.json();
-        // setPatients(data);
+    if (!error) return;
+    toast.error("Failed to load patients");
+  }, [error]);
 
-        // Using mock data for now
-        setTimeout(() => {
-          setPatients(mockPatients);
-          setIsLoading(false);
-        }, 500);
-      } catch (error) {
-        console.error("Failed to fetch patients:", error);
-        setIsLoading(false);
-      }
-    };
-
-    fetchPatients();
-  }, []);
-
-  const handleAddPatient = async (formData: PatientFormValues) => {
-    try {
-      // Replace with actual API call
-      // const response = await fetch('/api/patients', {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify(formData),
-      // });
-
-      // const newPatient = await response.json();
-
-      const newPatient: Patient = {
-        id: `PAT${(patients.length + 100).toString().padStart(3, "0")}`,
-        name: formData.name,
-        phoneNumber: formData.phoneNumber,
-        email: formData.email || undefined,
-        password: String(formData.password || "AutoGenerated123"),
-        gender: formData.gender,
-        age: formData.age,
-        address: formData.address,
-        emergencyContactName: formData.emergencyContactName,
-        emergencyContactPhone: formData.emergencyContactPhone,
-        emergencyContactRelationship: formData.emergencyContactRelationship,
-        adher: formData.adher,
-        medicalHistory: formData.medicalHistory,
-        allergies: formData.allergies,
-        bloodGroup: formData.bloodGroup,
-        occupation: formData.occupation,
-        createdAt: new Date(),
-        lastUpdated: new Date(),
-        updatedBy: "Dr. Johnson",
-      };
-
-      setPatients([newPatient, ...patients]);
-      setIsAddDialogOpen(false);
-
-      // Show success message
-      alert("Patient added successfully!");
-    } catch (error) {
-      console.error("Failed to add patient:", error);
-      alert("Failed to add patient. Please try again.");
-    }
+  // Doctor cannot create patients (permission)
+  const handleAddPatient = async (_formData: PatientFormValues) => {
+    toast.error("You are not allowed to add patients");
   };
 
   const handleEditPatient = async (formData: PatientFormValues) => {
     if (!selectedPatient) return;
 
-    try {
-      // Replace with actual API call
-      // const response = await fetch(`/api/patients/${selectedPatient.id}`, {
-      //   method: 'PUT',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify(formData),
-      // });
-
-      // const updatedPatient = await response.json();
-
-      const updatedPatient: Patient = {
-        ...selectedPatient,
-        name: formData.name,
-        phoneNumber: formData.phoneNumber,
-        email: formData.email || undefined,
-        gender: formData.gender,
-        age: formData.age,
-        address: formData.address,
-        emergencyContactName: formData.emergencyContactName,
-        emergencyContactPhone: formData.emergencyContactPhone,
-        emergencyContactRelationship: formData.emergencyContactRelationship,
-        adher: formData.adher,
-        medicalHistory: formData.medicalHistory,
-        allergies: formData.allergies,
-        bloodGroup: formData.bloodGroup,
-        occupation: formData.occupation,
-        lastUpdated: new Date(),
-      };
-
-      setPatients(
-        patients.map((p) => (p.id === selectedPatient.id ? updatedPatient : p))
-      );
-      setIsEditDialogOpen(false);
-      setSelectedPatient(null);
-
-      // Show success message
-      alert("Patient updated successfully!");
-    } catch (error) {
-      console.error("Failed to update patient:", error);
-      alert("Failed to update patient. Please try again.");
-    }
+    updatePatientMutation.mutate(
+      {
+        id: selectedPatient.id,
+       data: {
+    ...formData,
+    age: Number(formData.age),
+  },
+      },
+      {
+        onSuccess: () => {
+          toast.success("Patient updated successfully!");
+          setIsEditDialogOpen(false);
+          setSelectedPatient(null);
+        },
+        onError: (err) => {
+          toast.error(err?.message || "Failed to update patient");
+        },
+      }
+    );
   };
 
-  const handleDeletePatient = async (patientId: string) => {
-    if (!confirm("Are you sure you want to delete this patient?")) return;
-
-    try {
-      // Replace with actual API call
-      // await fetch(`/api/patients/${patientId}`, { method: 'DELETE' });
-
-      setPatients(patients.filter((p) => p.id !== patientId));
-      alert("Patient deleted successfully!");
-    } catch (error) {
-      console.error("Failed to delete patient:", error);
-      alert("Failed to delete patient. Please try again.");
-    }
+  const handleDeletePatient = async (_patientId: string) => {
+    toast.error("Deleting patients is not supported");
   };
 
   const filteredPatients = patients.filter((patient) => {
@@ -1314,20 +1224,22 @@ export default function PatientsPage() {
     if (activeTab === "recent") {
       const oneMonthAgo = new Date();
       oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
-      return patient.lastUpdated >= oneMonthAgo;
+      return patient.updatedAt >= oneMonthAgo;
     }
     if (activeTab === "highRisk") {
       return (
-        patient.adher === "poor" ||
-        patient.allergies.length > 3 ||
-        patient.age > 60
+        // patient.adher === "poor" ||
+        (patient.allergies ?? []).length > 3 ||
+     (patient.age ?? 0) > 60   
       );
     }
     return true;
   });
 
   return (
-    <div className="container mx-auto p-4 space-y-6">
+    <>
+      <Toaster />
+      <div className="container mx-auto p-4 space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div className="flex items-center gap-3">
@@ -1342,16 +1254,7 @@ export default function PatientsPage() {
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          <Button variant="outline" className="gap-2">
-            <Filter className="h-4 w-4" />
-            Filter
-          </Button>
-          <Button variant="outline" className="gap-2">
-            <Download className="h-4 w-4" />
-            Export
-          </Button>
-        </div>
+       
       </div>
 
       {/* Stats Cards */}
@@ -1397,12 +1300,12 @@ export default function PatientsPage() {
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
-              <div>
+              {/* <div>
                 <p className="text-sm text-gray-500">High Risk</p>
                 <p className="text-2xl font-bold">
                   {patients.filter((p) => p.adher === "poor").length}
                 </p>
-              </div>
+              </div> */}
               <div className="p-2 bg-red-100 rounded-full">
                 <AlertCircle className="h-5 w-5 text-red-600" />
               </div>
@@ -1418,7 +1321,7 @@ export default function PatientsPage() {
                 <p className="text-2xl font-bold">
                   {patients.length > 0
                     ? Math.round(
-                        patients.reduce((acc, p) => acc + p.age, 0) /
+                        patients.reduce((acc, p) => acc + (p.age ?? 0), 0) /
                           patients.length
                       )
                     : 0}{" "}
@@ -1446,24 +1349,7 @@ export default function PatientsPage() {
                 <TabsTrigger value="highRisk">High Risk</TabsTrigger>
               </TabsList>
 
-              <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-                {/* <DialogTrigger asChild>
-                  <Button className="gap-2">
-                    <Plus className="h-4 w-4" />
-                    Add Patient
-                  </Button>
-                </DialogTrigger> */}
-                <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-                  <DialogHeader>
-                    <DialogTitle>Add New Patient</DialogTitle>
-                  </DialogHeader>
-                  <PatientForm
-                    mode="add"
-                    onSave={handleAddPatient}
-                    onCancel={() => setIsAddDialogOpen(false)}
-                  />
-                </DialogContent>
-              </Dialog>
+
             </div>
 
             <TabsContent value={activeTab} className="space-y-4">
@@ -1478,8 +1364,9 @@ export default function PatientsPage() {
                   data={filteredPatients}
                   searchColumn="name"
                   searchPlaceholder="Search patients by name, phone, or ID..."
-                  onAddNew={() => setIsAddDialogOpen(true)}
+                  onAddNew={undefined}
                   addButtonText="Add Patient"
+
                   emptyMessage={
                     <div className="text-center py-8">
                       <Users className="h-12 w-12 text-gray-300 mx-auto mb-4" />
@@ -1491,10 +1378,7 @@ export default function PatientsPage() {
                           ? "Get started by adding your first patient"
                           : "No patients match the current filter"}
                       </p>
-                      <Button onClick={() => setIsAddDialogOpen(true)}>
-                        <Plus className="h-4 w-4 mr-2" />
-                        Add New Patient
-                      </Button>
+
                     </div>
                   }
                 />
@@ -1523,6 +1407,7 @@ export default function PatientsPage() {
           )}
         </DialogContent>
       </Dialog>
-    </div>
+      </div>
+    </>
   );
 }

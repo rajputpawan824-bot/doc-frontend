@@ -119,22 +119,22 @@ export default function DoctorSalaryPage() {
         </span>
       ),
     },
-    {
-      id: "actions",
-      header: "Actions",
-      cell: () => (
-        <Button
-          variant="ghost"
-          size="sm"
-          className="gap-2 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-          onClick={handleDownloadPayslip}
-          disabled={downloadPayslipMutation.isPending}
-        >
-          <Download className="h-4 w-4" />
-          Payslip
-        </Button>
-      ),
-    },
+    // {
+    //   id: "actions",
+    //   header: "Actions",
+    //   cell: () => (
+    //     <Button
+    //       variant="ghost"
+    //       size="sm"
+    //       className="gap-2 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+    //       onClick={handleDownloadPayslip}
+    //       disabled={downloadPayslipMutation.isPending}
+    //     >
+    //       <Download className="h-4 w-4" />
+    //       Payslip
+    //     </Button>
+    //   ),
+    // },
   ];
 
   return (
@@ -237,11 +237,11 @@ export default function DoctorSalaryPage() {
           </CardContent>
         </Card>
 
-        <Card className="bg-gradient-to-br from-blue-600 to-indigo-700 text-white shadow-md">
+        <Card className="border-l-4 border-l-blue-500 shadow-sm">
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-blue-100">Net Payable</p>
+                <p className="text-sm font-medium text-slate-500">Net Payable</p>
                 <h3 className="text-2xl font-bold">
                   {isLoadingDetails ? "..." : formatCurrency(summary.netSalary)}
                 </h3>
