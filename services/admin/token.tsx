@@ -21,6 +21,7 @@ export interface AppointmentQuery {
   date: string;
 }
 
+
 // ==================== GET CURRENT TOKEN ====================
 
 export function useCurrentToken(

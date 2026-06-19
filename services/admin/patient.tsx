@@ -65,12 +65,21 @@ export interface PatientListParams {
   search?: string;
 }
 
-export type PatientCreateData = Partial<Patient> & {
+export type PatientCreateData = {
+  name?: string;
+  phoneNumber?: string;
+  email?: string;
+  age?: number;
+  gender?: "MALE" | "FEMALE" | "OTHER";
+  address?: string;
+  adhar?: string;
+  bloodGroup?: string;
   relation?: string;
   otherRelation?: string;
   diseases?: string | string[];
   allergies?: string[] | string;
   medicalHistory?: string;
+  patientCode?: string;
 };
 
 export interface PatientCreatePayload {
@@ -79,8 +88,8 @@ export interface PatientCreatePayload {
   phone: string;
   email?: string;
   age?: number;
-  gender?: Patient["gender"];
-  bloodGroup?: Patient["bloodGroup"];
+ gender?: "MALE" | "FEMALE" | "OTHER";
+  bloodGroup?: string;
   aadhaar?: string;
   address?: string;
   relation?: string;
