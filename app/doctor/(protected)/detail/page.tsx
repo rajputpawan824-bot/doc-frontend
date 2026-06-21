@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { format } from "date-fns";
 import {
   User,
   Phone,
@@ -93,6 +94,7 @@ const {
     },
   });
 
+  
   const [doctorData, setDoctorData] = useState<DoctorDetails | null>(null);
 
   useEffect(() => {
@@ -363,9 +365,17 @@ const {
                 <Clock className="h-4 w-4" />
                 Working Hours
               </Label>
-              <p className="text-lg">
-                {doctorData.workingHours.start} - {doctorData.workingHours.end}
-              </p>
+             <p className="text-lg">
+  {format(
+    new Date(`1970-01-01T${doctorData.workingHours.start}`),
+    "hh:mm a"
+  )}
+  {" - "}
+  {format(
+    new Date(`1970-01-01T${doctorData.workingHours.end}`),
+    "hh:mm a"
+  )}
+</p>
             </div>
 
             {/* Experience */}
