@@ -29,7 +29,7 @@ export interface LeaveFormData {
   emergencyContact?: string;
   halfDayType?: HalfDayType;
   isHalfDay: boolean;
-  isPaid?: boolean;
+  requestedIsPaid?: boolean;
 }
 
 // API Request/Response Interfaces
@@ -42,7 +42,9 @@ export interface LeaveRequest {
   emergencyContact?: string;
   halfDayType?: HalfDayType;
   isHalfDay: boolean;
-  isPaid?: boolean;
+  requestedIsPaid?: boolean;
+
+approvedIsPaid?: boolean;
 }
 
 export interface LeaveResponse {
@@ -69,7 +71,9 @@ export interface LeaveResponse {
   rejectionReason?: string;
   attachments?: string[];
   isHalfDay: boolean;
-  isPaid?: boolean;
+  requestedIsPaid?: boolean;
+
+approvedIsPaid?: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -89,8 +93,22 @@ export interface LeaveApprovalPayload {
   status: "APPROVED" | "REJECTED";
   approvedBy?: string;
   rejectionReason?: string;
-  isPaid?: boolean;
+  requestedIsPaid?: boolean;
+
+approvedIsPaid?: boolean;
 }
+
+
+export interface LeaveBalanceResponse {
+  totalAllowed: number;
+  usedLeaves: number;
+  remainingLeaves: number;
+  unpaidLeaves: number;
+  paidHalfDays: number;
+  unpaidHalfDays: number;
+    policyType: "MONTHLY" | "YEARLY";
+}
+
 
 // Validation Rules
 export const LEAVE_VALIDATION_RULES: ValidationRules = {

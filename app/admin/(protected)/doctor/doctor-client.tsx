@@ -1001,13 +1001,13 @@ onClick: () => {
           validation: transformValidation(DOCTOR_VALIDATION_RULES.gender),
         },
 
-        {
-  name: "doctorCode",
-  label: "Doctor Code",
-  type: "text",
-  disabled: true,
-  width: "half",
-},
+//         {
+//   name: "doctorCode",
+//   label: "Doctor Code",
+//   type: "text",
+//   disabled: true,
+//   width: "half",
+// },
 
         {
           name: "salary",
@@ -1918,7 +1918,7 @@ const handleViewDetails = async (doctorId: string) => {
                 qualification: selectedDoctor.qualification,
                 registrationNo: selectedDoctor.registrationNo,
                 gender: selectedDoctor.gender,
-                 doctorCode: selectedDoctor.doctorCode,
+                // doctorCode: selectedDoctor.doctorCode,
                 department: selectedDoctor.department,
                 aadhaar: selectedDoctor.aadhaar,
                 experience: selectedDoctor.experience,

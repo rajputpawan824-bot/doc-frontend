@@ -8,6 +8,7 @@ import type {
   LeaveRequest,
   LeaveApprovalPayload,
   LeaveStatus,
+  LeaveBalanceResponse,
 } from "@/lib/validations/Admin/leave";
 
 // ==================== QUERY HOOKS ====================
@@ -106,7 +107,8 @@ export const useCreateLeave = (options?: {
         leaveType: formData.leaveType,
         fromDate: formData.fromDate,
         toDate: formData.toDate,
-         isPaid: formData.isPaid,
+        requestedIsPaid:
+  formData.requestedIsPaid,
         reason: formData.reason.trim(),
         emergencyContact: formData.emergencyContact?.trim(),
         isHalfDay: formData.isHalfDay,
@@ -155,12 +157,12 @@ export const useApproveLeave = (options?: {
   return useMutation<
     LeaveResponse,
     Error,
-    { leaveId: string; isPaid: boolean }
+    { leaveId: string; approvedIsPaid: boolean }
   >({
-    mutationFn: async ({ leaveId, isPaid }) => {
+    mutationFn: async ({ leaveId, approvedIsPaid }) => {
       const payload: LeaveApprovalPayload = {
         status: "APPROVED",
-        isPaid,
+        approvedIsPaid,
       };
 
       const response = await clientApi.put<{ data: LeaveResponse }>(
@@ -449,5 +451,165 @@ export const useEmployeesForLeave = (
     },
     enabled: !!role,
     retry: 2,
+  });
+};
+
+
+export const useLeaveBalance = (  month?: number,
+  year?: number,
+  status?: string) => {
+  return useQuery({
+    queryKey: ["leave-balance",     month,
+      year,
+      status,],
+
+    queryFn: async () => {
+            const params =
+        new URLSearchParams();
+
+      if (month) {
+        params.append(
+          "month",
+          String(month)
+        );
+      }
+
+      if (year) {
+        params.append(
+          "year",
+          String(year)
+        );
+      }
+
+      if (status) {
+        params.append(
+          "status",
+          status
+        );
+      }
+      const response =
+        await clientApi.get<{
+          data: LeaveBalanceResponse;
+        }>(
+          "/leave/leave-balance",
+           {
+      params: {
+        month,
+        year,
+        status,
+      },
+    }
+        );
+
+      if (!response.success) {
+        throw new Error(
+          response.error ||
+            "Failed to fetch leave balance"
+        );
+      }
+
+      return response.data?.data;
+    },
+
+    retry: 2,
+  });
+};
+
+
+export const useMyLeaves = (
+  month?: number,
+  year?: number,
+  status?: string
+) => {
+  return useQuery({
+    queryKey: [
+      "my-leaves",
+      month,
+      year,
+      status,
+    ],
+
+    queryFn: async () => {
+      const params =
+        new URLSearchParams();
+
+      if (month) {
+        params.append(
+          "month",
+          String(month)
+        );
+      }
+
+      if (year) {
+        params.append(
+          "year",
+          String(year)
+        );
+      }
+
+      if (status) {
+        params.append(
+          "status",
+          status
+        );
+      }
+
+      const response =
+        await clientApi.get<
+          LeaveListResponse
+        >(
+          `/leave/my-leaves?${
+            params.toString()
+          }`
+        );
+
+      if (!response.success) {
+        throw new Error(
+          response.error
+        );
+      }
+
+      return response.data?.data || [];
+    },
+  });
+};
+
+
+export const useCreateLeavePolicy = (options?: {
+  onSuccess?: (data: unknown) => void;
+  onError?: (error: Error) => void;
+}) => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (payload: {
+      role: "DOCTOR" | "STAFF" | "RECEPTIONIST";
+      policyType: "MONTHLY" | "YEARLY";
+      allowedLeaves: number;
+    }) => {
+      const response = await clientApi.post(
+        "/leave/create-leavepolicy",
+        payload
+      );
+
+      if (!response.success) {
+        throw new Error(
+          response.error ||
+          "Failed to save leave policy"
+        );
+      }
+
+      return response.data;
+    },
+
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({
+        queryKey: ["leave-policy"],
+      });
+
+      options?.onSuccess?.(data);
+    },
+
+    onError: options?.onError,
   });
 };

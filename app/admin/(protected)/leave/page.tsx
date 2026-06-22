@@ -49,6 +49,7 @@ import {
   useCreateLeave,
   useEmployeesForLeave,
   useOnLeave,
+  useCreateLeavePolicy,
 } from "@/services/admin/leave";
 
 import type {
@@ -80,6 +81,21 @@ const LeaveManagement = () => {
   new Date().toISOString().split("T")[0]
 );
 
+const [showPolicyModal, setShowPolicyModal] =
+  useState(false);
+
+const [policyRole, setPolicyRole] =
+  useState<
+    "DOCTOR" | "STAFF" | "RECEPTIONIST"
+  >("DOCTOR");
+
+const [policyType, setPolicyType] =
+  useState<
+    "MONTHLY" | "YEARLY"
+  >("MONTHLY");
+
+const [allowedLeaves, setAllowedLeaves] =
+  useState("");
   const [selectedLeave, setSelectedLeave] = useState<LeaveResponse | null>(
     null,
   );
@@ -99,7 +115,19 @@ const LeaveManagement = () => {
 const { data: employees = [] } =
   useEmployeesForLeave(selectedCategory);
 
+const savePolicy = useCreateLeavePolicy({
+  onSuccess: () => {
+    toast.success("Leave policy saved");
+    setShowPolicyModal(false);
+  },
 
+  onError: (error) => {
+    toast.error(
+      error.message ||
+      "Failed to save leave policy"
+    );
+  },
+});
 
   const createLeave = useCreateLeave({
     onSuccess: () => {
@@ -254,7 +282,7 @@ const {
 
   const getPaidStatus = (leave: LeaveResponse) =>
     leave.status === "APPROVED"
-      ? leave.isPaid
+      ? leave.approvedIsPaid
         ? "Paid"
         : "Unpaid"
       : "Pending Decision";
@@ -376,6 +404,14 @@ const {
             <Plus className="h-4 w-4" />
             Apply Leave
           </Button>
+
+                      <Button
+                      
+  variant="outline"
+  onClick={() => setShowPolicyModal(true)}
+>
+  Leave Policy
+</Button>
           <Button
             variant="outline"
             size="sm"
@@ -388,6 +424,7 @@ const {
             disabled={isFetching || isOnLeaveFetching || isOnLeaveTodayFetching}
              className="hover:bg-gray-50"
           >
+
             <RefreshCw
               className={`mr-2 h-4 w-4 ${
                 isFetching || isOnLeaveFetching || isOnLeaveTodayFetching
@@ -473,6 +510,9 @@ const {
             </div>
           </CardContent>
         </Card>
+        <Card>
+  
+</Card>
       </div>
 
       {/* Tabs Section */}
@@ -707,7 +747,7 @@ const {
               typeof data.emergencyContact === "string"
                 ? data.emergencyContact.trim()
                 : undefined,
-                isPaid: Boolean(data.ispaid),
+                requestedIsPaid: Boolean(data.isPaid),
             isHalfDay: Boolean(data.isHalfDay),
             halfDayType:
               typeof data.halfDayType === "string"
@@ -944,7 +984,7 @@ const {
                 </div>
                 <div className="text-sm font-semibold">
                   {selectedLeave.status === "APPROVED" ?
-                    (selectedLeave.isPaid ? "Paid" : "Unpaid") :
+                    (selectedLeave.approvedIsPaid ? "Paid" : "Unpaid") :
                     "Pending Decision"
                   }
                 </div>
@@ -1030,7 +1070,7 @@ const {
                 if (approveTargetLeave && approvalIsPaid !== null) {
                   approveLeave.mutate({
                     leaveId: approveTargetLeave._id,
-                    isPaid: approvalIsPaid,
+                    approvedIsPaid: approvalIsPaid,
                   });
                 }
               }}
@@ -1094,6 +1134,123 @@ const {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* leave policy  */}
+
+      <Dialog
+  open={showPolicyModal}
+  onOpenChange={setShowPolicyModal}
+>
+  <DialogContent>
+    <DialogHeader>
+      <DialogTitle>
+        Leave Policy
+      </DialogTitle>
+    </DialogHeader>
+
+    <div className="space-y-4">
+
+      <div>
+        <label>Role</label>
+
+        <Select
+          value={policyRole}
+          onValueChange={(v) =>
+            setPolicyRole(
+              v as
+                | "DOCTOR"
+                | "STAFF"
+                | "RECEPTIONIST"
+            )
+          }
+        >
+          <SelectTrigger>
+            <SelectValue />
+          </SelectTrigger>
+
+          <SelectContent>
+            <SelectItem value="DOCTOR">
+              Doctor
+            </SelectItem>
+
+            <SelectItem value="STAFF">
+              Staff
+            </SelectItem>
+
+            <SelectItem value="RECEPTIONIST">
+              Receptionist
+            </SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div>
+        <label>
+          Policy Type
+        </label>
+
+        <Select
+          value={policyType}
+          onValueChange={(v) =>
+            setPolicyType(
+              v as
+                | "MONTHLY"
+                | "YEARLY"
+            )
+          }
+        >
+          <SelectTrigger>
+            <SelectValue />
+          </SelectTrigger>
+
+          <SelectContent>
+            <SelectItem value="MONTHLY">
+              Monthly
+            </SelectItem>
+
+            <SelectItem value="YEARLY">
+              Yearly
+            </SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div>
+        <label>
+          Allowed Leaves
+        </label>
+
+        <Input
+          type="number"
+          value={allowedLeaves}
+          onChange={(e) =>
+            setAllowedLeaves(
+              e.target.value
+            )
+          }
+        />
+      </div>
+
+    </div>
+
+    <DialogFooter>
+      <Button
+        onClick={() =>
+          savePolicy.mutate({
+            role: policyRole,
+            policyType,
+            allowedLeaves:
+              Number(
+                allowedLeaves
+              ),
+          })
+        }
+      >
+        Save Policy
+      </Button>
+    </DialogFooter>
+  </DialogContent>
+</Dialog>
     </div>
   );
 };

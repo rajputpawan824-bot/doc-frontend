@@ -113,13 +113,7 @@ export const DOCTOR_VALIDATION_RULES: ValidationRules = {
       message: "Qualification must be at least 3 characters",
     },
   },
-  registrationNo: {
-    required: "Registration number is required",
-    pattern: {
-      value: /^[A-Za-z0-9\-]{5,20}$/,
-      message: "Registration number must be 5-20 alphanumeric characters",
-    },
-  },
+
   salary: {
     required: "Salary is required",
     validate: (value: unknown) => {
