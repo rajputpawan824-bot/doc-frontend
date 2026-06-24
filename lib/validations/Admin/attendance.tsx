@@ -78,3 +78,66 @@ export interface ClockAttendanceResponse {
   shiftStart: string;
   shiftEnd: string;
 }
+
+
+
+export interface AttendanceDashboardStatsResponse {
+  totalEmployees: number;
+  presentToday: number;
+  absentToday: number;
+  leaveToday: number;
+  lateToday: number;
+  halfDayToday: number;
+}
+
+export interface AttendanceRecord {
+  _id: string;
+
+  employeeName: string;
+  userRole: "DOCTOR" | "STAFF" | "RECEPTIONIST";
+
+  attendanceDate: string;
+
+  status:
+    | "PRESENT"
+    | "LATE"
+    | "ABSENT"
+    | "LEAVE"
+    | "HALF_DAY";
+
+  clockInTime: string | null;
+  clockOutTime: string | null;
+
+  totalWorkingMinutes: number;
+
+  shiftStart: string;
+  shiftEnd: string;
+
+  remarks?: string;
+}
+
+export interface AttendanceListResponse {
+  page: number;
+  limit: number;
+  total: number;
+  data: AttendanceRecord[];
+}
+
+export interface EmployeeAttendanceSummary {
+  _id: string;
+
+  employeeName: string;
+
+  userRole:
+    | "DOCTOR"
+    | "STAFF"
+    | "RECEPTIONIST";
+
+  presentDays: number;
+  absentDays: number;
+  leaveDays: number;
+  halfDays: number;
+  lateDays: number;
+
+  totalWorkingMinutes: number;
+}

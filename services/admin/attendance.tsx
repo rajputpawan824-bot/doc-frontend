@@ -8,7 +8,11 @@ TodayAttendanceResponse,
 AttendanceStatsResponse,
 AttendanceHistoryItem,
 AttendanceHistoryResponse,
-ClockAttendanceResponse
+ClockAttendanceResponse,
+AttendanceDashboardStatsResponse,
+AttendanceListResponse,
+EmployeeAttendanceSummary
+
 } from "@/lib/validations/Admin/attendance";
 
 export interface ClockPayload {
@@ -38,6 +42,10 @@ const ATTENDANCE_KEYS = {
   today: ["attendance", "today"],
   history: ["attendance", "history"],
   stats: ["attendance", "stats"],
+
+    adminAttendance: ["attendance", "all"],
+  dashboardStats: ["attendance", "dashboard"],
+  employeeSummary: ["attendance", "summary"],
 };
 
 // ==================== TODAY ATTENDANCE ====================
@@ -225,6 +233,145 @@ export const useClockOut = () => {
       queryClient.invalidateQueries({
         queryKey: ATTENDANCE_KEYS.stats,
       });
+    },
+  });
+};
+
+
+
+export const useAttendanceDashboardStats = (
+  role?: string,
+  date?: string,
+  month?: number,
+  year?: number
+) => {
+  return useQuery({
+    queryKey: [
+      ...ATTENDANCE_KEYS.dashboardStats,
+      role,
+      date,
+      month,
+      year,
+    ],
+
+    queryFn: async () => {
+     const response: ApiResponse<{
+  data: AttendanceDashboardStatsResponse;
+}> =
+        await clientApi.get(
+          "/attendance/dashboard-stats",
+          {
+            params: {
+              role,
+              date,
+              month,
+              year,
+            },
+          }
+        );
+        if (!response.success || !response.data) {
+  throw new Error(
+    "Failed to fetch dashboard stats"
+  );
+}
+
+      return response.data.data;
+    },
+  });
+};
+
+
+
+export const useAttendanceList = ({
+  page = 1,
+  limit = 10,
+  role,
+  status,
+  date,
+  search,
+}: {
+  page?: number;
+  limit?: number;
+  role?: string;
+  status?: string;
+  date?: string;
+  search?: string;
+}) => {
+  return useQuery({
+    queryKey: [
+      ...ATTENDANCE_KEYS.adminAttendance,
+      page,
+      limit,
+      role,
+      status,
+      date,
+      search,
+    ],
+
+    queryFn: async () => {
+         const response: ApiResponse<{
+  data: AttendanceListResponse;
+}> = await clientApi.get(
+          "/attendance/all",
+          {
+            params: {
+              page,
+              limit,
+              role,
+              status,
+              date,
+              search,
+            },
+          }
+        );
+        if (!response.success || !response.data) {
+  throw new Error(
+    "Failed to fetch Attendance List"
+  );
+}
+
+      return response.data.data;
+    },
+  });
+};
+
+
+
+export const useEmployeeAttendanceSummary = (
+  role?: string,
+  month?: number,
+  year?: number
+) => {
+  return useQuery({
+    queryKey: [
+      ...ATTENDANCE_KEYS.employeeSummary,
+      role,
+      month,
+      year,
+    ],
+
+    queryFn: async () => {
+      const response: ApiResponse<{
+  data: EmployeeAttendanceSummary;
+}> = 
+        await clientApi.get(
+          "/attendance/employee-summary",
+          {
+            params: {
+              role,
+              month,
+              year,
+            },
+          }
+        );
+         if (!response.success || !response.data) {
+  throw new Error(
+    "Failed to fetch dashboard stats"
+  );
+}
+
+
+      return response.data.data;
     },
   });
 };
