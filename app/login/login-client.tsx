@@ -75,7 +75,7 @@ const languages = [
 
 interface LoginFormData {
   email?: string;
-  mobile?: string;
+  phone?: string;
   password: string;
 }
 
@@ -88,6 +88,11 @@ interface LoginResponse {
 export default function LoginClient() {
   const router = useRouter();
   const [selectedRole, setSelectedRole] = useState("admin");
+  const [otpSent, setOtpSent] =
+  useState(false);
+
+const [otp, setOtp] =
+  useState("");
   const [selectedLanguage, setSelectedLanguage] = useState(
     "English (B a.s.: Admin)",
   );
@@ -95,7 +100,7 @@ export default function LoginClient() {
   const [formData, setFormData] = useState({
     email: "raunakt98@gmail.com",
     password: "HaHA7bOcLX#2",
-    mobile: "",
+    phone: "",
   });
 
   const handleInputChange = (field: string, value: string) => {
@@ -105,53 +110,125 @@ export default function LoginClient() {
     }));
   };
 
-  const loginEndpoint =
-    selectedRole === "doctor"
-      ? "/doctors/login"
-      : selectedRole === "staff" || selectedRole === "nurse"
-      ? "/staff/login"
-      : selectedRole === "receptionist"
-      ? "/receptionists/login"
-      : "/admins/login";
+const loginEndpoint =
+  selectedRole === "patient"
+    ? "/patient/login"
+    : selectedRole === "doctor"
+    ? "/doctors/login"
+    : selectedRole === "staff" ||
+      selectedRole === "nurse"
+    ? "/staff/login"
+    : selectedRole === "receptionist"
+    ? "/receptionists/login"
+    : "/admins/login";
 
   const {
     mutate: login,
     isPending: isLoading,
     error,
   } = useApiMutation<LoginResponse, LoginFormData>(loginEndpoint, "POST", {
-    onSuccess: async (data: LoginResponse & { access_token?: string; refresh_token?: string }) => {
-      // ✅ Save the token into cookies so clientApi can read it on every request
-      const token = data?.token ?? data?.access_token;
-      if (token) {
-        // Set cookie for server-side checks
-        await setAuthCookie(token);
-        
-        // Set localStorage for client-side checks (layout.tsx)
-        localStorage.setItem("access_token", token);
+onSuccess: async (data: any) => {
+  const token =
+    data?.token ||
+    data?.data?.token ||
+    data?.access_token;
 
-        clientApi.setTokens({
-          accessToken: token,
-          refreshToken: data?.refresh_token,
-        });
-      }
+  // PATIENT - FIRST STEP
+  if (
+    selectedRole === "patient" &&
+    !token
+  ) {
+    setOtpSent(true);
 
-      toast.success(data?.message || "Login successful!");
-      const targetRole = selectedRole === "nurse" ? "staff" : selectedRole;
-      router.push(`/${targetRole}/dashboard`);
-    },
+    toast.success(
+      data?.message || "OTP sent successfully"
+    );
+
+    return;
+  }
+
+  // LOGIN SUCCESS
+  if (token) {
+    await setAuthCookie(token);
+
+    localStorage.setItem(
+      "access_token",
+      token
+    );
+
+    clientApi.setTokens({
+      accessToken: token,
+      refreshToken: data?.refresh_token,
+    });
+
+    toast.success(
+      data?.message || "Login successful!"
+    );
+
+    if (selectedRole === "patient") {
+      router.push("/patient/clinicSelection");
+    } else {
+      const targetRole =
+        selectedRole === "nurse"
+          ? "staff"
+          : selectedRole;
+
+      router.push(
+        `/${targetRole}/dashboard`
+      );
+    }
+  }
+},
     onError: (error: Error) => {
       toast.error(`Error logging in: ${error.message}`);
     },
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const submitData: LoginFormData = { password: formData.password };
-    if (formData.email) submitData.email = formData.email;
-    if (formData.mobile) submitData.mobile = formData.mobile;
+const handleSubmit = (
+  e: React.FormEvent
+) => {
+  e.preventDefault();
 
-    login(submitData);
+  if (selectedRole === "patient") {
+    if (!formData.phone) {
+      toast.error(
+        "Mobile number is required"
+      );
+      return;
+    }
+
+    if (!otpSent) {
+      login({
+        phone: formData.phone,
+        email: formData.email,
+      } as any);
+
+      return;
+    }
+
+    login({
+      phone: formData.phone,
+      email: formData.email,
+      otp,
+    } as any);
+
+    return;
+  }
+
+  const submitData: LoginFormData = {
+    password: formData.password,
   };
+
+  if (formData.email) {
+    submitData.email = formData.email;
+  }
+
+  if (formData.phone) {
+    submitData.phone = formData.phone;
+  }
+
+  login(submitData);
+};
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-blue-950 flex items-center justify-center p-4">
@@ -255,62 +332,92 @@ export default function LoginClient() {
 
               {/* Mobile Number */}
               <div className="space-y-2">
-                <Label htmlFor="mobile" className="text-sm font-medium">
+                <Label htmlFor="phone" className="text-sm font-medium">
                   Mobile Number
                 </Label>
                 <div className="relative">
                   <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                   <Input
-                    id="mobile"
+                    id="phone"
                     type="tel"
-                    value={formData.mobile}
+                    value={formData.phone}
                     onChange={(e) =>
-                      handleInputChange("mobile", e.target.value)
+                      handleInputChange("phone", e.target.value)
                     }
                     className="pl-10 pr-4 py-6 border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-blue-500"
-                    placeholder="Enter your mobile number"
+                    placeholder="Enter your phone number"
                   />
                 </div>
               </div>
 
+              {selectedRole === "patient" &&
+  otpSent && (
+    <div className="space-y-2">
+      <Label
+        htmlFor="otp"
+        className="text-sm font-medium"
+      >
+        OTP
+      </Label>
+
+      <Input
+        id="otp"
+        type="text"
+        value={otp}
+        onChange={(e) =>
+          setOtp(e.target.value)
+        }
+        placeholder="Enter OTP"
+      />
+    </div>
+)}
+
               {/* Password */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="password" className="text-sm font-medium">
-                    Password
-                  </Label>
-                  <Link
-                    href="/forgotPassword"
-                    className="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400"
-                  >
-                    Forgot Password?
-                  </Link>
-                </div>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                  <Input
-                    id="password"
-                    type={showPassword ? "text" : "password"}
-                    value={formData.password}
-                    onChange={(e) =>
-                      handleInputChange("password", e.target.value)
-                    }
-                    className="pl-10 pr-12 py-6 border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-blue-500"
-                    placeholder="Enter your password"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-                  >
-                    {showPassword ? (
-                      <EyeOff className="w-5 h-5" />
-                    ) : (
-                      <Eye className="w-5 h-5" />
-                    )}
-                  </button>
-                </div>
-              </div>
+{selectedRole !== "patient" && (
+  <div className="space-y-2">
+    <div className="flex items-center justify-between">
+      <Label htmlFor="password" className="text-sm font-medium">
+        Password
+      </Label>
+
+      <Link
+        href="/forgotPassword"
+        className="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400"
+      >
+        Forgot Password?
+      </Link>
+    </div>
+
+    <div className="relative">
+      <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
+
+      <Input
+        id="password"
+        type={showPassword ? "text" : "password"}
+        value={formData.password}
+        onChange={(e) =>
+          handleInputChange("password", e.target.value)
+        }
+        className="pl-10 pr-12 py-6"
+        placeholder="Enter your password"
+      />
+
+      <button
+        type="button"
+        onClick={() =>
+          setShowPassword(!showPassword)
+        }
+        className="absolute right-3 top-1/2 -translate-y-1/2"
+      >
+        {showPassword ? (
+          <EyeOff className="w-5 h-5" />
+        ) : (
+          <Eye className="w-5 h-5" />
+        )}
+      </button>
+    </div>
+  </div>
+)}
 
               {/* Login Button */}
               <Button

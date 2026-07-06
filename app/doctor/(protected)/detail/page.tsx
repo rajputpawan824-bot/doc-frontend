@@ -19,9 +19,10 @@ import {
   Loader2,
   FileText,
   BriefcaseMedical,
+  Key,
 } from "lucide-react";
 
-import { useDoctorById, useUpdateDoctor } from "@/services/admin/doctor";
+import { useDoctorById, useUpdateDoctor,  useUpdateDoctorPassword, } from "@/services/admin/doctor";
 
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -32,6 +33,10 @@ import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import ReusableModal, {
+  FormSection,
+  ReusableFormData,
+} from "@/components/reusable/reusable-modal";
 
 interface DoctorDetails {
   id: string;
@@ -42,7 +47,7 @@ interface DoctorDetails {
   location: string;
   mobileNumber: string;
   email: string;
-  specialization: string;
+  department: string;
   experience: number;
   workingHours: { start: string; end: string };
   consultationDays: string[];
@@ -59,6 +64,8 @@ export default function DoctorDetailsSection({
   initialData,
 }: DoctorDetailsSectionProps) {
   const [isEditing, setIsEditing] = useState(false);
+  const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
+const [passwordModalKey, setPasswordModalKey] = useState(0);
 
   
 const [userId, setUserId] = useState<string>();
@@ -94,6 +101,8 @@ const {
     },
   });
 
+const updateDoctorPasswordMutation =
+  useUpdateDoctorPassword();
   
   const [doctorData, setDoctorData] = useState<DoctorDetails | null>(null);
 
@@ -107,7 +116,7 @@ const {
         location: doctor.address || "",
         mobileNumber: doctor.user?.phone || "",
         email: doctor.user?.email || "",
-        specialization: doctor.department || "",
+        department: doctor.department || "",
         experience: doctor.experience || 0,
         workingHours: {
           start: doctor.workingHours?.start || "-",
@@ -133,24 +142,81 @@ const {
     }));
   };
   
-  const handleSave = async () => {
-    if (!doctorData || !doctor) return;
+const handleSave = () => {
+  if (!doctorData || !doctor) return;
 
-    updateDoctorMutation.mutate({
-      id: doctor.id,
-      data: {
-        name: doctorData.name,
-        phone: doctorData.mobileNumber,
-        address: doctorData.location,
-        experience: doctorData.experience,
-      },
-    });
-  };
+  updateDoctorMutation.mutate({
+    id: doctor.id,
+    data: {
+      phone: doctorData.mobileNumber,
+      email: doctorData.email,
+      registrationNo: doctorData.registrationNo,
+      qualification: doctorData.qualification,
+      experience: doctorData.experience,
+    },
+  });
+};
 
   const handleCancel = () => {
     setIsEditing(false);
     refetch();
   };
+const passwordFormSections: FormSection[] = [
+  {
+    title: "Change Password",
+    icon: <Key className="h-4 w-4" />,
+    fields: [
+      {
+        name: "newPassword",
+        label: "New Password",
+        type: "password",
+        required: true,
+        width: "full",
+      },
+      {
+        name: "confirmPassword",
+        label: "Confirm Password",
+        type: "password",
+        required: true,
+        width: "full",
+        validation: {
+          custom: (value, formData) =>
+            value === formData.newPassword
+              ? null
+              : "Passwords must match",
+        },
+      },
+    ],
+  },
+];
+
+const handleUpdatePassword = (
+  data: ReusableFormData,
+) => {
+  if (!doctor?.id) return;
+
+  updateDoctorPasswordMutation.mutate(
+    {
+      id: doctor.id,
+      data: {
+        newPassword: String(data.newPassword),
+      },
+    },
+    {
+      onSuccess: () => {
+        toast.success("Password updated successfully");
+        setIsPasswordModalOpen(false);
+        setPasswordModalKey((prev) => prev + 1);
+      },
+      onError: (error) => {
+        toast.error(
+          error.message || "Failed to update password"
+        );
+      },
+    }
+  );
+};
+
 
   if (isLoading || !doctorData) {
     return (
@@ -181,6 +247,14 @@ const {
           Doctor Details / Profile
         </CardTitle>
         <div className="flex gap-2">
+
+  <Button
+    variant="outline"
+    onClick={() => setIsPasswordModalOpen(true)}
+  >
+    <Key className="h-4 w-4 mr-2" />
+    Change Password
+  </Button>
           {!isEditing ? (
             <Button onClick={() => setIsEditing(true)} className="gap-2">
               <Edit className="h-4 w-4" />
@@ -209,256 +283,287 @@ const {
         </div>
       </CardHeader>
 
-      <CardContent className="space-y-6">
-        {/* Personal Information Section */}
-        <div className="space-y-4">
-          <div className="flex items-start gap-6">
-            {/* Doctor Image */}
-            <div className="flex flex-col items-center gap-2">
-              <Avatar className="h-32 w-32">
-                <AvatarImage src={doctorData.image} alt={doctorData.name} />
-                <AvatarFallback className="text-2xl">
-                  <User className="h-12 w-12" />
-                </AvatarFallback>
-              </Avatar>
-              {isEditing && (
-                <Button variant="outline" size="sm">
-                  Change Image
-                </Button>
-              )}
-            </div>
-            </div>
-            {/* Basic Info */}
-            <div className="flex-1 space-y-4">
-              {/* Name */}
-              <div className="space-y-2">
-                <Label htmlFor="name" className="text-sm font-medium">
-                  Name of Doctor
-                </Label>
-                {isEditing ? (
-                  <Input
-                    id="name"
-                    value={doctorData.name}
-                    onChange={(e) => handleInputChange("name", e.target.value)}
-                  />
-                ) : (
-                  <p className="text-xl font-semibold">{doctorData.name}</p>
-                )}
-              </div>
 
-              {/* Location */}
-              <div className="space-y-2">
-                <Label className="text-sm font-medium flex items-center gap-2">
-                  <MapPin className="h-4 w-4" />
-                  Location
-                </Label>
-                {isEditing ? (
-                  <Input
-                    value={doctorData.location}
-                    onChange={(e) =>
-                      handleInputChange("location", e.target.value)
-                    }
-                  />
-                ) : (
-                  <p>{doctorData.location}</p>
-                )}
-              </div>
+<CardContent className="space-y-6">
 
-              {/* Contact Info */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium flex items-center gap-2">
-                    <Phone className="h-4 w-4" />
-                    Mobile Number
-                  </Label>
-                  {isEditing ? (
-                    <Input
-                      type="tel"
-                      value={doctorData.mobileNumber}
-                      onChange={(e) =>
-                        handleInputChange("mobileNumber", e.target.value)
-                      }
-                    />
-                  ) : (
-                    <p>{doctorData.mobileNumber}</p>
-                  )}
-                </div>
+<Card className="overflow-hidden border-0 shadow-lg">
+<CardContent className="p-0">
 
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium flex items-center gap-2">
-                    <Mail className="h-4 w-4" />
-                    Email
-                  </Label>
-                  {isEditing ? (
-                    <Input
-                      type="email"
-                      value={doctorData.email}
-                      onChange={(e) =>
-                        handleInputChange("email", e.target.value)
-                      }
-                    />
-                  ) : (
-                    <p>{doctorData.email}</p>
-                  )}
-                </div>
-              </div>
+<div className="bg-gradient-to-r from-blue-500 via-blue-600 to-indigo-600 p-8">
 
-              {/* Professional IDs */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium flex items-center gap-2">
-                    <FileText className="h-4 w-4" />
-                    Registration Number
-                  </Label>
-                  <p className="font-medium text-muted-foreground">{doctorData.registrationNo}</p>
-                </div>
+<div className="flex flex-col md:flex-row items-center gap-6">
 
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium flex items-center gap-2">
-                    <Clock className="h-4 w-4" />
-                    Shift
-                  </Label>
-                  <Badge variant="outline" className="capitalize">
-                    {doctor?.shift?.toLowerCase()}
-                  </Badge>
-                </div>
-              </div>
-              
-              {/* Qualification */}
-              <div className="space-y-2">
-                <Label className="text-sm font-medium">Qualification</Label>
-                <div className="flex items-center gap-2 text-muted-foreground">
-                   {doctorData.qualification}
-                </div>
-              
-            </div>
-          </div>
-        </div>
+<Avatar className="h-28 w-28 border-4 border-white/30">
+  <AvatarImage src={doctorData.image} />
+  <AvatarFallback className="bg-white/20 text-white">
+    <User className="h-12 w-12" />
+  </AvatarFallback>
+</Avatar>
 
-        <Separator />
+<div className="text-white">
+  <h2 className="text-3xl font-bold">
+    {doctorData.name}
+  </h2>
 
-        {/* Professional Information Section */}
-        <div className="space-y-4">
-          <h3 className="text-lg font-semibold">Professional Information</h3>
+  <p className="text-lg font-semibold">
+    Doctor
+  </p>
 
-          {/* Specialization */}
-          <div className="space-y-2">
-            <Label className="text-sm font-medium">Specialization</Label>
-            {isEditing ? (
-              <Input
-                value={doctorData.specialization}
-                onChange={(e) =>
-                  handleInputChange("specialization", e.target.value)
-                }
-              />
-            ) : (
-              <Badge variant="secondary" className="text-base px-3 py-1">
-                {doctorData.specialization}
-              </Badge>
-            )}
-          </div>
+  <div className="flex flex-wrap gap-3 mt-4">
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {/* Consultation Duration */}
-            <div className="space-y-2">
-              <Label className="text-sm font-medium flex items-center gap-2">
-                <Clock className="h-4 w-4" />
-                Working Hours
-              </Label>
-             <p className="text-lg">
-  {format(
-    new Date(`1970-01-01T${doctorData.workingHours.start}`),
-    "hh:mm a"
-  )}
-  {" - "}
-  {format(
-    new Date(`1970-01-01T${doctorData.workingHours.end}`),
-    "hh:mm a"
-  )}
+    <Badge className="bg-white text-blue-700">
+      {doctor?.doctorCode}
+    </Badge>
+
+    <Badge
+      className={
+        doctor?.status === "active"
+          ? "bg-green-500 text-white"
+          : "bg-red-500 text-white"
+      }
+    >
+      {doctor?.status}
+    </Badge>
+
+    <Badge className="bg-white/20 text-white">
+      {doctorData.qualification}
+    </Badge>
+
+  </div>
+</div>
+
+</div>
+</div>
+
+<div className="grid grid-cols-2 lg:grid-cols-4 gap-4 p-6 bg-slate-50">
+
+<Card>
+<CardContent className="p-4">
+<p className="text-xs text-slate-500">
+Experience
 </p>
-            </div>
+<p className="text-xl font-bold text-purple-600">
+{doctorData.experience} Years
+</p>
+</CardContent>
+</Card>
 
-            {/* Experience */}
-            <div className="space-y-2">
-              <Label className="text-sm font-medium flex items-center gap-2">
-                <BriefcaseMedical className="h-4 w-4" />
-                Experience (Years)
-              </Label>
-              {isEditing ? (
-                <Input
-                  type="number"
-                  value={doctorData.experience}
-                  onChange={(e) =>
-                    handleInputChange("experience", parseInt(e.target.value))
-                  }
-                />
-              ) : (
-                <p className="text-lg">{doctorData.experience} years</p>
-              )}
-            </div>
+<Card>
+<CardContent className="p-4">
+<p className="text-xs text-slate-500">
+Shift
+</p>
+<p className="text-xl font-bold text-orange-600">
+{doctor?.shift}
+</p>
+</CardContent>
+</Card>
 
-            {/* Consultation Fee */}
-            <div className="space-y-2">
-              <Label className="text-sm font-medium flex items-center gap-2">
-                <IndianRupee className="h-4 w-4" />
-                Consultation Fee
-              </Label>
-              <p className="text-lg">₹{doctorData.consultationFee}</p>
-            </div>
+<Card>
+<CardContent className="p-4">
+<p className="text-xs text-slate-500">
+Department
+</p>
+<p className="text-xl font-bold text-blue-600">
+{doctor?.department}
+</p>
+</CardContent>
+</Card>
 
-            {/* Consultation Days */}
-            <div className="space-y-2">
-              <Label className="text-sm font-medium flex items-center gap-2">
-                <Calendar className="h-4 w-4" />
-                Consultation Days
-              </Label>
-              {isEditing ? (
-                <div className="grid grid-cols-2 gap-2 mt-2">
-                  {["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"].map((day) => (
-                    <div key={day} className="flex items-center space-x-2">
-                      <Checkbox
-                        id={`cons-${day}`}
-                        checked={doctorData.consultationDays.includes(day)}
-                        onCheckedChange={(checked) => {
-                          const current = doctorData.consultationDays;
-                          const updated = checked
-                            ? [...current, day]
-                            : current.filter((d) => d !== day);
-                          handleInputChange("consultationDays", updated);
-                        }}
-                      />
-                      <Label
-                        htmlFor={`cons-${day}`}
-                        className="text-sm font-normal capitalize"
-                      >
-                        {day.toLowerCase()}
-                      </Label>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="flex flex-wrap gap-2">
-                  {doctorData.consultationDays.map((day, index) => (
-                    <Badge key={index} variant="outline">
-                      {day}
-                    </Badge>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
+<Card>
+<CardContent className="p-4">
+<p className="text-xs text-slate-500">
+Working Hours
+</p>
+<p className="text-xl font-bold text-green-600">
+{doctor?.workingHours?.start} - {doctor?.workingHours?.end}
+</p>
+</CardContent>
+</Card>
 
-        <Separator />
+</div>
 
-        {/* Audit Information */}
-        <div className="text-sm text-muted-foreground">
-          <p className="flex items-center gap-2">
-            Last updated: {new Date(doctorData.lastUpdated).toLocaleDateString()}
-          </p>
-          <p>Updated by: {doctorData.updatedBy}</p>
-        </div>
-      </CardContent>
+<div className="p-6 space-y-6">
+
+<Card>
+<CardHeader>
+<CardTitle>Personal Information</CardTitle>
+</CardHeader>
+
+<CardContent className="grid md:grid-cols-2 gap-4">
+
+<div>
+<Label>Phone</Label>
+{isEditing ? (
+<Input
+value={doctorData.mobileNumber}
+onChange={(e) =>
+handleInputChange("mobileNumber", e.target.value)
+}
+/>
+) : (
+<p>{doctorData.mobileNumber}</p>
+)}
+</div>
+
+<div>
+<Label>Email</Label>
+{isEditing ? (
+<Input
+value={doctorData.email}
+onChange={(e) =>
+handleInputChange("email", e.target.value)
+}
+/>
+) : (
+<p>{doctorData.email}</p>
+)}
+</div>
+
+<div>
+<Label>Name</Label>
+<p>{doctorData.name}</p>
+</div>
+
+<div>
+<Label>Address</Label>
+<p>{doctorData.location}</p>
+</div>
+
+</CardContent>
+</Card>
+
+<Card>
+<CardHeader>
+<CardTitle>Employment Information</CardTitle>
+</CardHeader>
+
+<CardContent className="grid md:grid-cols-2 gap-4">
+
+<div>
+<Label>Doctor Code</Label>
+<p>{doctor?.doctorCode}</p>
+</div>
+
+<div>
+<Label>Department</Label>
+<p>{doctor?.department}</p>
+</div>
+
+<div>
+<Label>Shift</Label>
+<p>{doctor?.shift}</p>
+</div>
+
+<div>
+<Label>Status</Label>
+<p className="capitalize">
+{doctor?.status}
+</p>
+</div>
+
+</CardContent>
+</Card>
+
+<Card>
+<CardHeader>
+<CardTitle>Professional Information</CardTitle>
+</CardHeader>
+
+<CardContent className="grid md:grid-cols-2 gap-4">
+
+<div>
+<Label>Qualification</Label>
+{isEditing ? (
+<Input
+value={doctorData.qualification}
+onChange={(e) =>
+handleInputChange("qualification", e.target.value)
+}
+/>
+) : (
+<p>{doctorData.qualification}</p>
+)}
+</div>
+
+<div>
+<Label>Registration Number</Label>
+{isEditing ? (
+<Input
+value={doctorData.registrationNo}
+onChange={(e) =>
+handleInputChange("registrationNo", e.target.value)
+}
+/>
+) : (
+<p>{doctorData.registrationNo}</p>
+)}
+</div>
+
+<div>
+<Label>Experience</Label>
+{isEditing ? (
+<Input
+type="number"
+value={doctorData.experience}
+onChange={(e) =>
+handleInputChange(
+"experience",
+Number(e.target.value)
+)
+}
+/>
+) : (
+<p>{doctorData.experience} Years</p>
+)}
+</div>
+
+<div>
+<Label>Consultation Fee</Label>
+<p>₹{doctorData.consultationFee}</p>
+</div>
+
+<div className="md:col-span-2">
+<Label>Availability Days</Label>
+
+<div className="flex flex-wrap gap-2 mt-2">
+{doctorData.consultationDays.map((day, index) => (
+<Badge key={index} variant="outline">
+{day}
+</Badge>
+))}
+</div>
+
+</div>
+
+</CardContent>
+</Card>
+
+</div>
+
+</CardContent>
+
+</Card>
+</CardContent>
+
+      <ReusableModal
+  key={passwordModalKey}
+  isOpen={isPasswordModalOpen}
+  onClose={() => {
+    setIsPasswordModalOpen(false);
+    setPasswordModalKey((prev) => prev + 1);
+  }}
+  onSave={handleUpdatePassword}
+  title="Change Password"
+  sections={passwordFormSections}
+  size="md"
+  saveButtonText={
+    updateDoctorPasswordMutation.isPending
+      ? "Updating..."
+      : "Update Password"
+  }
+  validationOnChange
+/>
     </Card>
   );
 }

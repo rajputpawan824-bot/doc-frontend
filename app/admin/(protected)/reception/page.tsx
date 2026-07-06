@@ -276,6 +276,13 @@ const ReceptionistManagement = () => {
     onSuccess: (data) => {
       toast.success("Receptionist added successfully");
       setIsAddModalOpen(false);
+                  queryClient.invalidateQueries({
+  queryKey: ["salary-list"],
+});
+
+queryClient.invalidateQueries({
+  queryKey: ["salary-dashboard-stats"],
+});
       queryClient.invalidateQueries({ queryKey: ["receptionists"] });
     },
     onError: (error) => {
@@ -289,11 +296,15 @@ const ReceptionistManagement = () => {
   useNextReceptionistCode();
 
   // ==================== DATA MANAGEMENT ====================
-  useEffect(() => {
-    if (activeTab === "deactivated") {
-      refetchDeactivated();
-    }
-  }, [activeTab, refetchDeactivated]);
+useEffect(() => {
+  refetchDeactivated();
+}, [refetchDeactivated]);
+
+useEffect(() => {
+  if (activeTab === "deactivated") {
+    refetchDeactivated();
+  }
+}, [activeTab, refetchDeactivated]);
 const activeReceptionists = validReceptionists.filter(
   (r) => r.isActive === true,
 );
@@ -414,7 +425,9 @@ const filteredActiveReceptionists = activeReceptionists.filter(
                   ? "bg-yellow-100 text-yellow-800"
                   : value === "AFTERNOON"
                   ? "bg-yellow-100 text-yellow-800"
-                  : value === "EVENING"
+                  : value === "ROTATIONAL"
+                  ? "bg-yellow-100 text-yellow-800"
+                  : value === "NIGHT"
                     ? "bg-orange-100 text-orange-800"
                     : "bg-indigo-100 text-indigo-800"
               }
@@ -677,7 +690,7 @@ const filteredActiveReceptionists = activeReceptionists.filter(
           options: [
             { value: Gender.MALE, label: "Male" },
             { value: Gender.FEMALE, label: "Female" },
-            { value: Gender.OTHER, label: "Other" },
+            { value: Gender.OTHERS, label: "Other" },
           ],
           validation: transformValidation(RECEPTION_VALIDATION_RULES.gender),
         },
@@ -703,9 +716,9 @@ const filteredActiveReceptionists = activeReceptionists.filter(
           required: true,
           placeholder: "30000",
           width: "half",
-          min: 10000,
+          min: 0,
           max: 100000,
-          step: 1000,
+          
           validation: transformValidation(RECEPTION_VALIDATION_RULES.salary),
         },
         {
@@ -716,8 +729,10 @@ const filteredActiveReceptionists = activeReceptionists.filter(
           width: "half",
           options: [
             { value: Shift.MORNING, label: "Morning" },
-            { value: Shift.EVENING, label: "Evening" },
+            { value: Shift.NIGHT, label: "Night" },
             { value: Shift.AFTERNOON, label: "Afternoon" },
+            { value: Shift.ROTATIONAL, label: "Rotational" },
+
           ],
           validation: transformValidation(RECEPTION_VALIDATION_RULES.shift),
         },
@@ -727,9 +742,7 @@ const filteredActiveReceptionists = activeReceptionists.filter(
           type: "text",
           placeholder: "e.g., D-01, Reception-1",
           width: "half",
-          validation: transformValidation(
-            RECEPTION_VALIDATION_RULES.deskNumber,
-          ),
+
         },
         {
   name: "receptionistCode",
@@ -832,9 +845,10 @@ const filteredActiveReceptionists = activeReceptionists.filter(
           name: "salary",
           label: "Salary (₹)",
           type: "number",
+          disabled: true,
           required: true,
           width: "half",
-          min: 10000,
+          min: 0,
           max: 100000,
           step: 1000,
           validation: transformValidation(RECEPTION_VALIDATION_RULES.salary),
@@ -847,8 +861,9 @@ const filteredActiveReceptionists = activeReceptionists.filter(
           width: "half",
           options: [
             { value: Shift.MORNING, label: "Morning" },
-            { value: Shift.EVENING, label: "Evening" },
+            { value: Shift.NIGHT, label: "Night" },
              { value: Shift.AFTERNOON, label: "Afternoon" },
+              { value: Shift.ROTATIONAL, label: "Rotational" },
           ],
           validation: transformValidation(RECEPTION_VALIDATION_RULES.shift),
         },
@@ -870,7 +885,7 @@ const filteredActiveReceptionists = activeReceptionists.filter(
           options: [
             { value: Gender.MALE, label: "Male" },
             { value: Gender.FEMALE, label: "Female" },
-            { value: Gender.OTHER, label: "Other" },
+            { value: Gender.OTHERS, label: "Other" },
           ],
           validation: transformValidation(RECEPTION_VALIDATION_RULES.gender),
         },
@@ -968,9 +983,7 @@ const filteredActiveReceptionists = activeReceptionists.filter(
           type: "password",
           required: true,
           width: "full",
-          validation: {
-            minLength: 6,
-          },
+ validation: transformValidation(RECEPTION_VALIDATION_RULES.password),
         },
         {
           name: "confirmPassword",
@@ -1159,14 +1172,22 @@ workingHours,
         isActive: false,
       },
       {
-        onSuccess: () => {
-          toast.success("Receptionist deactivated successfully");
-          setIsDetailModalOpen(false);
-          queryClient.invalidateQueries({ queryKey: ["receptionists"] });
-          queryClient.invalidateQueries({
-            queryKey: ["receptionist", receptionistId],
-          });
-        },
+onSuccess: () => {
+  toast.success("Receptionist deactivated successfully");
+  setIsDetailModalOpen(false);
+
+  queryClient.invalidateQueries({
+    queryKey: ["receptionists"],
+  });
+
+  queryClient.invalidateQueries({
+    queryKey: ["deactivated-receptionists"],
+  });
+
+  queryClient.invalidateQueries({
+    queryKey: ["receptionist", receptionistId],
+  });
+},
         onError: (error) => {
           toast.error("Failed to deactivate receptionist");
         },
@@ -1629,11 +1650,11 @@ workingHours,
                 <PaginatedReceptionistTable
                   columns={deactivatedColumns}
                   data={filteredDeactivatedReceptionists}
-                  currentPage={1}
-                  totalPages={1}
-                  limit={10}
-                  onPageChange={() => undefined}
-                  onLimitChange={() => undefined}
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  limit={limit}
+                  onPageChange={handlePageChange}
+                  onLimitChange={handleLimitChange}
                   emptyMessage={
                     <div className="text-center py-12">
                       <UserCheck className="mx-auto h-12 w-12 text-gray-400" />
@@ -1708,7 +1729,9 @@ workingHours,
   selectedReceptionist.receptionistCode,
                 registrationNo: selectedReceptionist.registrationNo,
 joiningDate: selectedReceptionist.joiningDate
-  ? selectedReceptionist.joiningDate.split("T")[0]
+  ? new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Asia/Kolkata",
+    }).format(new Date(selectedReceptionist.joiningDate))
   : "",
 
 workingHourStart:

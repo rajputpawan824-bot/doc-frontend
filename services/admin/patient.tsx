@@ -5,6 +5,7 @@ import { clientApi } from "@/lib/api";
 import type { ApiResponse } from "@/lib/api";
 import type { Patient } from "@/app/admin/(protected)/patient/page";
 
+
 type PaginationMeta = {
   page?: number;
   currentPage?: number;
@@ -80,6 +81,9 @@ export type PatientCreateData = {
   allergies?: string[] | string;
   medicalHistory?: string;
   patientCode?: string;
+    emergencyContactName?: string;
+  emergencyContactPhone?: string;
+  emergencyContactRelation?: string;
 };
 
 export interface PatientCreatePayload {
@@ -97,12 +101,96 @@ export interface PatientCreatePayload {
   diseases?: string | string[];
   allergies?: string[] | string;
   medicalHistory?: string;
+  emergencyContact?: {
+  name?: string;
+  phone?: string;
+  relation?: string;
+};
+}
+export interface PatientDashboardResponse {
+  profile: {
+    _id: string;
+    patientCode: string;
+    name: string;
+    age: number;
+    gender: string;
+    relation: string;
+  };
+
+  currentVisit: {
+    appointmentId: string;
+    doctorId: string;
+    doctorName: string;
+    tokenNumber: number;
+    currentServingToken: number;
+    patientsAhead: number;
+    status: string;
+  } | null;
+
+  nextAppointment: {
+    appointmentId: string;
+    doctorId: string;
+    doctorName: string;
+    department: string;
+    date: string;
+    slot: string;
+    status: string;
+  } | null;
+
+  stats: {
+    pastVisits: number;
+    familyProfiles: number;
+  };
+}
+
+
+export interface Clinic {
+  adminId: string;
+  clinicName: string;
+  location: string;
+  profileCount: number;
+}
+
+export interface MyClinicsResponse {
+  success: boolean;
+  count: number;
+  data: Clinic[];
+}
+
+export interface ClinicProfile {
+  _id: string;
+  patientCode: string;
+  name: string;
+  relation: string;
+  otherRelation?: string | null;
+}
+
+export interface ClinicProfilesData {
+  clinic: {
+    _id: string;
+    clinicName: string;
+    location: string;
+  };
+  profiles: ClinicProfile[];
 }
 
 type PatientStatusPayload = {
   id: string;
   isActive: boolean;
 };
+
+function unwrapData<T>(value: unknown): T {
+  if (
+    value &&
+    typeof value === "object" &&
+    "data" in value &&
+    (value as { data?: unknown }).data !== undefined
+  ) {
+    return unwrapData<T>((value as { data?: unknown }).data);
+  }
+
+  return value as T;
+}
 
 function getRawPatientList(response: RawPatientListResponse | undefined) {
   if (Array.isArray(response)) return response;
@@ -194,6 +282,12 @@ allergies:
         .filter(Boolean)
     : data.allergies || [],
     medicalHistory: data.medicalHistory ?? "",
+
+    emergencyContact: {
+  name: data.emergencyContactName || undefined,
+  phone: data.emergencyContactPhone || undefined,
+  relation: data.emergencyContactRelation || undefined,
+},
   };
 }
 
@@ -286,7 +380,7 @@ export const usePatientById = (patientId?: string) => {
         throw new Error("No data received from server");
       }
 
-      const patient = getRawPatient(response.data);
+      const patient = getRawPatient(unwrapData<RawPatientResponse>(response.data));
       if (!patient) {
         throw new Error("No patient data received from server");
       }
@@ -316,7 +410,7 @@ export function useAddPatient(options?: {
         throw new Error("No data received from server");
       }
 
-      const patient = getRawPatient(response.data);
+      const patient = getRawPatient(unwrapData<RawPatientResponse>(response.data));
       if (!patient) {
         throw new Error("No patient data received from server");
       }
@@ -327,6 +421,45 @@ export function useAddPatient(options?: {
     retryDelay: 1000,
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["patients"] });
+      options?.onSuccess?.(data);
+    },
+    onError: options?.onError,
+  });
+}
+
+export function useAddPatientProfile(options?: {
+  onSuccess?: (data: Patient) => void;
+  onError?: (error: Error) => void;
+}) {
+  const queryClient = useQueryClient();
+
+  return useMutation<Patient, Error, PatientCreateData>({
+    mutationFn: async (formData: PatientCreateData) => {
+      const payload = buildCreatePatientPayload(formData);
+
+      const response: ApiResponse<RawPatientResponse> =
+        await clientApi.post("/patient/create-patient", payload);
+
+      if (!response.success) {
+        throw new Error(response.error || "Failed to create patient");
+      }
+      if (!response.data) {
+        throw new Error("No data received from server");
+      }
+
+      const patient = getRawPatient(unwrapData<RawPatientResponse>(response.data));
+      if (!patient) {
+        throw new Error("No patient data received from server");
+      }
+
+      return normalizePatient(patient);
+    },
+    retry: 1,
+    retryDelay: 1000,
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["clinic-profiles"] });
+      queryClient.invalidateQueries({ queryKey: ["patient-dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["patient", data.id] });
       options?.onSuccess?.(data);
     },
     onError: options?.onError,
@@ -430,3 +563,201 @@ export const useNextPatientCode = () => {
     },
   });
 };
+
+
+
+export function usePatientLogin() {
+  return useMutation({
+    mutationFn: async (data: {
+      phone: string;
+      otp?: string;
+    }) => {
+      const response = await clientApi.post(
+        "/patient/login",
+        data
+      );
+
+      if (!response.success) {
+        throw new Error(
+          response.error || "Login failed"
+        );
+      }
+
+      return response.data;
+    },
+  });
+}
+
+
+export function useMyClinics() {
+  return useQuery<MyClinicsResponse>({
+    queryKey: ["my-clinics"],
+
+    queryFn: async () => {
+      const response =
+        await clientApi.get<MyClinicsResponse>(
+          "/patient/my-clinics"
+        );
+
+      if (!response.success) {
+        throw new Error(
+          response.error ||
+            "Failed to fetch clinics"
+        );
+      }
+
+      return response.data;
+    },
+  });
+}
+
+export function useMyClinic(
+  adminId?: string
+) {
+  return useQuery({
+    queryKey: ["my-clinic", adminId],
+
+    queryFn: async () => {
+      const response = await clientApi.get(
+        `/patient/my-clinic/${adminId}`
+      );
+
+      if (!response.success) {
+        throw new Error(
+          response.error ||
+            "Failed to fetch clinic"
+        );
+      }
+
+      return response.data;
+    },
+
+    enabled: !!adminId,
+  });
+}
+
+
+
+export function useClinicProfiles(
+  adminId?: string
+) {
+  return useQuery<ClinicProfilesData>({
+    queryKey: ["clinic-profiles", adminId],
+
+    queryFn: async () => {
+      const response = await clientApi.get<{
+        success: boolean;
+        data: ClinicProfilesData;
+      }>(
+        `/patient/my-clinic/${adminId}/profiles`
+      );
+
+      if (!response.success || !response.data) {
+        throw new Error(
+          "Failed to fetch profiles"
+        );
+      }
+
+      return unwrapData<ClinicProfilesData>(response.data);
+    },
+
+    enabled: !!adminId,
+  });
+}
+
+
+export function useMyClinicAppointments(
+  adminId?: string
+) {
+  return useQuery({
+    queryKey: [
+      "clinic-appointments",
+      adminId,
+    ],
+
+    queryFn: async () => {
+      const response = await clientApi.get(
+        `/patient/my-clinic/${adminId}/appointments`
+      );
+
+      if (!response.success) {
+        throw new Error(
+          response.error ||
+            "Failed to fetch appointments"
+        );
+      }
+
+      return response.data;
+    },
+
+    enabled: !!adminId,
+  });
+}
+
+
+export function usePatientDashboard(
+  patientId?: string
+) {
+  return useQuery<PatientDashboardResponse>({
+    queryKey: [
+      "patient-dashboard",
+      patientId,
+    ],
+
+    queryFn: async () => {
+      const response =
+        await clientApi.get<{
+          success: boolean;
+          data: PatientDashboardResponse;
+        }>(
+          `/patient/profile/${patientId}/dashboard`
+        );
+
+      if (!response.success) {
+        throw new Error(
+          response.error ||
+          "Failed to fetch dashboard"
+        );
+      }
+
+      if (!response.data) {
+        throw new Error(
+          "No dashboard data received"
+        );
+      }
+
+      return unwrapData<PatientDashboardResponse>(response.data);
+    },
+
+    enabled: !!patientId,
+  });
+}
+
+
+export function usePatientMedicalHistory(
+  patientId?: string
+) {
+  return useQuery({
+    queryKey: [
+      "patient-medical-history",
+      patientId,
+    ],
+
+    queryFn: async () => {
+      const response = await clientApi.get(
+        `/patient/profile/${patientId}/medical-history`
+      );
+
+      if (!response.success) {
+        throw new Error(
+          response.error ||
+            "Failed to fetch medical history"
+        );
+      }
+
+      return response.data;
+    },
+
+    enabled: !!patientId,
+  });
+}

@@ -49,6 +49,7 @@ import {
   useCreateLeave,
   useEmployeesForLeave,
   useOnLeave,
+  useLeavePolicy,
   useCreateLeavePolicy,
 } from "@/services/admin/leave";
 
@@ -77,10 +78,11 @@ const LeaveManagement = () => {
   const [onLeaveRole, setOnLeaveRole] = useState<
     "ALL" | "DOCTOR" | "STAFF" | "RECEPTIONIST" | "ADMIN"
   >("ALL");
-  const [onLeaveDate, setOnLeaveDate] = useState(
-  new Date().toISOString().split("T")[0]
+const [onLeaveDate, setOnLeaveDate] = useState(
+  new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Kolkata",
+  }).format(new Date())
 );
-
 const [showPolicyModal, setShowPolicyModal] =
   useState(false);
 
@@ -128,6 +130,12 @@ const savePolicy = useCreateLeavePolicy({
     );
   },
 });
+
+const {
+  data: leavePolicies,
+  isLoading: isPolicyLoading,
+} = useLeavePolicy();
+
 
   const createLeave = useCreateLeave({
     onSuccess: () => {
@@ -510,10 +518,47 @@ const {
             </div>
           </CardContent>
         </Card>
-        <Card>
-  
-</Card>
+
+
+
       </div>
+<div className="mt-12 space-y-4">
+  <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+    Leave Policies
+  </h3>
+
+  <div className="flex flex-wrap gap-3 mb-15">
+    {leavePolicies?.data?.map((policy: any) => (
+      <div
+        key={policy._id}
+        className="flex items-center gap-3 rounded-full border bg-white px-4 py-2 shadow-sm"
+      >
+        <span className="font-medium text-sm">
+          {policy.role}
+        </span>
+
+        <Badge
+          className={
+            policy.policyType === "YEARLY"
+              ? "bg-blue-100 text-blue-700 hover:bg-blue-100"
+              : "bg-green-100 text-green-700 hover:bg-green-100"
+          }
+        >
+          {policy.policyType}
+        </Badge>
+
+        <span className="font-semibold text-base text-foreground">
+          {policy.allowedLeaves}
+        </span>
+
+        <span className="text-sm text-muted-foreground">
+          Leaves
+        </span>
+      </div>
+    ))}
+  </div>
+</div>
+      
 
       {/* Tabs Section */}
       <Tabs

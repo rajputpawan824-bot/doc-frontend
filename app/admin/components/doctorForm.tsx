@@ -45,10 +45,10 @@ interface DoctorFormData {
   phoneNumber: string;
   experience: number;
   salary: string;
-  unit: "morning" | "evening" | "rotational";
+  unit: "morning" | "evening" | "rotational"|"night"|"afternoon";
   email: string;
   password: string;
-  gender: "male" | "female" | "other";
+  gender: "male" | "female" | "others";
   government: boolean;
   adjunct: boolean;
   address: string;
@@ -421,7 +421,7 @@ const [formData, setFormData] = useState<DoctorFormData>({
                     <div className="flex items-center space-x-2">
                       <RadioGroupItem value="other" id="other" />
                       <Label htmlFor="other" className="font-normal">
-                        Other
+                        Others
                       </Label>
                     </div>
                   </RadioGroup>

@@ -12,12 +12,12 @@ export type StaffCategory =
   | "DOCTOR"
   | "NURSE"
   | "TECHNICIAN"
-  | "ADMINISTRATOR"
   | "RECEPTIONIST"
   | "PHARMACIST"
   | "CLEANING_STAFF"
   | "SECURITY"
-  | "OTHER";
+ |"LAB_TECHNICIAN"
+  | "WARD_BOY";
 
 // Form Data Interface
 export interface LeaveFormData {

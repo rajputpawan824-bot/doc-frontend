@@ -12,6 +12,7 @@ export type ReusableFormData = Record<string, FormDataValue>;
 export interface FieldConfig {
   name: string;
   label: string;
+   prefix?: string;
   type: FieldType;
   required?: boolean | ((formData: ReusableFormData) => boolean);
   placeholder?: string;
@@ -179,6 +180,7 @@ function ReusableModalContent({
   );
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [showPassword, setShowPassword] = useState<Record<string, boolean>>({});
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
 
   const validateField = (
     name: string,
@@ -260,18 +262,49 @@ if (
     }
   };
 
-  const handleChange = (name: string, value: FormDataValue) => {
-    const newFormData = { ...formData, [name]: value };
-    setFormData(newFormData);
-
-    if (validationOnChange) {
-      const error = validateField(name, value, newFormData);
-      setErrors(prev => ({
-        ...prev,
-        [name]: error || '',
-      }));
-    }
+const handleChange = (name: string, value: FormDataValue) => {
+  const newFormData = {
+    ...formData,
+    [name]: value,
   };
+
+  setFormData(newFormData);
+
+  if (validationOnChange) {
+    const newErrors: Record<string, string> = {};
+
+    Object.keys(touched).forEach((fieldName) => {
+      if (touched[fieldName]) {
+        const error = validateField(
+          fieldName,
+          newFormData[fieldName],
+          newFormData
+        );
+
+        newErrors[fieldName] = error || "";
+      }
+    });
+
+    setErrors((prev) => ({
+      ...prev,
+      ...newErrors,
+    }));
+  }
+};
+
+const handleBlur = (name: string) => {
+  setTouched((prev) => ({
+    ...prev,
+    [name]: true,
+  }));
+
+  const error = validateField(name, formData[name], formData);
+
+  setErrors((prev) => ({
+    ...prev,
+    [name]: error || "",
+  }));
+};
 
   const renderField = (field: FieldConfig) => {
     const isHidden = typeof field.hidden === "function"
@@ -349,6 +382,7 @@ if (
                     type="radio"
                     name={field.name}
                     value={option.value}
+                      onBlur={() => handleBlur(field.name)}
                     checked={formData[field.name] === option.value}
                    onChange={(e) => {
   handleChange(field.name, e.target.value);
@@ -369,6 +403,7 @@ if (
               <input
                 type="checkbox"
                 id={field.name}
+                  onBlur={() => handleBlur(field.name)}
                 checked={fieldValueAsBoolean(formData[field.name])}
                onChange={(e) => {
   handleChange(field.name, e.target.checked);
@@ -410,6 +445,8 @@ case "checkbox-group":
               type="checkbox"
               className="hidden"
               checked={selected}
+                onBlur={() => handleBlur(field.name)}
+              disabled={field.disabled}
               onChange={(e) => {
                 const updated = e.target.checked
                   ? [...values, option.value]
@@ -433,6 +470,7 @@ case "checkbox-group":
         type={showPassword[field.name] ? "text" : "password"}
         id={field.name}
         required={required}
+          onBlur={() => handleBlur(field.name)}
         className={`${commonClasses} pr-10`}
         value={fieldValueAsString(formData[field.name])}
         onChange={(e) => {
@@ -461,11 +499,15 @@ case "checkbox-group":
       </button>
     </div>
   ) : (
+
+
+    
     <input
       type={field.type}
       id={field.name}
       required={required}
       className={commonClasses}
+        onBlur={() => handleBlur(field.name)}
       value={fieldValueAsString(formData[field.name])}
       onChange={(e) => {
         handleChange(field.name, e.target.value);

@@ -413,7 +413,7 @@ workingHours: reception.workingHours,
         updatedAt: new Date(reception.updatedAt ?? reception.createdAt),
       }));
     },
-    enabled: false, // Only fetch when needed
+    enabled: true,// Only fetch when needed
     retry: 2,
     retryDelay: 1000,
   });

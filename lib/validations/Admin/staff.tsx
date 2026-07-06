@@ -20,7 +20,7 @@ export type StaffShift =
   | "EVENING"
   | "NIGHT"
   | "ROTATING";
-export type Gender = "MALE" | "FEMALE" | "OTHER";
+export type Gender = "MALE" | "FEMALE" | "OTHERS";
 
 export interface StaffFormData {
   name: string;
@@ -68,6 +68,10 @@ export interface StaffResponse {
   // isActive can appear at top-level on detail endpoint
   isActive?: boolean;
   password?: string;
+  workingHours?: {
+  start?: string;
+  end?: string;
+};
   user: {
     _id?: string;
     id?: string;
@@ -175,30 +179,16 @@ skill: {
       );
     },
   },
-
-  experience: {
-    validate: (value: unknown) => {
-      if (!value || (typeof value === "string" && value.trim() === "")) {
-        return true; // Optional field
-      }
-
-      if (typeof value !== "string") return "Experience must be a string";
-
-      // Pattern validation
-      if (!/^\d+\s*(years?|yrs?|months?|mos?)?$/i.test(value)) {
-        return "Experience must be in format like '3 years', '6 months', or '5'";
-      }
-
-      // Extract numeric value
-      const match = value.match(/(\d+)/);
-      if (!match) return "Invalid experience format";
-
-      const years = parseInt(match[1], 10);
-      if (years > 50) return "Experience cannot exceed 50 years";
-      return true;
-    },
+experience: {
+  required: "Experience is required",
+  validate: (value: unknown) => {
+    const num = Number(value);
+    if (isNaN(num) || num < 0) {
+      return "Experience must be a valid number";
+    }
+    return true;
   },
-
+},
   salary: {
     required: "Salary is required",
     validate: (value: unknown) => {
@@ -234,10 +224,10 @@ skill: {
   gender: {
     required: "Gender is required",
     validate: (value: unknown) => {
-      const validGenders: Gender[] = ["MALE", "FEMALE", "OTHER"];
+      const validGenders: Gender[] = ["MALE", "FEMALE", "OTHERS"];
       return (
         (typeof value === "string" && validGenders.includes(value as Gender)) ||
-        "Gender must be one of: MALE, FEMALE, OTHER"
+        "Gender must be one of: MALE, FEMALE, OTHERS"
       );
     },
   },

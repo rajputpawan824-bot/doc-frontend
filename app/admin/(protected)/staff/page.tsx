@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo, useEffect, ReactNode } from "react";
+import { useDebounce } from "use-debounce";
 import {
   ColumnDef,
   flexRender,
@@ -113,7 +114,7 @@ interface StaffMember {
   experience?: string;
   salary: number;
   shift: "MORNING" | "AFTERNOON" | "EVENING" | "NIGHT" | "ROTATING";
-  gender: "MALE" | "FEMALE" | "OTHER";
+  gender: "MALE" | "FEMALE" | "OTHERS";
   aadhaar: string;
   address: string;
   registrationNo?: string;
@@ -285,7 +286,7 @@ const staffFormSections: FormSection[] = [
         options: [
           { value: "MALE", label: "Male" },
           { value: "FEMALE", label: "Female" },
-          { value: "OTHER", label: "Other" },
+          { value: "OTHERS", label: "Other" },
         ],
         validation: transformValidation(STAFF_VALIDATION_RULES.gender),
       },
@@ -372,8 +373,9 @@ const staffFormSections: FormSection[] = [
       {
         name: "experience",
         label: "Experience",
-        type: "text",
-        placeholder: "3 years or 6 months",
+        type: "number",
+         required: true,
+        placeholder: "Enter years of experience",
         width: "half",
         validation: transformValidation(STAFF_VALIDATION_RULES.experience),
       },
@@ -414,7 +416,7 @@ const staffFormSections: FormSection[] = [
         type: "text",
         placeholder: "NURSING, ICU, LAB, etc.",
         width: "half",
-        validation: transformValidation(STAFF_VALIDATION_RULES.department),
+       // validation: transformValidation(STAFF_VALIDATION_RULES.department),
       },
       {
         name: "registrationNo",
@@ -468,11 +470,19 @@ const staffFormSections: FormSection[] = [
   },
 ];
 
+
 const editStaffFormSections = staffFormSections.map((section) => ({
   ...section,
-  fields: section.fields.filter(
-    (field) => field.name !== "password"
-  ),
+  fields: section.fields
+    .filter((field) => field.name !== "password")
+    .map((field) =>
+      field.name === "salary"
+        ? {
+            ...field,
+            disabled: true,
+          }
+        : field
+    ),
 }));
 
 const passwordFormSections: FormSection[] = [
@@ -515,7 +525,8 @@ const StaffManagement = () => {
 const [passwordModalKey, setPasswordModalKey] = useState(0);
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(10);
-  const [searchQuery, setSearchQuery] = useState("");
+ const [searchQuery, setSearchQuery] = useState("");
+const [debouncedSearch] = useDebounce(searchQuery, 500);
 
   const [filterActive, setFilterActive] = useState<
     "active" | "inactive" | "all"
@@ -535,8 +546,12 @@ const [passwordModalKey, setPasswordModalKey] = useState(0);
     isLoading,
     isFetching,
     refetch,
-  } = useStaff({ status: filterActive, page, limit, search: searchQuery });
-
+  } = useStaff({
+  status: filterActive,
+  page,
+  limit,
+  search: debouncedSearch,
+});
   const {
     data: staffStats,
     isLoading: isStatsLoading,
@@ -549,6 +564,13 @@ const [passwordModalKey, setPasswordModalKey] = useState(0);
     onSuccess: (data) => {
       toast.success("Staff created successfully");
       setModalOpen(false);
+            queryClient.invalidateQueries({
+  queryKey: ["salary-list"],
+});
+
+queryClient.invalidateQueries({
+  queryKey: ["salary-dashboard-stats"],
+});
       queryClient.invalidateQueries({ queryKey: ["staff"] });
       queryClient.invalidateQueries({ queryKey: ["staff", "dashboard-stats"] });
     },
@@ -596,6 +618,7 @@ const [passwordModalKey, setPasswordModalKey] = useState(0);
 
   const enableStaffMutation = useEnableStaff({
     onSuccess: (data) => {
+          console.log("ENABLE SUCCESS");
       toast.success("Staff enabled successfully");
       setDeleteModalOpen(false);
       setStaffToDelete(null);
@@ -1202,13 +1225,21 @@ const detailActions: ActionButton[] =
 
   const handleSave = (data: Record<string, unknown>) => {
     console.log("clicked");
-    if (editingStaff) {
-      // Update staff
-      updateStaffMutation.mutate({
-        id: editingStaff.id,
-        data: data as Partial<StaffFormData>,
-      });
-    } else {
+  if (editingStaff) {
+  const updateData: Partial<StaffFormData> = {
+    ...data,
+
+    workingHours: {
+      start: String(data.workingHourStart || ""),
+      end: String(data.workingHourEnd || ""),
+    },
+  };
+
+  updateStaffMutation.mutate({
+    id: editingStaff.id,
+    data: updateData,
+  });
+} else {
       console.log("new staff clicked");
       // Add new staff
       const formData: StaffFormData = {
@@ -1453,14 +1484,18 @@ workingHourEnd:
               ) : (
                 <>
                   <Users className="h-5 w-5 text-blue-600" />
-                  All Staff ({totalRecords})
+                  All Staff (
+  {filterActive === "all"
+    ? totalRecords
+    : filteredStaff.length}
+)
                 </>
               )}
             </h3>
             <p className="text-sm text-gray-500">
               {viewMode === "other"
                 ? "Nurses, receptionists, technicians, and administrative staff"
-                : "All clinic staff members"}
+                : "clinic staff members"}
             </p>
           </div>
 
@@ -1551,7 +1586,7 @@ initialData={
         }
         description={
           staffToDelete?.user?.isActive || staffToDelete?.isActive
-            ? `Are you sure you want to disable ${staffToDelete?.user?.name || staffToDelete?.name}? They will no longer be able to access the system.`
+            ? `Are you sure you want to disable ${staffToDelete?.user?.name || staffToDelete?.name}?`
             : `Are you sure you want to enable ${staffToDelete?.user?.name || staffToDelete?.name}? They will regain access to the system.`
         }
         confirmLabel={

@@ -13,8 +13,8 @@ export interface ReceptionFormData {
   phone: string;
   experience: number | string;
   salary: number;
-  shift: "MORNING" | "EVENING" | "NIGHT"| "AFTERNOON";
-  gender: "MALE" | "FEMALE" | "OTHER";
+  shift: "MORNING" | "EVENING" | "NIGHT"| "AFTERNOON"|"ROTATIONAL";
+  gender: "MALE" | "FEMALE" | "OTHERS";
   aadhaar: string;
   address: string;
   deskNumber: string;
@@ -38,11 +38,11 @@ export interface ReceptionResponse {
   userId: string;
   experience: string;
   salary: number;
-  shift: "MORNING" | "EVENING" | "NIGHT" | "AFTERNOON";
+  shift: "MORNING" | "EVENING" | "NIGHT" | "AFTERNOON"|"ROTATIONAL";
   name: string;
   phoneNumber: string;
   email: string
-  gender: "MALE" | "FEMALE" | "OTHER";
+  gender: "MALE" | "FEMALE" | "OTHERS";
   aadhaar: string;
   address: string;
   deskNumber: string;
@@ -133,12 +133,10 @@ export const RECEPTION_VALIDATION_RULES: ValidationRules = {
     required: "Salary is required",
     validate: (value: unknown) => {
       const numValue = Number(value);
-      if (isNaN(numValue) || numValue < 10000) {
-        return "Salary must be at least ₹10,000";
+         if (isNaN(numValue) || numValue < 0) {
+        return "Salary must be a positive number";
       }
-      if (numValue > 100000) {
-        return "Salary must be less than ₹1,00,000";
-      }
+
       return true;
     },
   },
@@ -146,14 +144,14 @@ export const RECEPTION_VALIDATION_RULES: ValidationRules = {
     required: "Shift is required",
     validate: (value: unknown) =>
       (typeof value === "string" &&
-        ["MORNING", "EVENING", "NIGHT","AFTERNOON"].includes(value)) ||
+        ["MORNING", "EVENING", "NIGHT","AFTERNOON","ROTATIONAL"].includes(value)) ||
       "Invalid shift selection",
   },
   gender: {
     required: "Gender is required",
     validate: (value: unknown) =>
       (typeof value === "string" &&
-        ["MALE", "FEMALE", "OTHER"].includes(value)) ||
+        ["MALE", "FEMALE", "OTHERS"].includes(value)) ||
       "Invalid gender selection",
   },
   aadhaar: {
@@ -220,8 +218,8 @@ export interface CreateReceptionPayload {
   phone: string;
   experience: number | string;
   salary: number;
-  shift: "MORNING" | "EVENING" | "NIGHT"|"AFTERNOON";
-  gender: "MALE" | "FEMALE" | "OTHER";
+  shift: "MORNING" | "EVENING" | "NIGHT"|"AFTERNOON"|"ROTATIONAL";
+  gender: "MALE" | "FEMALE" | "OTHERS";
   aadhaar: string;
   address: string;
  deskNumber: string;
@@ -245,12 +243,13 @@ export enum Shift {
   EVENING = "EVENING",
   NIGHT = "NIGHT",
   AFTERNOON = "AFTERNOON",
+ ROTATIONAL= "ROTATIONAL"
 }
 
 export enum Gender {
   MALE = "MALE",
   FEMALE = "FEMALE",
-  OTHER = "OTHER",
+  OTHERS = "OTHERS",
 }
 
 // Helper function to convert string to boolean

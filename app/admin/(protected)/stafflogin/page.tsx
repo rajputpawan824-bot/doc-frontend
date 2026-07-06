@@ -137,6 +137,8 @@ const {
   search,
 });
 
+console.log("attendanceList", attendanceList);
+
 const {
   data: employeeSummary,
 } = useEmployeeAttendanceSummary(
@@ -519,11 +521,12 @@ const columns: ColumnDef<AttendanceRecord>[] = [
         <CardContent>
 <DataTable
   columns={columns}
-  data={attendanceList?.data || []}
+    data={attendanceList?.data || []}
   searchColumn="employeeName"
   searchPlaceholder="Search employee..."
   emptyMessage="No attendance records found"
 />
+
         </CardContent>
       </Card>
 

@@ -67,7 +67,7 @@ export default function TokenManagementClient({
   const [selectedDoctorId, setSelectedDoctorId] = useState<string>("");
   const [doctorSearch, setDoctorSearch] = useState("");
   const [modalDoctorSearch, setModalDoctorSearch] = useState("");
-  const today = useMemo(
+const today = useMemo(
   () =>
     new Intl.DateTimeFormat("en-CA", {
       timeZone: "Asia/Kolkata",

@@ -294,6 +294,13 @@ console.log("On Leave Data:", onLeaveData);
     onSuccess: (data) => {
       toast.success("Doctor added successfully");
       setIsAddModalOpen(false);
+      queryClient.invalidateQueries({
+  queryKey: ["salary-list"],
+});
+
+queryClient.invalidateQueries({
+  queryKey: ["salary-dashboard-stats"],
+});
       queryClient.invalidateQueries({ queryKey: ["doctors"] });
       queryClient.invalidateQueries({ queryKey: ["doctors", "dashboard-stats"] });
     },
@@ -721,6 +728,7 @@ onClick: () => {
           name: "name",
           label: "Full Name",
           type: "text",
+            prefix: "Dr.",
           required: true,
           placeholder: "Dr. John Doe",
           width: "full",
@@ -735,7 +743,7 @@ onClick: () => {
           options: [
             { value: "MALE", label: "Male" },
             { value: "FEMALE", label: "Female" },
-            { value: "OTHER", label: "Other" },
+            { value: "OTHERS", label: "Other" },
           ],
           validation: transformValidation(DOCTOR_VALIDATION_RULES.gender),
         },
@@ -844,14 +852,14 @@ onClick: () => {
           name: "consultationFee",
           label: "Consultation Fee (₹)",
           type: "number",
-          required: true,
+          required: false,
           placeholder: "500",
           width: "half",
           min: 0,
           max: 10000,
-          validation: transformValidation(
-            DOCTOR_VALIDATION_RULES.consultationFee,
-          ),
+          // validation: transformValidation(
+          //   DOCTOR_VALIDATION_RULES.consultationFee,
+          // ),
         },
       ],
     },
@@ -881,6 +889,7 @@ onClick: () => {
             { value: "AFTERNOON", label: "Afternoon" },
             { value: "EVENING", label: "Evening" },
             { value: "NIGHT", label: "Night" },
+             { value: "ROTATIONAL", label: "Rotational" },
           ],
           validation: transformValidation(DOCTOR_VALIDATION_RULES.shift),
         },
@@ -909,12 +918,12 @@ onClick: () => {
           name: "availabilityDays",
           label: "Availability Days",
           type: "checkbox-group",
-          required: true,
+          required: false,
           // placeholder: "Monday, Wednesday, Friday",
           width: "full",
-          validation: transformValidation(
-            DOCTOR_VALIDATION_RULES.availabilityDays,
-          ),
+          // validation: transformValidation(
+          //   DOCTOR_VALIDATION_RULES.availabilityDays,
+          // ),
           options: [
             { value: "MONDAY", label: "Monday" },
             { value: "TUESDAY", label: "Tuesday" },
@@ -937,6 +946,7 @@ onClick: () => {
         {
           name: "name",
           label: "Full Name",
+
           type: "text",
           required: true,
           width: "full",
@@ -945,6 +955,7 @@ onClick: () => {
         {
           name: "email",
           label: "Email Address",
+
           type: "email",
           required: true,
           width: "half",
@@ -963,6 +974,7 @@ onClick: () => {
           name: "qualification",
           label: "Qualification",
           type: "text",
+
           required: true,
           width: "half",
           validation: transformValidation(
@@ -973,6 +985,7 @@ onClick: () => {
           name: "registrationNo",
           label: "Registration Number",
           type: "text",
+   
           required: false,
           width: "half",
           validation: transformValidation(
@@ -982,6 +995,7 @@ onClick: () => {
         {
           name: "department",
           label: "Department",
+
           type: "text",
           required: true,
           width: "half",
@@ -990,13 +1004,14 @@ onClick: () => {
         {
           name: "gender",
           label: "Gender",
+
           type: "select",
           required: true,
           width: "half",
           options: [
             { value: "MALE", label: "Male" },
             { value: "FEMALE", label: "Female" },
-            { value: "OTHER", label: "Other" },
+            { value: "OTHERS", label: "Other" },
           ],
           validation: transformValidation(DOCTOR_VALIDATION_RULES.gender),
         },
@@ -1013,6 +1028,7 @@ onClick: () => {
           name: "salary",
           label: "Salary (₹)",
           type: "number",
+            disabled: true,
           required: true,
           width: "half",
           min: 0,
@@ -1023,18 +1039,20 @@ onClick: () => {
           name: "consultationFee",
           label: "Consultation Fee (₹)",
           type: "number",
-          required: true,
+
+          required: false,
           width: "half",
           min: 0,
           max: 10000,
-          validation: transformValidation(
-            DOCTOR_VALIDATION_RULES.consultationFee,
-          ),
+          // validation: transformValidation(
+          //   DOCTOR_VALIDATION_RULES.consultationFee,
+          // ),
         },
 
         {
   name: "joiningDate",
   label: "Joining Date",
+
   type: "date",
   width: "half",
 },
@@ -1049,6 +1067,7 @@ onClick: () => {
             { value: "AFTERNOON", label: "Afternoon" },
             { value: "EVENING", label: "Evening" },
             { value: "NIGHT", label: "Night" },
+                { value: "ROTATIONAL", label: "Rotational" },
           ],
           validation: transformValidation(DOCTOR_VALIDATION_RULES.shift),
         },
@@ -1067,6 +1086,7 @@ onClick: () => {
         {
           name: "aadhaar",
           label: "Aadhaar Number",
+
           type: "text",
           required: true,
           width: "half",
@@ -1075,6 +1095,7 @@ onClick: () => {
         {
           name: "experience",
           label: "Experience",
+
           type: "text",
           required: true,
           width: "half",
@@ -1083,6 +1104,7 @@ onClick: () => {
         {
           name: "address",
           label: "Address",
+          
           type: "textarea",
           required: true,
           width: "full",
@@ -1092,13 +1114,14 @@ onClick: () => {
         {
           name: "availabilityDays",
           label: "Availability Days",
+
           type: "checkbox-group",
-          required: true,
+          required: false,
           width: "full",
          // placeholder: "Monday, Wednesday, Friday",
-          validation: transformValidation(
-            DOCTOR_VALIDATION_RULES.availabilityDays,
-          ),
+          // validation: transformValidation(
+          //   DOCTOR_VALIDATION_RULES.availabilityDays,
+          // ),
           options: [
             { value: "MONDAY", label: "Monday" },
             { value: "TUESDAY", label: "Tuesday" },
@@ -1124,7 +1147,19 @@ onClick: () => {
           type: "password",
           required: true,
           width: "full",
-          validation: transformValidation(DOCTOR_VALIDATION_RULES.password),
+ validation: transformValidation(DOCTOR_VALIDATION_RULES.password),
+        },
+        {
+          name: "confirmPassword",
+          label: "Confirm Password",
+          type: "password",
+          required: true,
+          width: "full",
+          validation: {
+            minLength: 6,
+            custom: (value, formData) =>
+              value === formData.newPassword ? null : "Passwords must match",
+          },
         },
       ],
     },
@@ -1142,9 +1177,12 @@ onClick: () => {
 
 
 
+const cleanName = String(data.name || "")
+  .replace(/^Dr\.?\s*/i, "")
+  .trim();
 
     const formData: DoctorFormData = {
-      name: String(data.name || ""),
+  name: `Dr. ${cleanName}`,
       email: String(data.email || ""),
       phone: String(data.phone || ""),
       qualification: String(data.qualification || ""),
@@ -1247,6 +1285,7 @@ onClick: () => {
         id: selectedDoctor.id,
         data: { newPassword: String(data.newPassword || "") },
       },
+      
       {
         onSuccess: () => {
           toast.success("Password updated successfully");
@@ -1386,6 +1425,7 @@ const handleViewDetails = async (doctorId: string) => {
           AFTERNOON: "bg-orange-100 text-orange-800",
           EVENING: "bg-purple-100 text-purple-800",
           NIGHT: "bg-indigo-100 text-indigo-800",
+          ROTATIONAL:"bg-indigo-100 text-red-800",
         };
         return (
           <Badge
@@ -1923,9 +1963,10 @@ const handleViewDetails = async (doctorId: string) => {
                 aadhaar: selectedDoctor.aadhaar,
                 experience: selectedDoctor.experience,
               
-
 joiningDate: selectedDoctor.joiningDate
-  ? selectedDoctor.joiningDate.split("T")[0]
+  ? new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Asia/Kolkata",
+    }).format(new Date(selectedDoctor.joiningDate))
   : "",
              workingHourStart: selectedDoctor.workingHours?.start,
   workingHourEnd: selectedDoctor.workingHours?.end,

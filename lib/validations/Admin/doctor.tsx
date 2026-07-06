@@ -11,8 +11,8 @@ export interface DoctorFormData {
   qualification: string;
   registrationNo: string;
   salary: number;
-  shift: "MORNING" | "AFTERNOON" | "EVENING" | "NIGHT";
-  gender: "MALE" | "FEMALE" | "OTHER";
+  shift: "MORNING" | "AFTERNOON" | "EVENING" | "NIGHT"|"ROTATIONAL";
+  gender: "MALE" | "FEMALE" | "OTHERS";
   department: string;
   aadhaar: string;
   address: string;
@@ -35,8 +35,8 @@ export interface DoctorResponse {
   registrationNo: string;
 experience: number;
   salary: number;
-  shift: "MORNING" | "AFTERNOON" | "EVENING" | "NIGHT";
-  gender: "MALE" | "FEMALE" | "OTHER";
+  shift: "MORNING" | "AFTERNOON" | "EVENING" | "NIGHT"|"ROTATIONAL";
+  gender: "MALE" | "FEMALE" | "OTHERS";
   department: string;
   aadhaar: string;
   address: string;
@@ -121,9 +121,7 @@ export const DOCTOR_VALIDATION_RULES: ValidationRules = {
       if (isNaN(numValue) || numValue < 0) {
         return "Salary must be a positive number";
       }
-      if (numValue > 1000000) {
-        return "Salary cannot exceed 10,00,000";
-      }
+
       return true;
     },
   },
@@ -131,23 +129,27 @@ export const DOCTOR_VALIDATION_RULES: ValidationRules = {
     required: "Shift is required",
     validate: (value: unknown) =>
       (typeof value === "string" &&
-        ["MORNING", "AFTERNOON", "EVENING", "NIGHT"].includes(value)) ||
-      "Shift must be one of: MORNING, AFTERNOON, EVENING, NIGHT",
+        ["MORNING", "AFTERNOON", "EVENING", "NIGHT","ROTATIONAL"].includes(value)) ||
+      "Shift must be one of: MORNING, AFTERNOON, EVENING, NIGHT,ROTATIONAL"
   },
   gender: {
     required: "Gender is required",
     validate: (value: unknown) =>
       (typeof value === "string" &&
-        ["MALE", "FEMALE", "OTHER"].includes(value)) ||
+        ["MALE", "FEMALE", "OTHERS"].includes(value)) ||
       "Gender must be one of: MALE, FEMALE, OTHER",
   },
-  department: {
-    required: "Department is required",
-    minLength: {
-      value: 2,
-      message: "Department must be at least 2 characters",
-    },
+department: {
+  required: "Department is required",
+  pattern: {
+    value: /^[A-Za-z\s&-]+$/,
+    message: "Department can only contain letters, spaces, '&' and '-'",
   },
+  minLength: {
+    value: 2,
+    message: "Department must be at least 2 characters",
+  },
+},
   aadhaar: {
     required: "Aadhaar number is required",
     pattern: {
@@ -216,8 +218,8 @@ export interface CreateDoctorPayload {
   qualification: string;
   registrationNo: string;
   salary: number;
-  shift: "MORNING" | "AFTERNOON" | "EVENING" | "NIGHT";
-  gender: "MALE" | "FEMALE" | "OTHER";
+  shift: "MORNING" | "AFTERNOON" | "EVENING" | "NIGHT"|"ROTATIONAL";
+  gender: "MALE" | "FEMALE" | "OTHERS";
   department: string;
   aadhaar: string;
   address: string;

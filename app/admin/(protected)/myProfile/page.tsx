@@ -42,37 +42,23 @@ import {
   RefreshCw,
 } from "lucide-react";
 import {
-  useProfileUpdateValidation,
+
   formatDateForDisplay,
   getRoleDisplayName,
   isSubscriptionValid,
   formatSubscriptionDate,
   type ProfileFormData,
-  type ChangePasswordData,
+
   type ProfileResponse,
 } from "@/lib/validations/Admin/profile";
-import { useUpdateProfile, useChangePassword } from "@/services/admin/profile";
+import {   useAdminProfile,
+  useSendPasswordOtp,
+  useChangePassword, } from "@/services/admin/profile";
 import { clientApi } from "@/lib/api";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { ApiResponse } from "@/lib/api";
 
-// Mock data - In real app, this would come from API
-const mockProfileData: ProfileResponse = {
-  id: "b5275da9-bbbb-4d65-9ec4-7668721d9be6",
-  name: "Dr. Clinic Owner",
-  email: "clinicowner11@yopmail.com",
-  phone: "9876543210",
-  role: "ADMIN",
-  isActive: true,
-  lastLogin: "2025-12-20T20:29:31.481Z",
-  createdAt: "2025-12-20T19:59:27.230Z",
-  clinic: {
-    id: "476b94af-f76b-4223-9144-b7e86af1913c",
-    clinicName: "Healthy Life Clinic",
-    location: "Delhi, India",
-    subsValidity: "2026-01-20T19:59:27.227Z",
-  },
-};
+
 
 // Password reset steps enum
 enum PasswordResetStep {
@@ -90,9 +76,17 @@ export default function ProfilePage() {
   const [passwordResetStep, setPasswordResetStep] = useState<PasswordResetStep>(
     PasswordResetStep.INITIAL,
   );
-  const [resetToken, setResetToken] = useState<string>("");
+const [verifiedOtp, setVerifiedOtp] =
+  useState("");
+
   const [otpSent, setOtpSent] = useState(false);
   const [otpTimer, setOtpTimer] = useState(0);
+
+  const sendOtpMutation =
+  useSendPasswordOtp();
+
+const changePasswordMutation =
+  useChangePassword();
 
   // Profile form
   const {
@@ -101,12 +95,29 @@ export default function ProfilePage() {
     formState: { errors: profileErrors },
     reset: resetProfile,
   } = useForm<ProfileFormData>({
-    defaultValues: {
-      name: mockProfileData.name,
-      email: mockProfileData.email,
-      phone: mockProfileData.phone,
-    },
+defaultValues: {
+  name: "",
+  email: "",
+  phone: "",
+}
   });
+  const {
+  data: profileData,
+  isLoading: isProfileLoading,
+} = useAdminProfile();
+
+const profile = profileData ?? null;
+
+
+  useEffect(() => {
+  if (profile) {
+    resetProfile({
+      name: profile.name || "",
+      email: profile.email || "",
+      phone: profile.phone || "",
+    });
+  }
+}, [profile, resetProfile]);
 
   // OTP form
   const {
@@ -125,107 +136,54 @@ export default function ProfilePage() {
     watch,
   } = useForm<{ newPassword: string; confirmPassword: string }>();
 
-  const {
-    data: doctors = [],
-    isLoading: isLoadingDoctors,
-    error: fetchError,
-  } = useQuery({
-    queryKey: ["doctors"],
-    queryFn: async () => {
-      try {
-        const response =
-          await clientApi.get<ApiResponse<ProfileResponse[]>>("/admin/me");
-        return response?.data?.data || [];
-      } catch (error) {
-        console.error("Error fetching doctors:", error);
-        toast.error("Failed to load doctors");
-        throw error;
-      }
-    },
-    staleTime: 5 * 60 * 1000,
-  });
 
-  // Validation hooks
-  const { validate: validateProfileForm, errors: validationErrors } =
-    useProfileUpdateValidation();
+  // // Send OTP mutation
+  // const sendOtpMutation = useMutation({
+  //   mutationFn: async () => {
+  //     const response = await clientApi.post("/auth/send-otp", {
+  //       identifier:profile?.email,
+  //     });
+  //     return response.data;
+  //   },
+  //   onSuccess: () => {
+  //     toast.success(`OTP sent to ${profile?.email}`);
+  //     setOtpSent(true);
+  //     setOtpTimer(180); // 3 minutes timer
+  //     setPasswordResetStep(PasswordResetStep.VERIFY_OTP);
+  //   },
+  //   onError: (error: { response?: { data?: { message?: string } } }) => {
+  //     toast.error(error.response?.data?.message || "Failed to send OTP");
+  //     setIsLoading(false);
+  //   },
+  // });
 
-  // API mutations
-  const updateProfileMutation = useUpdateProfile({
-    onSuccess: (data: ProfileResponse) => {
-      toast.success("Profile updated successfully");
-      setIsLoading(false);
-    },
-    onError: (error: Error) => {
-      toast.error(error.message || "Failed to update profile");
-      setIsLoading(false);
-    },
-  });
 
-  // Send OTP mutation
-  const sendOtpMutation = useMutation({
-    mutationFn: async () => {
-      const response = await clientApi.post("/auth/send-otp", {
-        identifier: mockProfileData.email,
-      });
-      return response.data;
-    },
-    onSuccess: () => {
-      toast.success(`OTP sent to ${mockProfileData.email}`);
-      setOtpSent(true);
-      setOtpTimer(180); // 3 minutes timer
-      setPasswordResetStep(PasswordResetStep.VERIFY_OTP);
-    },
-    onError: (error: { response?: { data?: { message?: string } } }) => {
-      toast.error(error.response?.data?.message || "Failed to send OTP");
-      setIsLoading(false);
-    },
-  });
 
-  // Verify OTP mutation
-  const verifyOtpMutation = useMutation({
-    mutationFn: async (otp: string) => {
-      const response = await clientApi.post("/auth/verify-otp", {
-        identifier: mockProfileData.email,
-        otp,
-      });
-      return response.data;
-    },
-    onSuccess: (data) => {
-      toast.success("OTP verified successfully");
-      setResetToken(data.data.resetToken);
-      setPasswordResetStep(PasswordResetStep.RESET_PASSWORD);
-    },
-    onError: (error: { response?: { data?: { message?: string } } }) => {
-      toast.error(error.response?.data?.message || "Invalid OTP");
-      setIsLoading(false);
-    },
-  });
-
-  // Reset password mutation
-  const resetPasswordMutation = useMutation({
-    mutationFn: async (newPassword: string) => {
-      const response = await clientApi.post("/auth/reset-password", {
-        resetToken,
-        newPassword,
-      });
-      return response.data;
-    },
-    onSuccess: () => {
-      toast.success(
-        "Password reset successful. Please login with new password.",
-      );
-      setPasswordResetStep(PasswordResetStep.INITIAL);
-      resetOtp();
-      resetResetPassword();
-      setIsLoading(false);
-      // Optionally, log the user out after password reset
-      handleLogout();
-    },
-    onError: (error: { response?: { data?: { message?: string } } }) => {
-      toast.error(error.response?.data?.message || "Failed to reset password");
-      setIsLoading(false);
-    },
-  });
+  // // Reset password mutation
+  // const resetPasswordMutation = useMutation({
+  //   mutationFn: async (newPassword: string) => {
+  //     const response = await clientApi.post("/auth/reset-password", {
+  //       resetToken,
+  //       newPassword,
+  //     });
+  //     return response.data;
+  //   },
+  //   onSuccess: () => {
+  //     toast.success(
+  //       "Password reset successful. Please login with new password.",
+  //     );
+  //     setPasswordResetStep(PasswordResetStep.INITIAL);
+  //     resetOtp();
+  //     resetResetPassword();
+  //     setIsLoading(false);
+  //     // Optionally, log the user out after password reset
+  //     handleLogout();
+  //   },
+  //   onError: (error: { response?: { data?: { message?: string } } }) => {
+  //     toast.error(error.response?.data?.message || "Failed to reset password");
+  //     setIsLoading(false);
+  //   },
+  // });
 
   // OTP timer effect
   useEffect(() => {
@@ -240,46 +198,104 @@ export default function ProfilePage() {
     };
   }, [otpTimer, otpSent]);
 
-  const onProfileSubmit = async (data: ProfileFormData) => {
+const onProfileSubmit = async () => {
+  toast.info("Profile update not implemented yet");
+};
+const handleStartPasswordReset = async () => {
+  setIsLoading(true);
+
+  try {
+    const response =
+      await sendOtpMutation.mutateAsync();
+
+    toast.success(
+      `OTP: ${response.otp}`
+    );
+
+    setOtpSent(true);
+    setOtpTimer(600);
+
+    setPasswordResetStep(
+      PasswordResetStep.VERIFY_OTP
+    );
+  } catch (error) {
+    toast.error(
+      error instanceof Error
+        ? error.message
+        : "Failed to send OTP"
+    );
+  } finally {
+    setIsLoading(false);
+  }
+};
+
+ const onOtpSubmit = async (
+  data: { otp: string }
+) => {
+  setVerifiedOtp(data.otp);
+
+  setPasswordResetStep(
+    PasswordResetStep.RESET_PASSWORD
+  );
+};
+
+const onResetPasswordSubmit = async (data: {
+  newPassword: string;
+  confirmPassword: string;
+}) => {
+  if (data.newPassword !== data.confirmPassword) {
+    toast.error("Passwords do not match");
+    return;
+  }
+
+  try {
     setIsLoading(true);
 
-    await updateProfileMutation.mutateAsync(data);
-  };
+    await changePasswordMutation.mutateAsync({
+      otp: verifiedOtp,
+      newPassword: data.newPassword,
+    });
 
-  const handleStartPasswordReset = () => {
-    setPasswordResetStep(PasswordResetStep.SEND_OTP);
+    toast.success("Password changed successfully");
+
+    handleCancelPasswordReset();
+
+    // Optional: force logout after password change
+    // handleLogout();
+
+  } catch (error) {
+    toast.error(
+      error instanceof Error
+        ? error.message
+        : "Failed to change password"
+    );
+  } finally {
+    setIsLoading(false);
+  }
+};
+
+const handleResendOtp = async () => {
+  try {
     setIsLoading(true);
-    sendOtpMutation.mutate();
-  };
 
-  const onOtpSubmit = async (data: { otp: string }) => {
-    setIsLoading(true);
-    await verifyOtpMutation.mutateAsync(data.otp);
-  };
+    const response =
+      await sendOtpMutation.mutateAsync();
 
-  const onResetPasswordSubmit = async (data: {
-    newPassword: string;
-    confirmPassword: string;
-  }) => {
-    if (data.newPassword !== data.confirmPassword) {
-      toast.error("Passwords do not match");
-      return;
-    }
+    toast.success(
+      `OTP: ${response.otp}`
+    );
 
-    setIsLoading(true);
-    await resetPasswordMutation.mutateAsync(data.newPassword);
-  };
-
-  const handleResendOtp = () => {
-    setIsLoading(true);
-    sendOtpMutation.mutate();
-  };
+    setOtpTimer(600);
+  } finally {
+    setIsLoading(false);
+  }
+};
 
   const handleCancelPasswordReset = () => {
     setPasswordResetStep(PasswordResetStep.INITIAL);
     resetOtp();
     resetResetPassword();
-    setResetToken("");
+   // setResetToken("");
     setOtpSent(false);
     setOtpTimer(0);
   };
@@ -291,9 +307,9 @@ export default function ProfilePage() {
 
   const handleResetProfile = () => {
     resetProfile({
-      name: mockProfileData.name,
-      email: mockProfileData.email,
-      phone: mockProfileData.phone,
+      name:profile?.name,
+      email:profile?.email,
+      phone:profile?.phone,
     });
   };
 
@@ -304,6 +320,9 @@ export default function ProfilePage() {
       .toString()
       .padStart(2, "0")}`;
   };
+  if (isProfileLoading) {
+  return <ProfileLoading />;
+}
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100 p-4 md:p-6">
@@ -334,10 +353,10 @@ export default function ProfilePage() {
                   <div className="relative">
                     <div className="w-32 h-32 rounded-full bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center">
                       <span className="text-4xl font-bold text-white">
-                        {mockProfileData.name.charAt(0)}
+                        {profile?.name?.charAt(0) || "A"}
                       </span>
                     </div>
-                    {mockProfileData.isActive && (
+                    {profile?.isActive && (
                       <div className="absolute bottom-2 right-2 w-6 h-6 bg-green-500 rounded-full border-2 border-white flex items-center justify-center">
                         <CheckCircle className="h-3 w-3 text-white" />
                       </div>
@@ -345,18 +364,18 @@ export default function ProfilePage() {
                   </div>
                   <div>
                     <h3 className="text-xl font-semibold">
-                      {mockProfileData.name}
+                   {profile?.name || "N/A"}
                     </h3>
                     <Badge
                       variant={
-                        mockProfileData.role === "ADMIN"
+                       profile?.role === "ADMIN"
                           ? "default"
                           : "secondary"
                       }
                       className="mt-1"
                     >
                       <Shield className="h-3 w-3 mr-1" />
-                      {getRoleDisplayName(mockProfileData.role)}
+                   {getRoleDisplayName(profile?.role || "ADMIN")}
                     </Badge>
                   </div>
                 </div>
@@ -371,7 +390,7 @@ export default function ProfilePage() {
                     </div>
                     <div className="flex-1">
                       <p className="text-sm text-gray-500">Email</p>
-                      <p className="font-medium">{mockProfileData.email}</p>
+                      <p className="font-medium">{profile?.email || "N/A"}</p>
                     </div>
                   </div>
 
@@ -381,7 +400,7 @@ export default function ProfilePage() {
                     </div>
                     <div className="flex-1">
                       <p className="text-sm text-gray-500">Phone</p>
-                      <p className="font-medium">{mockProfileData.phone}</p>
+                      <p className="font-medium">{profile?.phone || "N/A"}</p>
                     </div>
                   </div>
 
@@ -392,7 +411,7 @@ export default function ProfilePage() {
                     <div className="flex-1">
                       <p className="text-sm text-gray-500">Clinic</p>
                       <p className="font-medium">
-                        {mockProfileData.clinic.clinicName}
+                      {profile?.clinic?.clinicName || "N/A"}
                       </p>
                     </div>
                   </div>
@@ -404,7 +423,7 @@ export default function ProfilePage() {
                     <div className="flex-1">
                       <p className="text-sm text-gray-500">Location</p>
                       <p className="font-medium">
-                        {mockProfileData.clinic.location}
+                       {profile?.clinic?.location || "N/A"}
                       </p>
                     </div>
                   </div>
@@ -416,7 +435,9 @@ export default function ProfilePage() {
                     <div className="flex-1">
                       <p className="text-sm text-gray-500">Last Login</p>
                       <p className="font-medium">
-                        {formatDateForDisplay(mockProfileData.lastLogin)}
+                        {profile?.lastLogin
+  ? formatDateForDisplay(profile.lastLogin)
+  : "N/A"}
                       </p>
                     </div>
                   </div>
@@ -431,28 +452,31 @@ export default function ProfilePage() {
                       Subscription Status
                     </span>
                     <Badge
-                      variant={
-                        isSubscriptionValid(mockProfileData.clinic.subsValidity)
-                          ? "default"
-                          : "destructive"
-                      }
+                variant={
+  profile?.clinic?.subsValidity &&
+  isSubscriptionValid(profile.clinic.subsValidity)
+    ? "default"
+    : "destructive"
+}
                     >
-                      {isSubscriptionValid(
-                        mockProfileData.clinic.subsValidity,
-                      ) ? (
+                      {profile?.clinic?.subsValidity
+  ? isSubscriptionValid(profile.clinic.subsValidity)
+  : false ? (
                         <CheckCircle className="h-3 w-3 mr-1" />
                       ) : (
                         <XCircle className="h-3 w-3 mr-1" />
                       )}
-                      {isSubscriptionValid(mockProfileData.clinic.subsValidity)
+                      {profile?.clinic?.subsValidity
+  ? isSubscriptionValid(profile.clinic.subsValidity)
+  : false
                         ? "Active"
                         : "Expired"}
                     </Badge>
                   </div>
                   <p className="text-sm text-gray-600">
-                    {formatSubscriptionDate(
-                      mockProfileData.clinic.subsValidity,
-                    )}
+                    {profile?.clinic?.subsValidity
+  ? formatSubscriptionDate(profile.clinic.subsValidity)
+  : "N/A"}
                   </p>
                 </div>
               </CardContent>
@@ -467,21 +491,23 @@ export default function ProfilePage() {
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-gray-600">Member Since</span>
                   <span className="font-medium">
-                    {new Date(mockProfileData.createdAt).toLocaleDateString()}
+                    {profile?.createdAt
+  ? new Date(profile.createdAt).toLocaleDateString()
+  : "N/A"}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-gray-600">Account Status</span>
                   <Badge
-                    variant={mockProfileData.isActive ? "default" : "secondary"}
+                    variant={profile?.isActive ? "default" : "secondary"}
                   >
-                    {mockProfileData.isActive ? "Active" : "Inactive"}
+                    {profile?.isActive ? "Active" : "Inactive"}
                   </Badge>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-gray-600">Role Level</span>
                   <Badge variant="outline">
-                    {mockProfileData.role === "ADMIN"
+                    {profile?.role === "ADMIN"
                       ? "Full Access"
                       : "Limited Access"}
                   </Badge>
@@ -669,7 +695,7 @@ export default function ProfilePage() {
                             <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border">
                               <MailIcon className="h-4 w-4 text-gray-500" />
                               <span className="font-medium">
-                                {mockProfileData.email}
+                               {profile?.email || "N/A"}
                               </span>
                             </div>
                             <p className="text-xs text-gray-500">
@@ -702,7 +728,7 @@ export default function ProfilePage() {
                                   <p className="text-sm text-blue-600">
                                     Enter the 6-digit OTP sent to{" "}
                                     <span className="font-semibold">
-                                      {mockProfileData.email}
+                                      {profile?.email || "N/A"}
                                     </span>
                                   </p>
                                 </div>
@@ -961,18 +987,22 @@ export default function ProfilePage() {
                       <li className="flex justify-between">
                         <span>Account Created</span>
                         <span className="font-medium">
-                          {new Date(
-                            mockProfileData.createdAt,
-                          ).toLocaleDateString()}
+                          {profile?.createdAt
+  ? new Date(profile.createdAt).toLocaleDateString()
+  : "N/A"}
                         </span>
                       </li>
                       <li className="flex justify-between">
                         <span>Last Updated</span>
-                        <span className="font-medium">Today</span>
+                       <span className="font-medium">
+  {profile?.updatedAt
+    ? new Date(profile.updatedAt).toLocaleDateString()
+    : "N/A"}
+</span>
                       </li>
                       <li className="flex justify-between">
                         <span>Login Count (This Month)</span>
-                        <span className="font-medium">24</span>
+                        <span className="font-medium">  {profile?.loginCount ?? 0}</span>
                       </li>
                     </ul>
                   </div>
@@ -994,9 +1024,13 @@ export default function ProfilePage() {
                       </li>
                       <li className="flex items-center justify-between">
                         <span>Password Last Changed</span>
-                        <span className="font-medium">15 days ago</span>
+                        <span className="font-medium"> {profile?.passwordChangedAt
+    ? formatDateForDisplay(
+        profile.passwordChangedAt
+      )
+    : "N/A"}</span>
                       </li>
-                      <li className="flex items-center justify-between">
+                      {/* <li className="flex items-center justify-between">
                         <span>Security Questions</span>
                         <Badge
                           variant="outline"
@@ -1004,7 +1038,7 @@ export default function ProfilePage() {
                         >
                           Set
                         </Badge>
-                      </li>
+                      </li> */}
                     </ul>
                   </div>
                 </div>

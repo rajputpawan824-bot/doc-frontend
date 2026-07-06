@@ -1,44 +1,47 @@
-// app/patients/page.tsx
 "use client";
 
-import { useState, useEffect } from "react";
-
-import { toast } from "sonner";
-import { Toaster } from "@/components/ui/sonner";
-import { usePatients, useUpdatePatient } from "@/services/admin/patient";
-
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import * as z from "zod";
+import { KeyboardEvent, ReactNode, useEffect, useMemo, useState } from "react";
+import {
+  Calendar,
+  ChevronLeft,
+  ChevronRight,
+  Droplets,
+  Eye,
+  FileText,
+  HeartPulse,
+  Mail,
+  MoreVertical,
+  Phone,
+  Search,
+  Settings2,
+  Stethoscope,
+  User,
+  Users,
+} from "lucide-react";
 import {
   ColumnDef,
+  ColumnFiltersState,
+  VisibilityState,
   flexRender,
   getCoreRowModel,
-  useReactTable,
+  getFilteredRowModel,
   getPaginationRowModel,
   getSortedRowModel,
   SortingState,
-  getFilteredRowModel,
-  ColumnFiltersState,
-  VisibilityState,
+  useReactTable,
 } from "@tanstack/react-table";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
+import { Toaster } from "@/components/ui/sonner";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -48,354 +51,93 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-  FormDescription,
-} from "@/components/ui/form";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Label } from "@/components/ui/label"; // Add this import
-
+import type { Patient } from "@/app/admin/(protected)/patient/page";
+import { usePatientById, usePatients } from "@/services/admin/patient";
 import {
-  Plus,
-  Search,
-  ChevronLeft,
-  ChevronRight,
-  Settings2,
-  Users,
-  Download,
-  Filter,
-  User,
-  Phone,
-  Mail,
-  MapPin,
-  Calendar,
-  Heart,
-  AlertCircle,
-  Briefcase,
-  Stethoscope,
-  Lock,
-  Save,
-  Eye,
-  Edit,
-  Trash2,
-  MoreVertical,
-  X,
-  Upload,
-  FileText,
-  Sparkles,
-} from "lucide-react";
+  usePatientAppointments,
+  type PatientAppointment,
+} from "@/services/admin/appointment";
+import {
+  useCreatePrescription,
+  usePrescriptionHistory,
+} from "@/services/admin/prescription";
 
-// ==================== TYPES & SCHEMAS ====================
-export interface Patient {
-  id: string;
-  name: string;
-  phoneNumber: string;
-  email?: string;
+type DoctorPatient = Patient & {
+  appointmentId?: string;
+  appointment?: {
+    _id?: string;
+    id?: string;
+    appointmentId?: string;
+    date?: string;
+    doctorName?: string;
+    doctor?: {
+      doctorName?: string;
+      user?: {
+        name?: string;
+      };
+    };
+  };
+};
 
-  gender?: "MALE" | "FEMALE" | "OTHER";
-  age?: number;
-  address?: string;
+type PrescriptionHistoryItem = {
+  _id?: string;
+  id?: string;
+  appointmentId?: string;
+  tokenNumber?: string | number;
+  prescription?: string | string[];
+  medicalNotes?: string | string[];
+  followUpDate?: string | Date | null;
+  createdAt?: string | Date;
+  updatedAt?: string | Date;
+  appointment?: {
+    _id?: string;
+    id?: string;
+    appointmentId?: string;
+    date?: string | Date;
+    tokenNumber?: string | number;
+    doctorName?: string;
+    doctor?: {
+      doctorName?: string;
+      user?: {
+        name?: string;
+      };
+    };
+  };
+  doctorName?: string;
+  doctor?: {
+    doctorName?: string;
+    user?: {
+      name?: string;
+    };
+  };
+};
 
-  emergencyContactName?: string;
-  emergencyContactPhone?: string;
-  emergencyContactRelationship?: string;
+type AppointmentOption = PatientAppointment & {
+  tokenNumber?: string | number;
+  token?: {
+    tokenNumber?: string | number;
+  };
+};
 
-  adhar?: string;
-
-  medicalHistory?: string;
-  allergies?: string[];
-
-  bloodGroup?:
-    | "A+"
-    | "A-"
-    | "B+"
-    | "B-"
-    | "AB+"
-    | "AB-"
-    | "O+"
-    | "O-";
-
-  occupation?: string;
-
-  adher?: "excellent" | "good" | "fair" | "poor";
-
-  createdAt?: Date;
-  updatedAt?: Date;
-
-  updatedBy?: string;
-  status?: "ACTIVE" | "INACTIVE";
-patientCode?: string;
-relation?: string;
-otherRelation?: string;
-diseases?: string[];
-medicalReports?: any[];
-dateOfBirth?: Date;
-}
-
-const patientFormSchema = z.object({
-  name: z.string().min(2, "Name must be at least 2 characters").max(100),
-  phoneNumber: z.string().min(10, "Please enter a valid phone number").max(15),
-  email: z
-    .string()
-    .email("Please enter a valid email")
-    .optional()
-    .or(z.literal("")),
-gender: z.enum([
-  "MALE",
-  "FEMALE",
-  "OTHER",
-]),
-  age: z.coerce
-    .number()
-    .min(0, "Age must be positive")
-    .max(120, "Please enter a valid age"),
-  address: z.string().min(5, "Please enter a complete address").max(500),
-  emergencyContactName: z.string().min(2, "Emergency contact name is required"),
-  emergencyContactPhone: z
-    .string()
-    .min(10, "Please enter a valid phone number"),
-  emergencyContactRelationship: z.string().min(1, "Relationship is required"),
-  adhar: z.string().min(12, "Adhar must be 12 digits").max(12),
-  adher: z.enum(["excellent", "good", "fair", "poor"]).optional(),
-  medicalHistory: z.string().optional(),
-  allergies: z.array(z.string()).default([]),
-  bloodGroup: z
-    .enum(["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"])
-    .optional(),
-  occupation: z.string().optional(),
-  generatePassword: z.boolean().default(true),
-  customPassword: z
-    .string()
-    .min(8, "Password must be at least 8 characters")
-    .optional(),
-});
-
-type PatientFormValues = z.input<typeof patientFormSchema>;
-
-// ==================== TABLE COLUMNS ====================
-const columns: ColumnDef<Patient>[] = [
-  {
-    id: "select",
-    header: ({ table }) => (
-      <Checkbox
-        checked={
-          table.getIsAllPageRowsSelected() ||
-          (table.getIsSomePageRowsSelected() && "indeterminate")
-        }
-        onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
-        aria-label="Select all"
-      />
-    ),
-    cell: ({ row }) => (
-      <Checkbox
-        checked={row.getIsSelected()}
-        onCheckedChange={(value) => row.toggleSelected(!!value)}
-        aria-label="Select row"
-      />
-    ),
-    enableSorting: false,
-    enableHiding: false,
-  },
-  {
-    accessorKey: "name",
-    header: "Patient Name",
-    cell: ({ row }) => {
-      const patient = row.original;
-      return (
-        <div className="flex items-center gap-3">
-          <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center">
-            <User className="h-5 w-5 text-blue-600" />
-          </div>
-          <div>
-            <p className="font-medium">{patient.name}</p>
-            <p className="text-sm text-gray-500">ID: {patient.id}</p>
-          </div>
-        </div>
-      );
-    },
-  },
-  {
-    accessorKey: "contact",
-    header: "Contact Information",
-    cell: ({ row }) => {
-      const patient = row.original;
-      return (
-        <div className="space-y-1">
-          <div className="flex items-center gap-2">
-            <Phone className="h-3 w-3 text-gray-500" />
-            <span className="text-sm">{patient.phoneNumber}</span>
-          </div>
-          {patient.email && (
-            <div className="flex items-center gap-2">
-              <Mail className="h-3 w-3 text-gray-500" />
-              <span className="text-sm text-gray-600">{patient.email}</span>
-            </div>
-          )}
-        </div>
-      );
-    },
-  },
-  {
-    accessorKey: "age",
-    header: "Age / Gender",
-    cell: ({ row }) => {
-      const patient = row.original;
-      return (
-        <div className="space-y-1">
-          <div className="flex items-center gap-2">
-            <span className="font-medium">{patient.age ?? "-"} years</span>
-          </div>
-          <Badge variant="outline" className="capitalize">
-            {patient.gender}
-          </Badge>
-        </div>
-      );
-    },
-  },
-  {
-    accessorKey: "emergencyContact",
-    header: "Emergency Contact",
-    cell: ({ row }) => {
-      const patient = row.original;
-      return (
-        <div className="space-y-1">
-          <p className="text-sm font-medium">{patient.emergencyContactName}</p>
-          <div className="flex items-center gap-2">
-            <Phone className="h-3 w-3 text-gray-500" />
-            <span className="text-sm">{patient.emergencyContactPhone}</span>
-          </div>
-          <Badge variant="secondary" className="text-xs capitalize">
-            {patient.emergencyContactRelationship}
-          </Badge>
-        </div>
-      );
-    },
-  },
-  {
-    accessorKey: "medicalInfo",
-    header: "Medical Information",
-    cell: ({ row }) => {
-      const patient = row.original;
-      return (
-        <div className="space-y-1">
-          {patient.bloodGroup && (
-            <Badge variant="destructive" className="text-xs">
-              Blood: {patient.bloodGroup}
-            </Badge>
-          )}
-          {((patient.allergies  ?? []).length > 0 && (
-            <div className="flex flex-wrap gap-1 mt-1">
-              {(patient.allergies ?? []).map((allergy, index) => (
-                <Badge key={index} variant="outline" className="text-xs">
-                  {allergy}
-                </Badge>
-              ))}
-              {(patient.allergies ?? []).length > 2 && (
-                <Badge variant="outline" className="text-xs">
-                  +{(patient.allergies ?? []).length - 2} more
-                </Badge>
-              )}
-            </div>
-          ))}
-        </div>
-      );
-    },
-  },
-  {
-    accessorKey: "adhar",
-    header: "Adhar Number",
-    cell: ({ row }) => <span className="font-mono text-sm">{row.original.adhar}</span>,
-  },
-  {
-    accessorKey: "lastUpdated",
-    header: "Last Updated",
-    cell: ({ row }) => {
-      const patient = row.original;
-      return (
-        <div className="space-y-1">
-          <div className="flex items-center gap-2">
-            <Calendar className="h-3 w-3 text-gray-500" />
-            <span className="text-sm">
-              {patient.updatedAt?.toLocaleDateString() ?? "-"}
-            </span>
-          </div>
-          <p className="text-xs text-gray-500">By: {patient.updatedBy}</p>
-        </div>
-      );
-    },
-  },
-  {
-    id: "actions",
-    cell: ({ row }) => {
-      const patient = row.original;
-
-      return (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className="h-8 w-8 p-0">
-              <span className="sr-only">Open menu</span>
-              <MoreVertical className="h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-48">
-            <DropdownMenuLabel>Actions</DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem className="flex items-center gap-2 cursor-pointer">
-              <Eye className="h-4 w-4" />
-              View Details
-            </DropdownMenuItem>
-            <DropdownMenuItem className="flex items-center gap-2 cursor-pointer">
-              <Edit className="h-4 w-4" />
-              Edit Patient
-            </DropdownMenuItem>
-            <DropdownMenuItem className="flex items-center gap-2 cursor-pointer">
-              <Stethoscope className="h-4 w-4" />
-              Medical Notes
-            </DropdownMenuItem>
-            <DropdownMenuItem className="flex items-center gap-2 cursor-pointer">
-              <FileText className="h-4 w-4" />
-              Add Prescription
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem className="text-red-600 flex items-center gap-2 cursor-pointer">
-              <Trash2 className="h-4 w-4" />
-              Delete Patient
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      );
-    },
-    enableSorting: false,
-    enableHiding: false,
-  },
-];
-
-// ==================== REUSABLE DATA TABLE ====================
 interface DataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[];
   data: TData[];
   searchColumn?: string;
   searchPlaceholder?: string;
-  emptyMessage?: React.ReactNode;
-  onAddNew?: () => void;
-  addButtonText?: string;
+  emptyMessage?: ReactNode;
 }
 
 function DataTable<TData, TValue>({
@@ -404,8 +146,6 @@ function DataTable<TData, TValue>({
   searchColumn = "name",
   searchPlaceholder = "Search...",
   emptyMessage = "No results found.",
-  onAddNew,
-  addButtonText = "Add New",
 }: DataTableProps<TData, TValue>) {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
@@ -440,12 +180,11 @@ function DataTable<TData, TValue>({
 
   return (
     <div className="space-y-4">
-      {/* Search and Controls */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-        <div className="flex items-center space-x-4 flex-1 w-full">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex w-full flex-1 items-center gap-4">
           {searchColumnObj && (
-            <div className="relative flex-1 max-w-sm">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <div className="relative w-full max-w-sm flex-1">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
               <Input
                 placeholder={searchPlaceholder}
                 value={
@@ -485,17 +224,9 @@ function DataTable<TData, TValue>({
                 ))}
             </DropdownMenuContent>
           </DropdownMenu>
-
-          {onAddNew && (
-            <Button onClick={onAddNew} className="gap-2">
-              <Plus className="h-4 w-4" />
-              {addButtonText}
-            </Button>
-          )}
         </div>
       </div>
 
-      {/* Table */}
       <div className="rounded-md border">
         <Table>
           <TableHeader>
@@ -507,7 +238,7 @@ function DataTable<TData, TValue>({
                       ? null
                       : flexRender(
                           header.column.columnDef.header,
-                          header.getContext()
+                          header.getContext(),
                         )}
                   </TableHead>
                 ))}
@@ -525,7 +256,7 @@ function DataTable<TData, TValue>({
                     <TableCell key={cell.id}>
                       {flexRender(
                         cell.column.columnDef.cell,
-                        cell.getContext()
+                        cell.getContext(),
                       )}
                     </TableCell>
                   ))}
@@ -545,13 +276,7 @@ function DataTable<TData, TValue>({
         </Table>
       </div>
 
-      {/* Pagination and Info */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-        <div className="text-sm text-muted-foreground">
-          {table.getFilteredSelectedRowModel().rows.length} of{" "}
-          {table.getFilteredRowModel().rows.length} row(s) selected.
-        </div>
-
+      <div className="flex flex-col items-center justify-end gap-4 sm:flex-row">
         <div className="flex items-center space-x-2">
           <Button
             variant="outline"
@@ -582,7 +307,7 @@ function DataTable<TData, TValue>({
           <select
             className="h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
             value={table.getState().pagination.pageSize}
-            onChange={(e) => table.setPageSize(Number(e.target.value))}
+            onChange={(event) => table.setPageSize(Number(event.target.value))}
           >
             {[5, 10, 20, 30, 40, 50].map((pageSize) => (
               <option key={pageSize} value={pageSize}>
@@ -596,817 +321,1011 @@ function DataTable<TData, TValue>({
   );
 }
 
-// ==================== PATIENT FORM ====================
-interface PatientFormProps {
-  patient?: Patient;
-  onSave: (data: PatientFormValues) => Promise<void>;
-  onCancel: () => void;
-  mode: "add" | "edit";
-}
+const formatList = (value?: string[] | string | null) => {
+  if (Array.isArray(value)) return value.filter(Boolean).join(", ");
+  return value || "";
+};
 
-function PatientForm({ patient, onSave, onCancel, mode }: PatientFormProps) {
-  const [allergies, setAllergies] = useState<string[]>(
-    patient?.allergies || []
-  );
-  const [newAllergy, setNewAllergy] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
+const formatDate = (value?: string | Date | null) => {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleDateString("en-IN", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+};
 
-// Replace the useForm line with this:
-const form = useForm<PatientFormValues>({
-  resolver: zodResolver(patientFormSchema) as any,
-  defaultValues: patient
-    ? {
-        name: patient.name,
-        phoneNumber: patient.phoneNumber,
-        email: patient.email || "",
-        gender: patient.gender,
-        age: patient.age,
-        address: patient.address,
-        emergencyContactName: patient.emergencyContactName,
-        emergencyContactPhone: patient.emergencyContactPhone,
-        emergencyContactRelationship: patient.emergencyContactRelationship,
-        adhar: patient.adhar || "",
-        // adher: patient.adher,
-        medicalHistory: patient.medicalHistory || "",
-        allergies: patient.allergies || [],
-        bloodGroup: patient.bloodGroup,
-        occupation: patient.occupation || "",
-        generatePassword: false,
-        customPassword: "",
-      }
-    : {
-        name: "",
-        phoneNumber: "",
-        email: "",
-        gender: "MALE",
-        age: 0,
-        address: "",
-        emergencyContactName: "",
-        emergencyContactPhone: "",
-        emergencyContactRelationship: "",
-        adhar: "",
-        adher: "good",
-        medicalHistory: "",
-        allergies: [],
-        bloodGroup: undefined,
-        occupation: "",
-        generatePassword: true,
-        customPassword: "",
-      },
+const getTimeValue = (value?: string | Date | null) => {
+  if (!value) return 0;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? 0 : date.getTime();
+};
+
+const getIsActive = (patient?: Patient | null) =>
+  patient?.user?.isActive ?? patient?.status !== "INACTIVE";
+
+const getEmergencyContact = (patient?: Patient | null) => {
+  const contact = patient?.emergencyContact;
+  if (contact && typeof contact === "object") {
+    return {
+      name: contact.name,
+      phone: contact.phone,
+      relation: contact.relation,
+    };
+  }
+
+  return {
+    name: undefined,
+    phone: undefined,
+    relation: typeof contact === "string" ? contact : undefined,
+  };
+};
+
+const getAppointmentId = (appointment?: AppointmentOption | null) =>
+  appointment?._id || appointment?.id || appointment?.appointmentId || "";
+
+const getAppointmentDate = (appointment?: AppointmentOption | null) =>
+  appointment?.date || "";
+
+const getAppointmentToken = (
+  appointment?: AppointmentOption | PrescriptionHistoryItem | null,
+) => {
+  if (!appointment) return "";
+  if ("token" in appointment && appointment.token?.tokenNumber) {
+    return String(appointment.token.tokenNumber);
+  }
+  if (appointment.tokenNumber) return String(appointment.tokenNumber);
+  if ("appointment" in appointment && appointment.appointment?.tokenNumber) {
+    return String(appointment.appointment.tokenNumber);
+  }
+  return "";
+};
+
+const getAppointmentStatus = (appointment?: AppointmentOption | null) =>
+  String(appointment?.status || "").toUpperCase();
+
+const isCancelledAppointment = (appointment: AppointmentOption) =>
+  getAppointmentStatus(appointment) === "CANCELLED";
+
+const isPastAppointment = (appointment: AppointmentOption) => {
+  const dateValue = getAppointmentDate(appointment);
+  if (!dateValue) return false;
+  const appointmentDate = new Date(dateValue);
+  if (Number.isNaN(appointmentDate.getTime())) return false;
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  appointmentDate.setHours(0, 0, 0, 0);
+  return appointmentDate < today;
+};
+
+const isUpcomingAppointment = (appointment: AppointmentOption) =>
+  !isCancelledAppointment(appointment) && !isPastAppointment(appointment);
+
+const getPatientAppointmentStats = (appointments: AppointmentOption[]) => ({
+  total: appointments.length,
+  upcoming: appointments.filter(isUpcomingAppointment).length,
+  past: appointments.filter(
+    (appointment) =>
+      !isCancelledAppointment(appointment) && isPastAppointment(appointment),
+  ).length,
+  cancelled: appointments.filter(isCancelledAppointment).length,
 });
 
-  const generatePassword = () => {
-    const chars =
-      "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*";
-    return Array.from({ length: 12 }, () =>
-      chars.charAt(Math.floor(Math.random() * chars.length))
-    ).join("");
-  };
+const getHistoryItems = (value: unknown): PrescriptionHistoryItem[] => {
+  if (Array.isArray(value)) return value as PrescriptionHistoryItem[];
+  if (value && typeof value === "object") {
+    const body = value as {
+      data?: unknown;
+      history?: PrescriptionHistoryItem[];
+      prescriptions?: PrescriptionHistoryItem[];
+      result?: PrescriptionHistoryItem[];
+    };
 
-  const addAllergy = () => {
-    if (newAllergy.trim() && !allergies.includes(newAllergy.trim())) {
-      const updatedAllergies = [...allergies, newAllergy.trim()];
-      setAllergies(updatedAllergies);
-      form.setValue("allergies", updatedAllergies);
-      setNewAllergy("");
-    }
-  };
+    if (Array.isArray(body.history)) return body.history;
+    if (Array.isArray(body.prescriptions)) return body.prescriptions;
+    if (Array.isArray(body.result)) return body.result;
+    return getHistoryItems(body.data);
+  }
 
-  const removeAllergy = (allergyToRemove: string) => {
-    const updatedAllergies = allergies.filter(
-      (allergy) => allergy !== allergyToRemove
-    );
-    setAllergies(updatedAllergies);
-    form.setValue("allergies", updatedAllergies);
-  };
+  return [];
+};
 
-  const onSubmit = async (data: PatientFormValues) => {
-    setIsSubmitting(true);
-    try {
-      // Generate password if needed
-      const finalData = {
-        ...data,
-        password: data.generatePassword
-          ? generatePassword()
-          : data.customPassword || "",
-      };
-      await onSave(finalData);
-    } catch (error) {
-      console.error("Failed to save patient:", error);
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
+const getHistoryDate = (item: PrescriptionHistoryItem) =>
+  item.appointment?.date || item.createdAt || item.updatedAt || null;
 
-  const generatePasswordField = form.watch("generatePassword");
+const getHistoryDoctorName = (item: PrescriptionHistoryItem) =>
+  item.doctorName ||
+  item.doctor?.doctorName ||
+  item.doctor?.user?.name ||
+  item.appointment?.doctorName ||
+  item.appointment?.doctor?.doctorName ||
+  item.appointment?.doctor?.user?.name ||
+  "";
+
+const getHistoryToken = (item: PrescriptionHistoryItem) =>
+  getAppointmentToken(item);
+
+const splitNumberedText = (value?: string | string[]) => {
+  if (Array.isArray(value)) return value.filter(Boolean);
+  if (!value) return [];
+
+  return value
+    .split(/\n|,(?=\s*\D)/)
+    .map((item) => item.replace(/^\s*\d+[\).]\s*/, "").trim())
+    .filter(Boolean);
+};
+
+const DetailItem = ({ label, value }: { label: string; value?: ReactNode }) => {
+  if (value === undefined || value === null || value === "") return null;
 
   return (
-    <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-        <Card>
-          <CardContent className="pt-6 space-y-6">
-            {/* Section 1: Basic Information */}
-            <div className="space-y-4">
-              <h3 className="text-lg font-semibold flex items-center gap-2">
-                <User className="h-5 w-5" />
-                Basic Information
-              </h3>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="name"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="flex items-center gap-2">
-                        <User className="h-4 w-4" />
-                        Patient Name *
-                      </FormLabel>
-                      <FormControl>
-                        <Input placeholder="John Doe" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="age"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="flex items-center gap-2">
-                        <Calendar className="h-4 w-4" />
-                        Age *
-                      </FormLabel>
-                      <FormControl>
-                       <Input
-  type="number"
-  placeholder="30"
- value={typeof field.value === "number" ? field.value : ""}
-  onChange={(e) => field.onChange(Number(e.target.value))}
-/>
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="gender"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Gender *</FormLabel>
-                      <Select
-                        onValueChange={field.onChange}
-                        defaultValue={field.value}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select gender" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                        <SelectItem value="MALE">Male</SelectItem>
-<SelectItem value="FEMALE">Female</SelectItem>
-<SelectItem value="OTHER">Other</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="occupation"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="flex items-center gap-2">
-                        <Briefcase className="h-4 w-4" />
-                        Occupation
-                      </FormLabel>
-                      <FormControl>
-                        <Input
-                          placeholder="e.g., Software Engineer"
-                          {...field}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="adhar"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="flex items-center gap-2">
-                        <FileText className="h-4 w-4" />
-                        Adhar Number *
-                      </FormLabel>
-                      <FormControl>
-                        <Input placeholder="1234 5678 9012" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-            </div>
-
-            {/* Section 2: Contact Information */}
-            <div className="space-y-4">
-              <h3 className="text-lg font-semibold flex items-center gap-2">
-                <Phone className="h-5 w-5" />
-                Contact Information
-              </h3>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="phoneNumber"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="flex items-center gap-2">
-                        <Phone className="h-4 w-4" />
-                        Phone Number *
-                      </FormLabel>
-                      <FormControl>
-                        <Input placeholder="+1 (555) 123-4567" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="email"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="flex items-center gap-2">
-                        <Mail className="h-4 w-4" />
-                        Email (Optional)
-                      </FormLabel>
-                      <FormControl>
-                        <Input
-                          placeholder="john@example.com"
-                          type="email"
-                          {...field}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-
-              <FormField
-                control={form.control}
-                name="address"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="flex items-center gap-2">
-                      <MapPin className="h-4 w-4" />
-                      Address *
-                    </FormLabel>
-                    <FormControl>
-                      <Textarea
-                        placeholder="Full address including street, city, state, and zip code"
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-
-            {/* Section 3: Emergency Contact */}
-            <div className="space-y-4">
-              <h3 className="text-lg font-semibold flex items-center gap-2">
-                <AlertCircle className="h-5 w-5" />
-                Emergency Contact
-              </h3>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <FormField
-                  control={form.control}
-                  name="emergencyContactName"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Name *</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Jane Doe" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="emergencyContactRelationship"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Relationship *</FormLabel>
-                      <Select
-                        onValueChange={field.onChange}
-                        defaultValue={field.value}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select relationship" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="spouse">Spouse</SelectItem>
-                          <SelectItem value="parent">Parent</SelectItem>
-                          <SelectItem value="child">Child</SelectItem>
-                          <SelectItem value="sibling">Sibling</SelectItem>
-                          <SelectItem value="friend">Friend</SelectItem>
-                          <SelectItem value="other">Other</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="emergencyContactPhone"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Phone Number *</FormLabel>
-                      <FormControl>
-                        <Input placeholder="+1 (555) 987-6543" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-            </div>
-
-            {/* Section 4: Medical Information */}
-            <div className="space-y-4">
-              <h3 className="text-lg font-semibold flex items-center gap-2">
-                <Stethoscope className="h-5 w-5" />
-                Medical Information
-              </h3>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="bloodGroup"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="flex items-center gap-2">
-                        <Heart className="h-4 w-4" />
-                        Blood Group
-                      </FormLabel>
-                      <Select
-                        onValueChange={field.onChange}
-                        value={field.value}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select blood group" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="A+">A+</SelectItem>
-                          <SelectItem value="A-">A-</SelectItem>
-                          <SelectItem value="B+">B+</SelectItem>
-                          <SelectItem value="B-">B-</SelectItem>
-                          <SelectItem value="AB+">AB+</SelectItem>
-                          <SelectItem value="AB-">AB-</SelectItem>
-                          <SelectItem value="O+">O+</SelectItem>
-                          <SelectItem value="O-">O-</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="adher"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Adherence / Compliance</FormLabel>
-                      <Select
-                        onValueChange={field.onChange}
-                        value={field.value}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select adherence level" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="excellent">Excellent</SelectItem>
-                          <SelectItem value="good">Good</SelectItem>
-                          <SelectItem value="fair">Fair</SelectItem>
-                          <SelectItem value="poor">Poor</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-
-              {/* Allergies */}
-              <div className="space-y-2">
-                <Label>Allergies</Label>
-                <div className="flex gap-2">
-                  <Input
-                    placeholder="Add allergy (e.g., Penicillin)"
-                    value={newAllergy}
-                    onChange={(e) => setNewAllergy(e.target.value)}
-                    onKeyPress={(e) =>
-                      e.key === "Enter" && (e.preventDefault(), addAllergy())
-                    }
-                  />
-                  <Button type="button" variant="outline" onClick={addAllergy}>
-                    Add
-                  </Button>
-                </div>
-                <div className="flex flex-wrap gap-2 mt-2">
-                  {allergies.map((allergy) => (
-                    <Badge key={allergy} variant="secondary" className="gap-1">
-                      {allergy}
-                      <button
-                        type="button"
-                        onClick={() => removeAllergy(allergy)}
-                        className="ml-1 hover:text-red-500"
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    </Badge>
-                  ))}
-                </div>
-              </div>
-
-              <FormField
-                control={form.control}
-                name="medicalHistory"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Medical History</FormLabel>
-                    <FormControl>
-                      <Textarea
-                        placeholder="Any previous medical conditions, surgeries, or relevant history"
-                        {...field}
-                        rows={3}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-
-            {/* Section 5: Patient Portal Access (Only for new patients) */}
-            {mode === "add" && (
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold flex items-center gap-2">
-                  <Lock className="h-5 w-5" />
-                  Patient Portal Access
-                </h3>
-
-                <FormField
-                  control={form.control}
-                  name="generatePassword"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
-                      <div className="space-y-0.5">
-                        <FormLabel className="text-base">
-                          Auto-generate Password
-                        </FormLabel>
-                        <FormDescription>
-                          A secure password will be generated and sent to the
-                          patient&apos;s email
-                        </FormDescription>
-                      </div>
-                      <FormControl>
-                        <Switch
-                          checked={field.value}
-                          onCheckedChange={field.onChange}
-                        />
-                      </FormControl>
-                    </FormItem>
-                  )}
-                />
-
-                {!generatePasswordField && (
-                  <FormField
-                    control={form.control}
-                    name="customPassword"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="flex items-center gap-2">
-                          <Lock className="h-4 w-4" />
-                          Set Custom Password
-                        </FormLabel>
-                        <FormControl>
-                          <Input
-                            type="password"
-                            placeholder="Enter custom password"
-                            {...field}
-                          />
-                        </FormControl>
-                        <FormDescription>
-                          Minimum 8 characters with letters and numbers
-                        </FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                )}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Action Buttons */}
-        <div className="flex justify-end gap-4">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={onCancel}
-            disabled={isSubmitting}
-          >
-            Cancel
-          </Button>
-          <Button type="submit" disabled={isSubmitting} className="gap-2">
-            <Save className="h-4 w-4" />
-            {isSubmitting
-              ? "Saving..."
-              : mode === "add"
-              ? "Add Patient"
-              : "Update Patient"}
-          </Button>
-        </div>
-      </form>
-    </Form>
+    <div className="space-y-1">
+      <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+        {label}
+      </p>
+      <div className="break-words text-sm font-medium text-slate-900">
+        {value}
+      </div>
+    </div>
   );
-}
+};
 
-// ==================== MAIN PAGE COMPONENT ====================
+const DetailSection = ({
+  title,
+  children,
+}: {
+  title: string;
+  children: ReactNode;
+}) => (
+  <section className="space-y-3">
+    <h3 className="text-sm font-semibold text-slate-700">{title}</h3>
+    <div className="grid grid-cols-1 gap-5 rounded-lg border bg-white p-4 md:grid-cols-2">
+      {children}
+    </div>
+  </section>
+);
+
+const NumberedList = ({
+  items,
+  emptyText,
+}: {
+  items: string[];
+  emptyText: string;
+}) => {
+  if (!items.length) {
+    return <p className="text-sm text-slate-500">{emptyText}</p>;
+  }
+
+  return (
+    <ol className="list-decimal space-y-1 pl-5 text-sm text-slate-700">
+      {items.map((item, index) => (
+        <li key={`${item}-${index}`}>{item}</li>
+      ))}
+    </ol>
+  );
+};
 
 export default function PatientsPage() {
-  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
-  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-  const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
+  const [selectedPatient, setSelectedPatient] = useState<DoctorPatient | null>(
+    null,
+  );
+  const [viewPatientOpen, setViewPatientOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [prescriptionDialogOpen, setPrescriptionDialogOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("all");
+  const [page] = useState(1);
+  const [limit] = useState(10);
+  const [search] = useState("");
 
-  const [page, setPage] = useState(1);
-  const [limit, setLimit] = useState(10);
-  const [search, setSearch] = useState("");
+  const [prescription, setPrescription] = useState("");
+  const [medicalNotes, setMedicalNotes] = useState("");
+  const [followUpDate, setFollowUpDate] = useState("");
+  const [followUpRequired, setFollowUpRequired] = useState(false);
+  const [selectedAppointmentId, setSelectedAppointmentId] = useState("");
 
+  const queryClient = useQueryClient();
   const { data, isLoading, error } = usePatients({ page, limit, search });
-const patients: any[] = data?.data ?? [];
-  const pagination = data?.pagination;
+  const patients: DoctorPatient[] = (data?.data ?? []) as DoctorPatient[];
 
-  const updatePatientMutation = useUpdatePatient();
+  const {
+    data: patientDetails,
+    isLoading: patientDetailsLoading,
+  } = usePatientById(viewPatientOpen ? selectedPatient?.id : undefined);
+
+  const {
+    data: prescriptionHistory,
+    isLoading: historyLoading,
+  } = usePrescriptionHistory(historyOpen ? selectedPatient?.id : undefined);
+
+  const {
+    data: patientAppointments = [],
+    isLoading: appointmentsLoading,
+  } = usePatientAppointments(
+    selectedPatient?.id && (prescriptionDialogOpen || viewPatientOpen)
+      ? selectedPatient.id
+      : undefined,
+  );
+
+  const createPrescriptionMutation = useCreatePrescription();
 
   useEffect(() => {
-    if (!error) return;
-    toast.error("Failed to load patients");
+    if (error) toast.error("Failed to load patients");
   }, [error]);
 
-  // Doctor cannot create patients (permission)
-  const handleAddPatient = async (_formData: PatientFormValues) => {
-    toast.error("You are not allowed to add patients");
+  const sortedHistory = useMemo(
+    () =>
+      [...getHistoryItems(prescriptionHistory)].sort(
+        (a, b) => getTimeValue(getHistoryDate(b)) - getTimeValue(getHistoryDate(a)),
+      ),
+    [prescriptionHistory],
+  );
+
+  const appointmentOptions = patientAppointments as AppointmentOption[];
+  const selectedAppointment = appointmentOptions.find(
+    (appointment) => getAppointmentId(appointment) === selectedAppointmentId,
+  );
+  const appointmentStats = getPatientAppointmentStats(appointmentOptions);
+
+  const openPrescriptionDialog = (patient: DoctorPatient) => {
+    setSelectedPatient(patient);
+
+    setPrescription("");
+    setMedicalNotes("");
+    setFollowUpDate("");
+    setFollowUpRequired(false);
+    setSelectedAppointmentId("");
+    setPrescriptionDialogOpen(true);
   };
 
-  const handleEditPatient = async (formData: PatientFormValues) => {
-    if (!selectedPatient) return;
+  const ensureNumberedText = (value: string) => {
+    if (!value) return "";
+    if (/^\d+\.\s/.test(value)) return value;
+    return `1. ${value}`;
+  };
 
-    updatePatientMutation.mutate(
+  const handleNumberedFocus = (
+    value: string,
+    setter: (value: string) => void,
+  ) => {
+    if (!value) setter("1. ");
+  };
+
+  const handleNumberedChange = (
+    value: string,
+    setter: (value: string) => void,
+  ) => {
+    setter(ensureNumberedText(value));
+  };
+
+  const handleNumberedKeyDown = (
+    event: KeyboardEvent<HTMLTextAreaElement>,
+    value: string,
+    setter: (value: string) => void,
+  ) => {
+    if (event.key !== "Enter") return;
+
+    event.preventDefault();
+    const nextNumber = value.split("\n").length + 1;
+    setter(`${value}\n${nextNumber}. `);
+  };
+
+  const handleSavePrescription = () => {
+    if (!selectedPatient?.id) {
+      toast.error("Patient not found");
+      return;
+    }
+
+    if (!selectedAppointmentId) {
+      toast.error("Please select an appointment");
+      return;
+    }
+
+    if (!prescription.trim() && !medicalNotes.trim()) {
+      toast.error("Add prescription or medical notes before saving");
+      return;
+    }
+
+    createPrescriptionMutation.mutate(
       {
-        id: selectedPatient.id,
-       data: {
-    ...formData,
-    age: Number(formData.age),
-  },
+        appointmentId: selectedAppointmentId,
+       
+        data: {
+          prescription: prescription.trim(),
+          medicalNotes: medicalNotes.trim(),
+          followUpDate: followUpDate || null,
+          isFollowUpRequired: followUpRequired,
+        },
       },
       {
         onSuccess: () => {
-          toast.success("Patient updated successfully!");
-          setIsEditDialogOpen(false);
-          setSelectedPatient(null);
+          toast.success("Prescription saved");
+          setPrescriptionDialogOpen(false);
+          setPrescription("");
+          setMedicalNotes("");
+          setFollowUpDate("");
+          setFollowUpRequired(false);
+          setSelectedAppointmentId("");
+          void queryClient.invalidateQueries({
+            queryKey: ["prescription-history", selectedPatient.id],
+          });
         },
-        onError: (err) => {
-          toast.error(err?.message || "Failed to update patient");
+        onError: (mutationError: Error) => {
+          toast.error(mutationError.message || "Failed to save prescription");
         },
-      }
+      },
     );
   };
 
-  const handleDeletePatient = async (_patientId: string) => {
-    toast.error("Deleting patients is not supported");
-  };
+  const columns: ColumnDef<DoctorPatient>[] = [
+    {
+      accessorKey: "name",
+      header: "Patient Name",
+      cell: ({ row }) => {
+        const patient = row.original;
+        return (
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100">
+              <User className="h-5 w-5 text-blue-600" />
+            </div>
+            <div>
+              <p className="font-medium">{patient.name}</p>
+              <p className="text-sm text-gray-500">
+                Code: {patient.patientCode || patient.id}
+              </p>
+            </div>
+          </div>
+        );
+      },
+    },
+    {
+      accessorKey: "contact",
+      header: "Contact Information",
+      cell: ({ row }) => {
+        const patient = row.original;
+        return (
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <Phone className="h-3 w-3 text-gray-500" />
+              <span className="text-sm">{patient.phoneNumber}</span>
+            </div>
+            {patient.email && (
+              <div className="flex items-center gap-2">
+                <Mail className="h-3 w-3 text-gray-500" />
+                <span className="text-sm text-gray-600">{patient.email}</span>
+              </div>
+            )}
+          </div>
+        );
+      },
+    },
+    {
+      accessorKey: "age",
+      header: "Age / Gender",
+      cell: ({ row }) => {
+        const patient = row.original;
+        return (
+          <div className="space-y-1">
+            <span className="font-medium">
+              {patient.age !== undefined ? `${patient.age} years` : "-"}
+            </span>
+            <Badge variant="outline" className="capitalize">
+              {patient.gender}
+            </Badge>
+          </div>
+        );
+      },
+    },
+    {
+      accessorKey: "emergencyContact",
+      header: "Emergency Contact",
+      cell: ({ row }) => {
+        const contact = getEmergencyContact(row.original);
+        return (
+          <div className="space-y-1">
+            <p className="text-sm font-medium">{contact.name || "-"}</p>
+            {contact.phone && (
+              <div className="flex items-center gap-2">
+                <Phone className="h-3 w-3 text-gray-500" />
+                <span className="text-sm">{contact.phone}</span>
+              </div>
+            )}
+            {contact.relation && (
+              <Badge variant="secondary" className="text-xs capitalize">
+                {contact.relation}
+              </Badge>
+            )}
+          </div>
+        );
+      },
+    },
+    {
+      accessorKey: "medicalInfo",
+      header: "Medical Information",
+      cell: ({ row }) => {
+        const patient = row.original;
+        const allergies = Array.isArray(patient.allergies)
+          ? patient.allergies
+          : splitNumberedText(patient.allergies);
 
-  const filteredPatients = patients.filter((patient) => {
-    if (activeTab === "all") return true;
-    if (activeTab === "recent") {
-      const oneMonthAgo = new Date();
-      oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
-      return patient.updatedAt >= oneMonthAgo;
-    }
-    if (activeTab === "highRisk") {
-      return (
-        // patient.adher === "poor" ||
-        (patient.allergies ?? []).length > 3 ||
-     (patient.age ?? 0) > 60   
-      );
-    }
-    return true;
-  });
+        return (
+          <div className="space-y-1">
+            {patient.bloodGroup && (
+              <Badge variant="destructive" className="text-xs">
+                Blood: {patient.bloodGroup}
+              </Badge>
+            )}
+            {allergies.length > 0 && (
+              <div className="mt-1 flex flex-wrap gap-1">
+                {allergies.slice(0, 2).map((allergy, index) => (
+                  <Badge key={`${allergy}-${index}`} variant="outline" className="text-xs">
+                    {allergy}
+                  </Badge>
+                ))}
+                {allergies.length > 2 && (
+                  <Badge variant="outline" className="text-xs">
+                    +{allergies.length - 2} more
+                  </Badge>
+                )}
+              </div>
+            )}
+          </div>
+        );
+      },
+    },
+    {
+      accessorKey: "adhar",
+      header: "Adhar Number",
+      cell: ({ row }) => (
+        <span className="font-mono text-sm">{row.original.adhar}</span>
+      ),
+    },
+    {
+      accessorKey: "lastUpdated",
+      header: "Last Updated",
+      cell: ({ row }) => (
+        <div className="space-y-1">
+          <div className="flex items-center gap-2">
+            <Calendar className="h-3 w-3 text-gray-500" />
+            <span className="text-sm">{formatDate(row.original.updatedAt) || "-"}</span>
+          </div>
+        </div>
+      ),
+    },
+    {
+      id: "actions",
+      enableHiding: false,
+      header: "",
+      cell: ({ row }) => {
+        const patient = row.original;
+
+        return (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" className="h-8 w-8 p-0">
+                <MoreVertical className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+
+            <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuLabel>Patient Actions</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+
+              <DropdownMenuItem
+                onClick={() => {
+                  setSelectedPatient(patient);
+                  setViewPatientOpen(true);
+                }}
+              >
+                <Eye className="mr-2 h-4 w-4" />
+                View Patient
+              </DropdownMenuItem>
+
+              <DropdownMenuItem
+                onClick={() => {
+                  setSelectedPatient(patient);
+                  setHistoryOpen(true);
+                }}
+              >
+                <FileText className="mr-2 h-4 w-4" />
+                Prescription History
+              </DropdownMenuItem>
+
+              <DropdownMenuItem onClick={() => openPrescriptionDialog(patient)}>
+                <Stethoscope className="mr-2 h-4 w-4" />
+                Create Prescription
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        );
+      },
+    },
+  ];
+
+  const filteredPatients = patients;
+  const patientForDetails = patientDetails;
 
   return (
     <>
       <Toaster />
-      <div className="container mx-auto p-4 space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div className="flex items-center gap-3">
-          <div className="p-2 bg-blue-100 rounded-lg">
-            <Users className="h-6 w-6 text-blue-600" />
-          </div>
-          <div>
-            <h1 className="text-3xl font-bold">Patient Management</h1>
-            <p className="text-gray-600">
-              Manage {patients.length} patient records
-            </p>
+      <div className="container mx-auto space-y-6 p-4">
+        <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
+          <div className="flex items-center gap-3">
+            <div className="rounded-lg bg-blue-100 p-2">
+              <Users className="h-6 w-6 text-blue-600" />
+            </div>
+            <div>
+              <h1 className="text-3xl font-bold">Patient Management</h1>
+              <p className="text-gray-600">
+                Manage {patients.length} patient records
+              </p>
+            </div>
           </div>
         </div>
 
-       
-      </div>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-500">Total Patients</p>
+                  <p className="text-2xl font-bold">{patients.length}</p>
+                </div>
+                <Users className="h-8 w-8 text-blue-500" />
+              </div>
+            </CardContent>
+          </Card>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-500">New This Month</p>
+                  <p className="text-2xl font-bold">
+                    {
+                      patients.filter((patient) => {
+                        const now = new Date();
+                        const firstDayOfMonth = new Date(
+                          now.getFullYear(),
+                          now.getMonth(),
+                          1,
+                        );
+                        return (
+                          patient.createdAt &&
+                          new Date(patient.createdAt) >= firstDayOfMonth
+                        );
+                      }).length
+                    }
+                  </p>
+                </div>
+                <HeartPulse className="h-8 w-8 text-emerald-500" />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-500">Avg. Age</p>
+                  <p className="text-2xl font-bold">
+                    {patients.length > 0
+                      ? Math.round(
+                          patients.reduce(
+                            (total, patient) => total + (patient.age ?? 0),
+                            0,
+                          ) / patients.length,
+                        )
+                      : 0}{" "}
+                    yrs
+                  </p>
+                </div>
+                <Calendar className="h-8 w-8 text-violet-500" />
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
         <Card>
           <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-500">Total Patients</p>
-                <p className="text-2xl font-bold">{patients.length}</p>
-              </div>
-              <Users className="h-8 w-8 text-blue-500" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-500">New This Month</p>
-                <p className="text-2xl font-bold">
-                  {
-                    patients.filter((p) => {
-                      const now = new Date();
-                      const lastMonth = new Date(
-                        now.getFullYear(),
-                        now.getMonth() - 1,
-                        1
-                      );
-                      return p.createdAt >= lastMonth;
-                    }).length
-                  }
-                </p>
-              </div>
-              <div className="p-2 bg-green-100 rounded-full">
-                <Sparkles className="h-5 w-5 text-green-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              {/* <div>
-                <p className="text-sm text-gray-500">High Risk</p>
-                <p className="text-2xl font-bold">
-                  {patients.filter((p) => p.adher === "poor").length}
-                </p>
-              </div> */}
-              <div className="p-2 bg-red-100 rounded-full">
-                <AlertCircle className="h-5 w-5 text-red-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-500">Avg. Age</p>
-                <p className="text-2xl font-bold">
-                  {patients.length > 0
-                    ? Math.round(
-                        patients.reduce((acc, p) => acc + (p.age ?? 0), 0) /
-                          patients.length
-                      )
-                    : 0}{" "}
-                  yrs
-                </p>
-              </div>
-              <Calendar className="h-8 w-8 text-purple-500" />
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Tabs and Table */}
-      <Card>
-        <CardContent className="pt-6">
-          <Tabs
-            value={activeTab}
-            onValueChange={setActiveTab}
-            className="space-y-4"
-          >
-            <div className="flex justify-between items-center">
+            <Tabs
+              value={activeTab}
+              onValueChange={setActiveTab}
+              className="space-y-4"
+            >
               <TabsList>
                 <TabsTrigger value="all">All Patients</TabsTrigger>
-                <TabsTrigger value="recent">Recent</TabsTrigger>
-                <TabsTrigger value="highRisk">High Risk</TabsTrigger>
               </TabsList>
 
+              <TabsContent value={activeTab} className="space-y-4">
+                {isLoading ? (
+                  <div className="py-8 text-center">
+                    <div className="mx-auto h-12 w-12 animate-spin rounded-full border-b-2 border-blue-600" />
+                    <p className="mt-4 text-gray-600">Loading patients...</p>
+                  </div>
+                ) : (
+                  <DataTable<DoctorPatient, unknown>
+                    columns={columns}
+                    data={filteredPatients}
+                    searchColumn="name"
+                    searchPlaceholder="Search patients by name, phone, or ID..."
+                    emptyMessage={
+                      <div className="py-8 text-center">
+                        <Users className="mx-auto mb-4 h-12 w-12 text-gray-300" />
+                        <h3 className="mb-2 text-lg font-semibold">
+                          No patients found
+                        </h3>
+                        <p className="text-gray-500">
+                          No patients match the current filter
+                        </p>
+                      </div>
+                    }
+                  />
+                )}
+              </TabsContent>
+            </Tabs>
+          </CardContent>
+        </Card>
 
-            </div>
+        <Dialog open={viewPatientOpen} onOpenChange={setViewPatientOpen}>
+          <DialogContent className="max-h-[90vh] max-w-5xl overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Patient Details</DialogTitle>
+            </DialogHeader>
 
-            <TabsContent value={activeTab} className="space-y-4">
-              {isLoading ? (
-                <div className="text-center py-8">
-                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-                  <p className="mt-4 text-gray-600">Loading patients...</p>
+            {patientDetailsLoading ? (
+              <div className="flex h-40 items-center justify-center">
+                <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-blue-600" />
+              </div>
+            ) : patientForDetails ? (
+              <div className="space-y-6">
+                <div className="flex flex-col gap-3 rounded-lg border bg-white p-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="text-sm text-slate-500">Patient Code</p>
+                    <p className="text-lg font-semibold text-blue-700">
+                      {patientForDetails.patientCode || patientForDetails.id}
+                    </p>
+                  </div>
+                  <Badge
+                    className={
+                      getIsActive(patientForDetails)
+                        ? "bg-green-100 text-green-800"
+                        : "bg-gray-100 text-gray-800"
+                    }
+                  >
+                    {getIsActive(patientForDetails) ? "ACTIVE" : "INACTIVE"}
+                  </Badge>
+                </div>
+
+                <DetailSection title="Patient Information">
+                  <DetailItem
+                    label="Patient Code"
+                    value={patientForDetails.patientCode || patientForDetails.id}
+                  />
+                  <DetailItem label="Name" value={patientForDetails.name} />
+                  <DetailItem
+                    label="Age"
+                    value={
+                      patientForDetails.age !== undefined
+                        ? `${patientForDetails.age} years`
+                        : ""
+                    }
+                  />
+                  <DetailItem label="Gender" value={patientForDetails.gender} />
+                  <DetailItem label="Blood Group" value={patientForDetails.bloodGroup} />
+                </DetailSection>
+
+                <DetailSection title="Contact Information">
+                  <DetailItem label="Phone" value={patientForDetails.phoneNumber} />
+                  <DetailItem label="Email" value={patientForDetails.email} />
+                  <DetailItem label="Address" value={patientForDetails.address} />
+                </DetailSection>
+
+                <DetailSection title="Medical Information">
+                  <DetailItem
+                    label="Diseases"
+                    value={formatList(patientForDetails.diseases)}
+                  />
+                  <DetailItem
+                    label="Allergies"
+                    value={formatList(patientForDetails.allergies)}
+                  />
+                  <DetailItem
+                    label="Medical History"
+                    value={patientForDetails.medicalHistory}
+                  />
+                </DetailSection>
+
+                <DetailSection title="Appointment Summary">
+                  {appointmentsLoading ? (
+                    <DetailItem label="Appointments" value="Loading..." />
+                  ) : (
+                    <>
+                      <DetailItem label="Total Appointments" value={appointmentStats.total} />
+                      <DetailItem label="Upcoming" value={appointmentStats.upcoming} />
+                      <DetailItem label="Past" value={appointmentStats.past} />
+                      <DetailItem label="Cancelled" value={appointmentStats.cancelled} />
+                    </>
+                  )}
+                </DetailSection>
+              </div>
+            ) : (
+              <p className="text-sm text-slate-500">
+                Patient details could not be loaded.
+              </p>
+            )}
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={historyOpen} onOpenChange={setHistoryOpen}>
+          <DialogContent className="max-h-[90vh] max-w-6xl overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Prescription History</DialogTitle>
+            </DialogHeader>
+
+            <div className="space-y-6">
+              <div className="rounded-lg border bg-slate-50 p-4">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="text-lg font-semibold text-slate-900">
+                      {selectedPatient?.name}
+                    </p>
+                    <p className="text-sm text-slate-500">
+                      {selectedPatient?.patientCode || selectedPatient?.id}
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {selectedPatient?.bloodGroup && (
+                      <Badge variant="destructive" className="gap-1">
+                        <Droplets className="h-3 w-3" />
+                        {selectedPatient.bloodGroup}
+                      </Badge>
+                    )}
+                    {selectedPatient?.gender && (
+                      <Badge variant="outline">{selectedPatient.gender}</Badge>
+                    )}
+                    {selectedPatient?.age !== undefined && (
+                      <Badge variant="secondary">{selectedPatient.age} yrs</Badge>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {historyLoading ? (
+                <div className="flex h-40 items-center justify-center">
+                  <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-blue-600" />
+                </div>
+              ) : sortedHistory.length ? (
+                <div className="relative space-y-5 before:absolute before:left-4 before:top-2 before:h-full before:w-px before:bg-slate-200">
+                  {sortedHistory.map((item, index) => {
+                    const prescriptionItems = splitNumberedText(item.prescription);
+                    const notesItems = splitNumberedText(item.medicalNotes);
+
+                    return (
+                      <div
+                        key={item._id || item.id || index}
+                        className="relative pl-10"
+                      >
+                        <div className="absolute left-2 top-6 h-4 w-4 rounded-full border-2 border-blue-600 bg-white" />
+                        <Card className="border shadow-sm">
+                          <CardContent className="space-y-5 p-5">
+                            <div className="flex flex-col gap-3 border-b pb-4 sm:flex-row sm:items-start sm:justify-between">
+                              <div>
+                                <h3 className="text-lg font-semibold text-slate-900">
+                                  {formatDate(getHistoryDate(item)) || "Date not available"}
+                                </h3>
+                                <p className="text-sm font-medium text-slate-700">
+                                  Token #{getHistoryToken(item) || "-"}
+                                </p>
+                              </div>
+                              <p className="text-sm font-medium text-slate-700">
+                                Doctor: {getHistoryDoctorName(item) || "-"}
+                              </p>
+                            </div>
+
+                            <div className="grid gap-5 md:grid-cols-2">
+                              <div className="space-y-2">
+                                <Label>Prescription</Label>
+                                <NumberedList
+                                  items={prescriptionItems}
+                                  emptyText="No prescription recorded"
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <Label>Medical Notes</Label>
+                                <NumberedList
+                                  items={notesItems}
+                                  emptyText="No medical notes recorded"
+                                />
+                              </div>
+                            </div>
+
+                            <div className="rounded-md bg-slate-50 p-3">
+                              <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                                Follow Up Date
+                              </p>
+                              <p className="mt-1 text-sm font-semibold text-slate-800">
+                                {formatDate(item.followUpDate) || "-"}
+                              </p>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      </div>
+                    );
+                  })}
                 </div>
               ) : (
-                <DataTable<Patient, unknown>
-                  columns={columns}
-                  data={filteredPatients}
-                  searchColumn="name"
-                  searchPlaceholder="Search patients by name, phone, or ID..."
-                  onAddNew={undefined}
-                  addButtonText="Add Patient"
+                <div className="rounded-lg border border-dashed py-14 text-center">
+                  <FileText className="mx-auto mb-4 h-10 w-10 text-slate-300" />
+                  <h3 className="text-lg font-semibold text-slate-900">
+                    No Prescription History Available
+                  </h3>
+                </div>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
 
-                  emptyMessage={
-                    <div className="text-center py-8">
-                      <Users className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-                      <h3 className="text-lg font-semibold mb-2">
-                        No patients found
-                      </h3>
-                      <p className="text-gray-500 mb-4">
-                        {activeTab === "all"
-                          ? "Get started by adding your first patient"
-                          : "No patients match the current filter"}
-                      </p>
+        <Dialog
+          open={prescriptionDialogOpen}
+          onOpenChange={setPrescriptionDialogOpen}
+        >
+          <DialogContent className="max-h-[90vh] max-w-4xl overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Create Prescription</DialogTitle>
+            </DialogHeader>
 
-                    </div>
+            <div className="space-y-5">
+              <div className="space-y-3">
+                <Label>Select Appointment</Label>
+                {appointmentsLoading ? (
+                  <div className="rounded-lg border bg-slate-50 p-4 text-sm text-slate-500">
+                    Loading appointments...
+                  </div>
+                ) : appointmentOptions.length ? (
+                  <div className="grid gap-3 md:grid-cols-2">
+                    {appointmentOptions.map((appointment) => {
+                      const appointmentId = getAppointmentId(appointment);
+                      const isSelected = selectedAppointmentId === appointmentId;
+                      const tokenNumber = getAppointmentToken(appointment);
+
+                      return (
+                        <button
+                          key={appointmentId}
+                          type="button"
+                          onClick={() => setSelectedAppointmentId(appointmentId)}
+                          className={`rounded-lg border p-4 text-left transition ${
+                            isSelected
+                              ? "border-blue-500 bg-blue-50 ring-2 ring-blue-100"
+                              : "bg-white hover:border-blue-200 hover:bg-slate-50"
+                          }`}
+                        >
+                          <p className="font-semibold text-slate-900">
+                            {selectedPatient?.name}
+                          </p>
+                          <p className="text-sm text-slate-600">
+                            {formatDate(getAppointmentDate(appointment)) || "Date not available"}
+                          </p>
+                          <p className="text-sm font-medium text-slate-700">
+                            Token #{tokenNumber || "-"}
+                          </p>
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="rounded-lg border border-dashed p-4 text-sm text-slate-500">
+                    No appointments available for this patient.
+                  </div>
+                )}
+                {!selectedAppointmentId && (
+                  <p className="text-sm font-medium text-amber-700">
+                    Please select an appointment
+                  </p>
+                )}
+              </div>
+
+              <div className="grid gap-4 rounded-lg border bg-slate-50 p-4 md:grid-cols-4">
+                <DetailItem label="Patient Name" value={selectedPatient?.name} />
+                <DetailItem
+                  label="Patient Code"
+                  value={selectedPatient?.patientCode || selectedPatient?.id}
+                />
+                <DetailItem
+                  label="Appointment Date"
+                  value={
+                    selectedAppointment
+                      ? formatDate(getAppointmentDate(selectedAppointment))
+                      : "-"
                   }
                 />
-              )}
-            </TabsContent>
-          </Tabs>
-        </CardContent>
-      </Card>
+                <DetailItem
+                  label="Token Number"
+                  value={
+                    selectedAppointment
+                      ? `Token #${getAppointmentToken(selectedAppointment) || "-"}`
+                      : "-"
+                  }
+                />
+              </div>
 
-      {/* Edit Patient Dialog */}
-      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Edit Patient</DialogTitle>
-          </DialogHeader>
-          {selectedPatient && (
-            <PatientForm
-              patient={selectedPatient}
-              mode="edit"
-              onSave={handleEditPatient}
-              onCancel={() => {
-                setIsEditDialogOpen(false);
-                setSelectedPatient(null);
-              }}
-            />
-          )}
-        </DialogContent>
-      </Dialog>
+              <div className="grid gap-6 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>Prescription</Label>
+                  <Textarea
+                    rows={12}
+                    value={prescription}
+                    onFocus={() => handleNumberedFocus(prescription, setPrescription)}
+                    onKeyDown={(event) =>
+                      handleNumberedKeyDown(event, prescription, setPrescription)
+                    }
+                    onChange={(event) =>
+                      handleNumberedChange(event.target.value, setPrescription)
+                    }
+                    placeholder={"1. Medicine Name - Morning - 5 Days\n2. Medicine Name - Afternoon - 3 Days"}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Medical Notes</Label>
+                  <Textarea
+                    rows={12}
+                    value={medicalNotes}
+                    onFocus={() => handleNumberedFocus(medicalNotes, setMedicalNotes)}
+                    onKeyDown={(event) =>
+                      handleNumberedKeyDown(event, medicalNotes, setMedicalNotes)
+                    }
+                    onChange={(event) =>
+                      handleNumberedChange(event.target.value, setMedicalNotes)
+                    }
+                    placeholder={"1. Drink more water\n2. Avoid spicy food\n3. Take proper rest"}
+                  />
+                </div>
+              </div>
+
+              <div className="grid gap-4 rounded-lg border bg-white p-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>Follow Up Date</Label>
+                  <Input
+                    type="date"
+                    value={followUpDate}
+                    onChange={(event) => setFollowUpDate(event.target.value)}
+                  />
+                </div>
+                <div className="flex items-center justify-between rounded-md border px-4 py-3">
+                  <Label>Follow Up Required</Label>
+                  <Switch
+                    checked={followUpRequired}
+                    onCheckedChange={setFollowUpRequired}
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-3">
+                <Button
+                  variant="outline"
+                  onClick={() => setPrescriptionDialogOpen(false)}
+                  disabled={createPrescriptionMutation.isPending}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleSavePrescription}
+                  disabled={
+                    createPrescriptionMutation.isPending ||
+                    !selectedAppointmentId
+                  }
+                >
+                  {createPrescriptionMutation.isPending
+                    ? "Saving..."
+                    : "Save Prescription"}
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </>
   );

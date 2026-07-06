@@ -613,3 +613,39 @@ export const useCreateLeavePolicy = (options?: {
     onError: options?.onError,
   });
 };
+
+
+interface LeavePolicy {
+  _id: string;
+  role: "DOCTOR" | "STAFF" | "RECEPTIONIST";
+  policyType: "MONTHLY" | "YEARLY";
+  allowedLeaves: number;
+}
+
+interface LeavePolicyResponse {
+  data: LeavePolicy[];
+}
+
+export const useLeavePolicy = () => {
+  return useQuery<LeavePolicyResponse>({
+    queryKey: ["leave-policy"],
+
+    queryFn: async () => {
+      const response =
+        await clientApi.get<LeavePolicyResponse>(
+          "/leave/leavepolicy"
+        );
+
+      if (!response.success) {
+        throw new Error(
+          response.error ||
+          "Failed to fetch leave policy"
+        );
+      }
+
+      return response.data;
+    },
+
+    staleTime: 0,
+  });
+};

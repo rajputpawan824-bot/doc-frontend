@@ -3,17 +3,28 @@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { 
-  History, 
-  Calendar, 
-  Download, 
+import { ReactNode, useMemo, useState } from 'react';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import {
+  History,
+  Calendar,
+  Download,
   Search,
-  Stethoscope,
   Pill,
-  FileText
+  FileText,
+  Droplets
 } from "lucide-react";
 import DataTable from "@/components/reusable/data-table";
 import { ColumnDef } from "@tanstack/react-table";
+import { usePatientAppointments, type PatientAppointment } from "@/services/admin/appointment";
+import { usePatientPortalSelection } from "@/lib/hooks/usePatientPortalSelection";
+import { usePrescriptionHistory,downloadPrescriptionPdf} from "@/services/admin/prescription";
 
 interface VisitHistory {
   id: string;
@@ -21,41 +32,136 @@ interface VisitHistory {
   doctor: string;
   department: string;
   reason: string;
-  status: "Completed" | "Cancelled";
+  slot: string;
+  status: string;
   hasPrescription: boolean;
 }
 
-export default function PatientHistoryPage() {
-  const mockHistory: VisitHistory[] = [
-    {
-      id: "V-9921",
-      date: "2026-05-10",
-      doctor: "Dr. John Smith",
-      department: "Cardiology",
-      reason: "Regular Checkup",
-      status: "Completed",
-      hasPrescription: true
-    },
-    {
-      id: "V-9801",
-      date: "2026-04-15",
-      doctor: "Dr. Sarah Wilson",
-      department: "General OPD",
-      reason: "Viral Fever",
-      status: "Completed",
-      hasPrescription: true
-    },
-    {
-      id: "V-9750",
-      date: "2026-03-20",
-      doctor: "Dr. John Smith",
-      department: "Cardiology",
-      reason: "ECG Review",
-      status: "Completed",
-      hasPrescription: false
-    }
-  ];
+function getDoctorName(appointment: PatientAppointment) {
+  return (
+    appointment.doctorName ||
+    appointment.doctor?.doctorName ||
+    appointment.doctor?.user?.name ||
+    "--"
+  );
+}
 
+function getDepartment(appointment: PatientAppointment) {
+  return appointment.department || appointment.doctor?.department || "General OPD";
+}
+
+function formatDate(date?: string) {
+  if (!date) return "--";
+  const parsed = new Date(date);
+  return Number.isNaN(parsed.getTime()) ? date : parsed.toLocaleDateString();
+}
+
+
+const formatHistoryDate = (value?: string | Date | null) => {
+  if (!value) return "";
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) return "";
+
+  return date.toLocaleDateString("en-IN", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+};
+
+const splitNumberedText = (value?: string | string[]) => {
+  if (Array.isArray(value)) return value.filter(Boolean);
+
+  if (!value) return [];
+
+  return value
+    .split(/\n|,(?=\s*\D)/)
+    .map((item) => item.replace(/^\s*\d+[\).]\s*/, "").trim())
+    .filter(Boolean);
+};
+
+const NumberedList = ({
+  items,
+  emptyText,
+}: {
+  items: string[];
+  emptyText: string;
+}) => {
+  if (!items.length) {
+    return <p className="text-sm text-slate-500">{emptyText}</p>;
+  }
+
+  return (
+    <ol className="list-decimal space-y-1 pl-5 text-sm text-slate-700">
+      {items.map((item, index) => (
+        <li key={`${item}-${index}`}>{item}</li>
+      ))}
+    </ol>
+  );
+};
+
+
+export default function PatientHistoryPage() {
+
+    const [historyOpen, setHistoryOpen] = useState(false);
+  const { patientId } = usePatientPortalSelection();
+  const {
+    data: appointments = [],
+    isLoading,
+  } = usePatientAppointments(patientId);
+
+  const {
+  data: prescriptionHistory,
+  isLoading: historyLoading,
+} = usePrescriptionHistory(patientId);
+
+const getHistoryItems = (value: any) => {
+  if (!value) return [];
+
+  if (Array.isArray(value)) {
+    return value;
+  }
+
+  if (Array.isArray(value.history)) {
+    return value.history;
+  }
+
+  if (value.data) {
+    return getHistoryItems(value.data);
+  }
+
+  return [];
+};
+
+const historyItems =
+  getHistoryItems(prescriptionHistory);
+
+
+  console.log(
+  "prescriptionHistory",
+  prescriptionHistory
+);
+
+console.log(
+  "historyItems",
+  historyItems
+);
+
+
+
+const visitHistory: VisitHistory[] = appointments.map((appointment) => ({
+  id: appointment._id || appointment.id || appointment.appointmentId || "",
+  date: formatDate(appointment.date),
+  doctor: getDoctorName(appointment),
+  department: getDepartment(appointment),
+  reason: appointment.reason || "--",
+  slot: appointment.slot || appointment.time || "--",
+  status: appointment.status || "--",
+  hasPrescription:
+    appointment.status === "COMPLETED",
+}));
   const columns: ColumnDef<VisitHistory>[] = [
     {
       accessorKey: "date",
@@ -82,12 +188,24 @@ export default function PatientHistoryPage() {
       header: "Reason",
     },
     {
+      accessorKey: "slot",
+      header: "Slot",
+    },
+    {
       id: "prescription",
       header: "Prescription",
       cell: ({ row }) => row.original.hasPrescription ? (
-        <Button variant="ghost" size="sm" className="text-blue-600 h-8 gap-2 px-2 hover:bg-blue-50">
-          <Download className="h-4 w-4" /> Download
-        </Button>
+<Button
+  variant="ghost"
+  size="sm"
+  className="text-blue-600 h-8 gap-2 px-2 hover:bg-blue-50"
+  onClick={() =>
+    downloadPrescriptionPdf(row.original.id)
+  }
+>
+  <Download className="h-4 w-4" />
+  Download
+</Button>
       ) : (
         <span className="text-xs text-slate-400 italic pl-2">N/A</span>
       ),
@@ -96,7 +214,7 @@ export default function PatientHistoryPage() {
       accessorKey: "status",
       header: "Status",
       cell: ({ row }) => (
-        <Badge variant="outline" className={row.original.status === "Completed" ? "text-green-600 bg-green-50 border-none" : "text-slate-500"}>
+        <Badge variant="outline" className={row.original.status.toUpperCase() === "COMPLETED" ? "text-green-600 bg-green-50 border-none" : "text-slate-500"}>
           {row.original.status}
         </Badge>
       ),
@@ -114,9 +232,7 @@ export default function PatientHistoryPage() {
           <Button variant="outline" className="flex-1 sm:w-auto gap-2">
             <Search className="h-4 w-4" /> Search
           </Button>
-          <Button className="flex-1 sm:w-auto bg-blue-600 gap-2">
-            <Download className="h-4 w-4" /> Export All
-          </Button>
+
         </div>
       </div>
 
@@ -131,9 +247,10 @@ export default function PatientHistoryPage() {
             <CardContent className="p-0 sm:p-6">
               <DataTable 
                 columns={columns} 
-                data={mockHistory} 
+                data={visitHistory} 
                 searchColumn="doctor"
                 searchPlaceholder="Search by doctor..."
+                emptyMessage={isLoading ? "Loading appointments..." : "No history found."}
               />
             </CardContent>
           </Card>
@@ -147,11 +264,15 @@ export default function PatientHistoryPage() {
               </div>
               <div>
                 <h3 className="text-xl font-bold">Active Medications</h3>
-                <p className="text-blue-100 text-sm">2 current prescriptions</p>
+                <p className="text-white-100 text-sm">{visitHistory.filter((visit) => visit.hasPrescription).length} current prescriptions</p>
               </div>
-              <Button variant="secondary" className="w-full font-bold">
-                View Details
-              </Button>
+<Button
+  variant="secondary"
+  className="w-full font-bold"
+  onClick={() => setHistoryOpen(true)}
+>
+  Prescription History
+</Button>
             </CardContent>
           </Card>
 
@@ -161,22 +282,173 @@ export default function PatientHistoryPage() {
               <CardDescription>Recently added files</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              {[1, 2].map(i => (
-                <div key={i} className="flex items-center justify-between p-3 bg-slate-50 rounded-xl">
+              {visitHistory.filter((visit) => visit.hasPrescription).slice(0, 2).map((visit) => (
+                <div key={visit.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-xl">
                   <div className="flex items-center gap-3">
                     <FileText className="h-5 w-5 text-slate-400" />
                     <div>
-                      <p className="text-sm font-bold text-slate-700">Scan_Report_{i}.pdf</p>
-                      <p className="text-[10px] text-slate-400">Added May {12-i}, 2026</p>
+                      <p className="text-sm font-bold text-slate-700">Prescription_{visit.id || "visit"}.pdf</p>
+                      <p className="text-[10px] text-slate-400">Added {visit.date}</p>
                     </div>
                   </div>
                   <Download className="h-4 w-4 text-blue-600 cursor-pointer" />
                 </div>
               ))}
+              {visitHistory.filter((visit) => visit.hasPrescription).length === 0 && (
+                <p className="text-sm text-slate-400">No documents found.</p>
+              )}
             </CardContent>
           </Card>
         </div>
       </div>
+
+      <Dialog
+  open={historyOpen}
+  onOpenChange={setHistoryOpen}
+>
+  <DialogContent className="max-h-[90vh] max-w-6xl overflow-y-auto">
+    <DialogHeader>
+      <DialogTitle>
+        Prescription History
+      </DialogTitle>
+    </DialogHeader>
+
+    <div className="space-y-6">
+
+      <div className="rounded-lg border bg-slate-50 p-4">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-lg font-semibold text-slate-900">
+              Current Patient
+            </p>
+            <p className="text-sm text-slate-500">
+              Complete Prescription Timeline
+            </p>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            <Badge variant="secondary">
+              {historyItems.length} Visits
+            </Badge>
+          </div>
+        </div>
+      </div>
+
+      {historyLoading ? (
+        <div className="flex h-40 items-center justify-center">
+          Loading...
+        </div>
+      ) : historyItems.length > 0 ? (
+
+        <div className="relative space-y-5 before:absolute before:left-4 before:top-2 before:h-full before:w-px before:bg-slate-200">
+
+          {historyItems.map((item: any, index: number) => {
+
+            const prescriptionItems =
+              splitNumberedText(item.prescription);
+
+            const notesItems =
+              splitNumberedText(item.medicalNotes);
+
+            return (
+              <div
+                key={item._id || index}
+                className="relative pl-10"
+              >
+                <div className="absolute left-2 top-6 h-4 w-4 rounded-full border-2 border-blue-600 bg-white" />
+
+                <Card>
+                  <CardContent className="space-y-5 p-5">
+
+                    <div className="flex flex-col gap-3 border-b pb-4 sm:flex-row sm:items-start sm:justify-between">
+
+                      <div>
+                        <h3 className="text-lg font-semibold">
+                          {formatHistoryDate(
+                            item.appointment?.date ||
+                            item.createdAt
+                          )}
+                        </h3>
+
+                        <p className="text-sm font-medium">
+                          Token #
+                          {item.tokenNumber ||
+                            item.appointment?.tokenNumber ||
+                            "-"}
+                        </p>
+                      </div>
+
+                      <p className="text-sm font-medium">
+                        Doctor:
+                        {" "}
+                        {item.doctorName ||
+                          item.appointment?.doctorName ||
+                          "-"}
+                      </p>
+
+                    </div>
+
+                    <div className="grid gap-5 md:grid-cols-2">
+
+                      <div>
+                        <Label>
+                          Prescription
+                        </Label>
+
+                        <NumberedList
+                          items={prescriptionItems}
+                          emptyText="No prescription recorded"
+                        />
+                      </div>
+
+                      <div>
+                        <Label>
+                          Medical Notes
+                        </Label>
+
+                        <NumberedList
+                          items={notesItems}
+                          emptyText="No medical notes recorded"
+                        />
+                      </div>
+
+                    </div>
+
+                    <div className="rounded-md bg-slate-50 p-3">
+                      <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                        Follow Up Date
+                      </p>
+
+                      <p className="mt-1 text-sm font-semibold text-slate-800">
+                        {formatHistoryDate(
+                          item.followUpDate
+                        ) || "-"}
+                      </p>
+                    </div>
+
+                  </CardContent>
+                </Card>
+
+              </div>
+            );
+          })}
+        </div>
+
+      ) : (
+
+        <div className="rounded-lg border border-dashed py-14 text-center">
+          <FileText className="mx-auto mb-4 h-10 w-10 text-slate-300" />
+          <h3 className="text-lg font-semibold">
+            No Prescription History Available
+          </h3>
+        </div>
+
+      )}
+    </div>
+  </DialogContent>
+</Dialog>
+
+
     </div>
   );
 }

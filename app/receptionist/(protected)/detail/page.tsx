@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState  } from "react";
 import {
   User,
   Phone,
@@ -12,6 +12,7 @@ import {
   X,
   UserCircle,
   Monitor,
+  Key ,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,54 +21,161 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { useReceptionistById ,  useUpdateReceptionist, useUpdateReceptionistPassword,} from "@/services/admin/reception";
+import { format } from "util";
+import ReusableModal, {
+  FormSection,
+  ReusableFormData,
+} from "@/components/reusable/reusable-modal";
 
-interface ReceptionistDetails {
-  id: string;
-  name: string;
-  image?: string;
-  location: string;
-  mobileNumber: string;
-  password: string;
-  email: string;
-  shift: string;
-  deskNumber: string;
-  lastUpdated: Date;
-  updatedBy: string;
-}
+
 
 export default function ReceptionistProfilePage() {
   const [isEditing, setIsEditing] = useState(false);
-  const [data, setData] = useState<ReceptionistDetails>({
-    id: "R001",
-    name: "Sarah Parker",
-    image: "",
-    location: "Main Entrance Desk",
-    mobileNumber: "+1 (555) 987-6543",
-    password: "********",
-    email: "sarah.parker@clinic.com",
-    shift: "Morning (08:00 AM - 04:00 PM)",
-    deskNumber: "D-12",
-    lastUpdated: new Date(),
-    updatedBy: "Admin",
+  const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
+const [passwordModalKey, setPasswordModalKey] = useState(0);
+const {
+  data: receptionist,
+  isLoading,
+  isError,
+   refetch,
+} = useReceptionistById("profile");
+
+const [formData, setFormData] = useState({
+  registrationNo:"",
+  phone: "",
+  email: "",
+
+  experience: "",
+});
+
+useEffect(() => {
+  if (receptionist) {
+    setFormData({
+    
+      phone: receptionist.phoneNumber || "",
+      email: receptionist.email || "",
+      registrationNo: receptionist.registrationNo || "",
+      experience: receptionist.experience || "",
+    });
+  }
+}, [receptionist]);
+
+const updateReceptionist = useUpdateReceptionist({
+  onSuccess: () => {
+    refetch();
+    setIsEditing(false);
+  },
+});
+
+const updateReceptionistPassword =
+  useUpdateReceptionistPassword({
+    onSuccess: () => {
+      setIsPasswordModalOpen(false);
+      setPasswordModalKey((prev) => prev + 1);
+    },
   });
 
-  const handleInputChange = (field: keyof ReceptionistDetails, value: string) => {
-    setData((prev) => ({ ...prev, [field]: value }));
-  };
+if (isLoading) {
+  return <div>Loading...</div>;
+}
 
-  const handleSave = () => {
-    setIsEditing(false);
-    console.log("Saving receptionist data:", data);
-  };
+if (isError || !receptionist) {
+  return <div>Failed to load receptionist profile</div>;
+}
+
+
+
+
+
+const handleInputChange = (
+  field: keyof typeof formData,
+  value: string,
+) => {
+  setFormData((prev) => ({
+    ...prev,
+    [field]: value,
+  }));
+};
+
+const handleSave = () => {
+  if (!receptionist?.id) return;
+
+  updateReceptionist.mutate({
+    id: receptionist.id,
+    data: {
+     
+      phone: formData.phone,
+      email:formData.email,
+    
+     registrationNo: formData.registrationNo,
+      experience: formData.experience,
+    },
+  });
+};
+
+
+
+const passwordFormSections: FormSection[] = [
+  {
+    title: "Change Password",
+    icon: <Key className="h-4 w-4" />,
+    fields: [
+      {
+        name: "newPassword",
+        label: "New Password",
+        type: "password",
+        required: true,
+        width: "full",
+        validation: {
+          minLength: 6,
+        },
+      },
+      {
+        name: "confirmPassword",
+        label: "Confirm Password",
+        type: "password",
+        required: true,
+        width: "full",
+        validation: {
+          minLength: 6,
+          custom: (value, formData) =>
+            value === formData.newPassword
+              ? null
+              : "Passwords must match",
+        },
+      },
+    ],
+  },
+];
+const handleUpdatePassword = (
+  data: ReusableFormData,
+) => {
+  if (!receptionist?.id) return;
+
+  updateReceptionistPassword.mutate({
+    id: receptionist.id,
+    newPassword: String(data.newPassword),
+  });
+};
 
   return (
-    <Card className="w-full max-w-4xl mx-auto shadow-sm">
+   <div className="max-w-5xl mx-auto space-y-6">
+
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle className="flex items-center gap-2 text-2xl text-slate-800">
           <UserCircle className="h-6 w-6 text-blue-600" />
           Receptionist Profile
         </CardTitle>
         <div className="flex gap-2">
+         
+  <Button
+    variant="outline"
+    onClick={() => setIsPasswordModalOpen(true)}
+  >
+    <Key className="h-4 w-4 mr-2" />
+    Change Password
+  </Button>
           {!isEditing ? (
             <Button onClick={() => setIsEditing(true)} className="gap-2 bg-blue-600">
               <Edit className="h-4 w-4" />
@@ -89,119 +197,297 @@ export default function ReceptionistProfilePage() {
       </CardHeader>
 
       <CardContent className="space-y-6">
-        <div className="flex flex-col md:flex-row gap-8">
-          {/* Left Column: Image */}
-          <div className="flex flex-col items-center gap-4">
-            <Avatar className="h-32 w-32 border-2 border-slate-100 shadow-sm">
-              <AvatarImage src={data.image} alt={data.name} />
-              <AvatarFallback className="bg-blue-50 text-blue-600">
-                <User className="h-12 w-12" />
-              </AvatarFallback>
-            </Avatar>
-            {isEditing && (
-              <Button variant="outline" size="sm" className="text-xs">
-                Upload Photo
-              </Button>
-            )}
-          </div>
+      <Card className="overflow-hidden border-0 shadow-lg">
+<CardContent className="p-0">
 
-          {/* Right Column: Info */}
-          <div className="flex-1 space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label className="text-slate-500">Full Name</Label>
-                {isEditing ? (
-                  <Input value={data.name} onChange={(e) => handleInputChange("name", e.target.value)} />
-                ) : (
-                  <p className="text-lg font-semibold text-slate-900">{data.name}</p>
-                )}
-              </div>
-              <div className="space-y-2">
-                <Label className="text-slate-500">Location / Desk</Label>
-                {isEditing ? (
-                  <Input value={data.location} onChange={(e) => handleInputChange("location", e.target.value)} />
-                ) : (
-                  <p className="flex items-center gap-2 text-slate-700">
-                    <MapPin className="h-4 w-4 text-slate-400" />
-                    {data.location}
-                  </p>
-                )}
-              </div>
-            </div>
+<div className="bg-gradient-to-r from-blue-500 via-blue-600 to-indigo-600 p-8">
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label className="text-slate-500">Mobile Number</Label>
-                {isEditing ? (
-                  <Input value={data.mobileNumber} onChange={(e) => handleInputChange("mobileNumber", e.target.value)} />
-                ) : (
-                  <p className="flex items-center gap-2 text-slate-700">
-                    <Phone className="h-4 w-4 text-slate-400" />
-                    {data.mobileNumber}
-                  </p>
-                )}
-              </div>
-              <div className="space-y-2">
-                <Label className="text-slate-500">Email Address</Label>
-                {isEditing ? (
-                  <Input value={data.email} onChange={(e) => handleInputChange("email", e.target.value)} />
-                ) : (
-                  <p className="flex items-center gap-2 text-slate-700">
-                    <Mail className="h-4 w-4 text-slate-400" />
-                    {data.email}
-                  </p>
-                )}
-              </div>
-            </div>
+<div className="flex flex-col md:flex-row items-center gap-6">
 
-            {isEditing && (
-              <div className="space-y-2">
-                <Label className="text-slate-500">Password</Label>
-                <Input type="password" placeholder="Change password" onChange={(e) => handleInputChange("password", e.target.value)} />
-              </div>
-            )}
-          </div>
-        </div>
+<Avatar className="h-28 w-28 border-4 border-white/30">
+  <AvatarImage src="" />
+  <AvatarFallback className="bg-white/20 text-white">
+    <User className="h-12 w-12" />
+  </AvatarFallback>
+</Avatar>
 
-        <Separator className="bg-slate-100" />
+<div className="text-white">
+  <h2 className="text-3xl font-bold">
+    {receptionist.name}
+  </h2>
 
-        <div className="space-y-4">
-          <h3 className="text-lg font-semibold text-slate-800">Operational Details</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-2">
-              <Label className="text-slate-500 flex items-center gap-2">
-                <Clock className="h-4 w-4" />
-                Assigned Shift
-              </Label>
-              {isEditing ? (
-                <Input value={data.shift} onChange={(e) => handleInputChange("shift", e.target.value)} />
-              ) : (
-                <Badge variant="secondary" className="bg-blue-50 text-blue-700 hover:bg-blue-100 border-none px-3 py-1">
-                  {data.shift}
-                </Badge>
-              )}
-            </div>
-            <div className="space-y-2">
-              <Label className="text-slate-500 flex items-center gap-2">
-                <Monitor className="h-4 w-4" />
-                Desk Number
-              </Label>
-              {isEditing ? (
-                <Input value={data.deskNumber} onChange={(e) => handleInputChange("deskNumber", e.target.value)} />
-              ) : (
-                <p className="text-lg font-medium text-slate-900">{data.deskNumber}</p>
-              )}
-            </div>
-          </div>
-        </div>
+  <p className="text-white-100 text-lg font-bold">
+    Receptionist
+  </p>
 
-        <Separator className="bg-slate-100" />
+  <div className="flex flex-wrap gap-3 mt-4">
 
-        <div className="text-xs text-slate-400 flex justify-between">
-          <p>Last updated: {data.lastUpdated.toLocaleString()}</p>
-          <p>Updated by: {data.updatedBy}</p>
-        </div>
+    <Badge className="bg-white text-blue-700">
+      {receptionist.receptionistCode}
+    </Badge>
+
+    <Badge
+      className={
+        receptionist.isActive
+          ? "bg-green-500 text-white"
+          : "bg-red-500 text-white"
+      }
+    >
+      {receptionist.isActive
+        ? "Active"
+        : "Inactive"}
+    </Badge>
+
+  </div>
+</div>
+
+</div>
+</div>
+
+<div className="grid grid-cols-2 lg:grid-cols-4 gap-4 p-6 bg-slate-50">
+
+<Card>
+<CardContent className="p-4">
+<p className="text-xs text-slate-500">
+Experience
+</p>
+<p className="text-xl font-bold text-purple-600">
+{receptionist.experience} Years
+</p>
+</CardContent>
+</Card>
+
+<Card>
+<CardContent className="p-4">
+<p className="text-xs text-slate-500">
+Shift
+</p>
+<p className="text-xl font-bold text-orange-600">
+{receptionist.shift}
+</p>
+</CardContent>
+</Card>
+
+<Card>
+<CardContent className="p-4">
+<p className="text-xs text-slate-500">
+Desk Number
+</p>
+<p className="text-xl font-bold text-blue-600">
+{receptionist.deskNumber}
+</p>
+</CardContent>
+</Card>
+
+<Card>
+<CardContent className="p-4">
+<p className="text-xs text-slate-500">
+Working Hours
+</p>
+
+<p className="text-xl font-bold text-green-600">
+{receptionist.workingHours?.start}
+-
+{receptionist.workingHours?.end}
+</p>
+
+</CardContent>
+</Card>
+
+</div>
+
+<div className="p-6 space-y-6">
+
+  {/* Personal Information */}
+  <Card>
+    <CardHeader>
+      <CardTitle>Personal Information</CardTitle>
+    </CardHeader>
+
+    <CardContent className="grid md:grid-cols-2 gap-4">
+
+      <div>
+        <Label>Phone</Label>
+        {isEditing ? (
+          <Input
+            value={formData.phone}
+            onChange={(e) =>
+              handleInputChange("phone", e.target.value)
+            }
+          />
+        ) : (
+          <p className="font-medium">
+            {receptionist.phoneNumber}
+          </p>
+        )}
+      </div>
+
+      <div>
+        <Label>Email</Label>
+        {isEditing ? (
+          <Input
+            value={formData.email}
+            onChange={(e) =>
+              handleInputChange("email", e.target.value)
+            }
+          />
+        ) : (
+          <p className="font-medium">
+            {receptionist.email}
+          </p>
+        )}
+      </div>
+
+      <div>
+        <Label>Name</Label>
+        <p className="font-medium">
+          {receptionist.name}
+        </p>
+      </div>
+
+      <div>
+        <Label>Gender</Label>
+        <p className="font-medium">
+          {receptionist.gender}
+        </p>
+      </div>
+
+      <div className="md:col-span-2">
+        <Label>Address</Label>
+        <p className="font-medium">
+          {receptionist.address}
+        </p>
+      </div>
+
+    </CardContent>
+  </Card>
+
+  {/* Employment Information */}
+  <Card>
+    <CardHeader>
+      <CardTitle>
+        Employment Information
+      </CardTitle>
+    </CardHeader>
+
+    <CardContent className="grid md:grid-cols-2 gap-4">
+
+      <div>
+        <Label>Receptionist Code</Label>
+        <p>{receptionist.receptionistCode}</p>
+      </div>
+
+      <div>
+        <Label>Desk Number</Label>
+        <p>{receptionist.deskNumber}</p>
+      </div>
+
+      <div>
+        <Label>Shift</Label>
+        <p>{receptionist.shift}</p>
+      </div>
+
+      <div>
+        <Label>Joining Date</Label>
+        <p>
+          {receptionist.joiningDate
+            ? new Date(
+                receptionist.joiningDate
+              ).toLocaleDateString()
+            : "-"}
+        </p>
+      </div>
+
+    </CardContent>
+  </Card>
+
+  {/* Professional Information */}
+  <Card>
+    <CardHeader>
+      <CardTitle>
+        Professional Information
+      </CardTitle>
+    </CardHeader>
+
+    <CardContent className="grid md:grid-cols-2 gap-4">
+
+      <div>
+        <Label>Experience</Label>
+
+        {isEditing ? (
+          <Input
+            value={formData.experience}
+            onChange={(e) =>
+              handleInputChange(
+                "experience",
+                e.target.value
+              )
+            }
+          />
+        ) : (
+          <p>
+            {receptionist.experience} Years
+          </p>
+        )}
+      </div>
+
+      <div>
+        <Label>Registration Number</Label>
+
+        {isEditing ? (
+          <Input
+            value={formData.registrationNo}
+            onChange={(e) =>
+              handleInputChange(
+                "registrationNo",
+                e.target.value
+              )
+            }
+          />
+        ) : (
+          <p>
+            {receptionist.registrationNo || "-"}
+          </p>
+        )}
+      </div>
+
+      <div>
+        <Label>Salary</Label>
+        <p>
+          ₹
+          {receptionist.salary?.toLocaleString()}
+        </p>
+      </div>
+
+      <div>
+        <Label>Aadhaar</Label>
+        <p>{receptionist.aadhaar}</p>
+      </div>
+
+    </CardContent>
+  </Card>
+
+</div>
       </CardContent>
+      
+      <ReusableModal
+  key={passwordModalKey}
+  isOpen={isPasswordModalOpen}
+  onClose={() => {
+    setIsPasswordModalOpen(false);
+    setPasswordModalKey((prev) => prev + 1);
+  }}
+  onSave={handleUpdatePassword}
+  title="Change Password"
+  sections={passwordFormSections}
+  size="md"
+  saveButtonText={
+    updateReceptionistPassword.isPending
+      ? "Updating..."
+      : "Update Password"
+  }
+  validationOnChange
+/>
     </Card>
-  );
-}
+  </CardContent>
+    </div>);}

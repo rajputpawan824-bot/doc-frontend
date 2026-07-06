@@ -3,11 +3,14 @@
 import { useState } from "react";
 import { 
   Calendar, 
-  Plus, 
-  CheckCircle2, 
+  CalendarDays, 
   Clock, 
+  CheckCircle2, 
+  XCircle, 
+  Plus, 
   Info,
-  CalendarDays
+  Users,
+  CalendarRange
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -21,7 +24,7 @@ import {
   getLeaveStatusBgColor, 
   LeaveType 
 } from "@/lib/validations/Admin/leave";
-import { useCreateLeave } from "@/services/admin/leave";
+import { useCreateLeave ,useMyLeaves,useLeaveBalance } from "@/services/admin/leave";
 import { format } from "date-fns";
 
 export default function ReceptionistLeavePage() {
@@ -37,12 +40,192 @@ export default function ReceptionistLeavePage() {
     },
   });
 
-  const handleApplyLeave = (data: any) => {
+
+    const [
+    selectedMonth,
+    setSelectedMonth
+  ] = useState<number>();
+  
+  const [
+    selectedYear,
+    setSelectedYear
+  ] = useState<number>();
+  
+  const {
+    data: leaveBalance,
+  } = useLeaveBalance(
+    selectedMonth,
+    selectedYear
+  );
+
+const {
+  data: history = [],
+} = useMyLeaves(
+  selectedMonth,
+  selectedYear
+);
+
+
+
+ const columns: ColumnDef<LeaveResponse>[] = [
+    {
+      
+      accessorKey: "leaveType",
+      header: "Leave Type",
+      cell: ({ row }) => {
+        const type = row.getValue("leaveType") as LeaveType;
+        return (
+          <div className="flex flex-col">
+            <span className="font-medium">{getLeaveTypeLabel(type)}</span>
+            {row.original.isHalfDay && (
+              <span className="text-xs text-slate-500">
+                Half Day ({row.original.halfDay?.replace("_", " ")})
+              </span>
+            )}
+          </div>
+        );
+      },
+    },
+    {
+      accessorKey: "dates",
+      header: "Duration",
+      cell: ({ row }) => (
+        <div className="flex items-center gap-2 text-sm">
+          <CalendarDays className="h-4 w-4 text-slate-400" />
+          <span>
+            {format(new Date(row.original.fromDate), "MMM d")} - {format(new Date(row.original.toDate), "MMM d, yyyy")}
+          </span>
+          <Badge variant="outline" className="ml-1">
+            {row.original.numberOfDays} {row.original.numberOfDays === 1 ? "day" : "days"}
+          </Badge>
+        </div>
+      ),
+    },
+    {
+      accessorKey: "status",
+      header: "Status",
+      cell: ({ row }) => {
+        const status = row.getValue("status") as string;
+        return (
+          <Badge className={`${getLeaveStatusBgColor(row.original.status)} border-none shadow-none`}>
+            {status}
+          </Badge>
+        );
+      },
+    },
+    {
+      accessorKey: "reason",
+      header: "Reason",
+      cell: ({ row }) => (
+        <span className="text-slate-600 truncate max-w-[200px]" title={row.getValue("reason")}>
+          {row.getValue("reason")}
+        </span>
+      ),
+    },
+    {
+ accessorKey:
+  "requestedIsPaid",
+ header:
+  "Requested As",
+ cell: ({row}) =>
+  row.original
+    .requestedIsPaid
+    ? "Paid"
+    : "Unpaid"
+},
+    {
+      id: "actions",
+      header: "Actions",
+      cell: ({ row }) => (
+        <Button 
+          variant="ghost" 
+          size="sm" 
+          className="text-blue-600 hover:text-blue-700"
+          disabled={row.original.status !== "PENDING"}
+        >
+          Cancel
+        </Button>
+      ),
+    },
+  ];
+
+  const leaveFormFields: FieldConfig[] = [
+    {
+      name: "leaveType",
+      label: "Type of Leave",
+      type: "select",
+      required: true,
+      options: [
+        { label: "Sick Leave", value: "SICK" },
+        { label: "Casual Leave", value: "CASUAL" },
+        { label: "Emergency Leave", value: "EMERGENCY" },
+      ],
+      width: "half",
+    },
+    {
+      name: "emergencyContact",
+      label: "Emergency Contact",
+      type: "tel",
+      placeholder: "Enter 10-digit number",
+      width: "half",
+    },
+    {
+      name: "fromDate",
+      label: "Start Date",
+      type: "date",
+      required: true,
+      width: "half",
+    },
+    {
+      name: "toDate",
+      label: "End Date",
+      type: "date",
+      required: true,
+      width: "half",
+    },
+{
+  name: "requestedIsPaid",
+  label: "Request Paid Leave",
+  type: "checkbox",
+  width: "half",
+  defaultValue: true,
+},
+    {
+      name: "isHalfDay",
+      label: "Half Day Leave",
+      type: "checkbox",
+      width: "half",
+      defaultValue: false,
+    },
+    {
+      name: "halfDayType",
+      label: "Shift Option",
+      type: "select",
+      options: [
+        { label: "First Half", value: "FIRST_HALF" },
+        { label: "Second Half", value: "SECOND_HALF" },
+      ],
+      width: "half",
+      hidden: (formData) => !Boolean(formData.isHalfDay),
+      required: (formData) => Boolean(formData.isHalfDay),
+    },
+    {
+      name: "reason",
+      label: "Reason for Leave",
+      type: "textarea",
+      required: true,
+      placeholder: "Please explain the reason for your leave request...",
+      rows: 3,
+    },
+  ];
+
+    const handleApplyLeave = (data: any) => {
     console.log("[DEBUG] 1. FORM SUBMIT TRIGGERED - Form data:", data);
     console.log("[DEBUG] 2. FORM SUBMIT - About to call mutate()");
     console.log("[DEBUG] 3. Mutation hook status before mutate:", createLeaveMutation.status);
     console.log("[DEBUG] 4. Payload being sent:", JSON.stringify(data, null, 2));
-
+    
+    // Call the mutation
     try {
       createLeaveMutation.mutate(data);
       console.log("[DEBUG] 5. mutate() called successfully");
@@ -51,132 +234,208 @@ export default function ReceptionistLeavePage() {
     }
   };
 
-  const mockHistory: LeaveResponse[] = [
-    {
-      _id: "1",
-      staffId: "R001",
-      staffName: "Sarah Parker",
-      leaveType: "CASUAL",
-      fromDate: "2026-06-01",
-      toDate: "2026-06-02",
-      numberOfDays: 2,
-      reason: "Personal work",
-      appliedOn: "2026-05-20",
-      status: "PENDING",
-      isHalfDay: false,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    },
-  ];
 
-  const columns: ColumnDef<LeaveResponse>[] = [
-    {
-      accessorKey: "leaveType",
-      header: "Type",
-      cell: ({ row }) => (
-        <span className="font-medium">{getLeaveTypeLabel(row.original.leaveType)}</span>
-      ),
-    },
-    {
-      accessorKey: "dates",
-      header: "Duration",
-      cell: ({ row }) => (
-        <span className="text-sm">
-          {format(new Date(row.original.fromDate), "MMM d")} - {format(new Date(row.original.toDate), "MMM d, yyyy")}
-        </span>
-      ),
-    },
-    {
-      accessorKey: "status",
-      header: "Status",
-      cell: ({ row }) => (
-        <Badge className={`${getLeaveStatusBgColor(row.original.status)} border-none`}>
-          {row.original.status}
-        </Badge>
-      ),
-    },
-    {
-      id: "actions",
-      header: "Actions",
-      cell: ({ row }) => (
-        <Button variant="ghost" size="sm" className="text-red-600" disabled={row.original.status !== "PENDING"}>
-          Cancel
-        </Button>
-      ),
-    },
-  ];
-
-  const leaveFields: FieldConfig[] = [
-    { name: "leaveType", label: "Leave Type", type: "select", required: true, options: [
-      { label: "Casual Leave", value: "CASUAL" },
-      { label: "Sick Leave", value: "SICK" },
-      { label: "Emergency Leave", value: "EMERGENCY" },
-    ], width: "half" },
-    { name: "fromDate", label: "Start Date", type: "date", required: true, width: "half" },
-    { name: "toDate", label: "End Date", type: "date", required: true, width: "half" },
-    { name: "isHalfDay", label: "Half Day Leave", type: "checkbox", width: "half", defaultValue: false },
-    {
-  name: "isPaid",
-  label: "Paid Leave",
-  type: "checkbox",
-  width: "half",
-  defaultValue: true
-},
-    { name: "halfDayType", label: "Shift Option", type: "select", options: [
-      { label: "First Half", value: "FIRST_HALF" },
-      { label: "Second Half", value: "SECOND_HALF" },
-    ], width: "half", hidden: (formData) => !Boolean(formData.isHalfDay), required: (formData) => Boolean(formData.isHalfDay) },
-    { name: "reason", label: "Reason", type: "textarea", required: true },
-  ];
-
-  return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold text-slate-900">Leave Management</h1>
-        <Button onClick={() => setIsModalOpen(true)} className="bg-blue-600 gap-2">
-          <Plus className="h-4 w-4" /> Apply Leave
-        </Button>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card className="shadow-sm">
-          <CardContent className="pt-6">
-            <p className="text-sm text-slate-500">Remaining Balance</p>
-            <h3 className="text-2xl font-bold text-blue-600">14 Days</h3>
-          </CardContent>
-        </Card>
-        <Card className="shadow-sm">
-          <CardContent className="pt-6">
-            <p className="text-sm text-slate-500">Leaves Taken</p>
-            <h3 className="text-2xl font-bold text-slate-900">6 Days</h3>
-          </CardContent>
-        </Card>
-        <Card className="shadow-sm">
-          <CardContent className="pt-6">
-            <p className="text-sm text-slate-500">Pending Approval</p>
-            <h3 className="text-2xl font-bold text-orange-600">2 Days</h3>
-          </CardContent>
-        </Card>
-      </div>
-
-      <Card className="shadow-sm">
-        <CardHeader>
-          <CardTitle>My Leave Applications</CardTitle>
-          <CardDescription>Status and history of applied leaves</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <DataTable columns={columns} data={mockHistory} searchColumn="leaveType" searchPlaceholder="Filter by type..." />
-        </CardContent>
-      </Card>
-
-      <ReusableModal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        onSave={handleApplyLeave}
-        title="Apply for Leave"
-        fields={leaveFields}
-        saveButtonText="Submit Application"
-      />
-    </div>
-  );
+ 
+   return (
+     <div className="space-y-6">
+       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+         <div>
+           <h1 className="text-2xl font-bold text-slate-900">Leave Management</h1>
+           <p className="text-slate-500">Apply for leave and track your leave history</p>
+         </div>
+        <div className="flex items-center gap-2">
+   <select
+     className="h-10 rounded-md border px-3 text-sm"
+     value={selectedMonth ?? ""}
+     onChange={(e) =>
+       setSelectedMonth(
+         e.target.value
+           ? Number(e.target.value)
+           : undefined
+       )
+     }
+   >
+     <option value="">All Months</option>
+     <option value="1">January</option>
+     <option value="2">February</option>
+     <option value="3">March</option>
+     <option value="4">April</option>
+     <option value="5">May</option>
+     <option value="6">June</option>
+     <option value="7">July</option>
+     <option value="8">August</option>
+     <option value="9">September</option>
+     <option value="10">October</option>
+     <option value="11">November</option>
+     <option value="12">December</option>
+   </select>
+ 
+   <select
+     className="h-10 rounded-md border px-3 text-sm"
+     value={selectedYear ?? ""}
+     onChange={(e) =>
+       setSelectedYear(
+         e.target.value
+           ? Number(e.target.value)
+           : undefined
+       )
+     }
+   >
+ <option value="">All Years</option>
+ 
+ {Array.from(
+   { length: 20 },
+   (_, i) => new Date().getFullYear() - 10 + i
+ ).map((year) => (
+   <option key={year} value={year}>
+     {year}
+   </option>
+ ))}
+   </select>
+ 
+   <Button
+     variant="outline"
+     onClick={() => {
+       setSelectedMonth(undefined);
+       setSelectedYear(undefined);
+     }}
+   >
+     Clear
+   </Button>
+ 
+   <Button
+     className="gap-2 bg-blue-600 hover:bg-blue-700"
+     onClick={() => setIsModalOpen(true)}
+   >
+     <Plus className="h-4 w-4" />
+     Apply Leave
+   </Button>
+ </div>
+       </div>
+ 
+       {/* Summary Cards */}
+       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+         <Card className="shadow-sm">
+           <CardContent className="pt-6">
+             <div className="flex items-center justify-between">
+               <div>
+                 <p className="text-sm font-medium text-slate-500">Total Allowed Leaves</p>
+                 <h3 className="text-2xl font-bold text-blue-600">{leaveBalance?.totalAllowed ?? 0} days</h3>
+                <p className="text-xs text-slate-400">
+   of {leaveBalance?.totalAllowed ?? 0} total{" "}
+   {leaveBalance?.policyType?.toLowerCase()}
+ </p>
+               </div>
+               <div className="p-3 bg-blue-50 rounded-xl">
+                 <Calendar className="h-6 w-6 text-blue-600" />
+               </div>
+             </div>
+           </CardContent>
+         </Card>
+ 
+         <Card className="shadow-sm">
+           <CardContent className="pt-6">
+             <div className="flex items-center justify-between">
+               <div>
+                 <p className="text-sm font-medium text-slate-500">Used Paid Leaves</p>
+                 <h3 className="text-2xl font-bold text-slate-900">{leaveBalance?.usedLeaves ?? 0} days</h3>
+                 <p className="text-xs text-green-600 flex items-center gap-1 mt-1">
+                   <CheckCircle2 className="h-3 w-3" />
+                   All approved
+                 </p>
+               </div>
+               <div className="p-3 bg-slate-100 rounded-xl">
+                 <CalendarRange className="h-6 w-6 text-slate-600" />
+               </div>
+             </div>
+           </CardContent>
+         </Card>
+ 
+         <Card className="shadow-sm">
+           <CardContent className="pt-6">
+             <div className="flex items-center justify-between">
+               <div>
+                 <p className="text-sm font-medium text-slate-500">Remaining Leaves</p>
+                 <h3 className="text-2xl font-bold text-orange-600">{leaveBalance?.remainingLeaves ?? 0} days</h3>
+                 <p className="text-xs text-orange-500 flex items-center gap-1 mt-1">
+                   <Clock className="h-3 w-3" />
+                   Awaiting approval
+                 </p>
+               </div>
+               <div className="p-3 bg-orange-50 rounded-xl">
+                 <Clock className="h-6 w-6 text-orange-600" />
+               </div>
+             </div>
+           </CardContent>
+         </Card>
+ 
+             <Card className="shadow-sm">
+           <CardContent className="pt-6">
+             <div className="flex items-center justify-between">
+               <div>
+                 <p className="text-sm font-medium text-slate-500">Unpaid Leaves</p>
+                 <h3 className="text-2xl font-bold text-orange-600">{ leaveBalance?.unpaidLeaves ?? 0} days</h3>
+                 <p className="text-xs text-orange-500 flex items-center gap-1 mt-1">
+                   <Clock className="h-3 w-3" />
+                   Awaiting approval
+                 </p>
+               </div>
+               <div className="p-3 bg-orange-50 rounded-xl">
+                 <Clock className="h-6 w-6 text-orange-600" />
+               </div>
+             </div>
+           </CardContent>
+         </Card>
+ 
+ 
+       </div>
+ 
+       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+         {/* Applied Leaves Table */}
+         <div className="lg:col-span-2">
+           <Card className="shadow-sm h-full">
+             <CardHeader>
+               <CardTitle className="text-lg">Applied Leaves History</CardTitle>
+               <CardDescription>Track status of your leave applications</CardDescription>
+             </CardHeader>
+             <CardContent>
+               <DataTable 
+                 columns={columns} 
+                 data={history} 
+                 searchColumn="reason"
+                 searchPlaceholder="Search by reason..."
+               />
+             </CardContent>
+           </Card>
+         </div>
+ 
+         {/* Sidebar Info */}
+         <div className="space-y-6">
+                     <Card className="bg-indigo-50 border-indigo-100">
+             <CardContent className="pt-6">
+               <h4 className="font-semibold text-indigo-900 text-sm mb-2 flex items-center gap-2">
+                 <Info className="h-4 w-4" />
+                 Leave Policy Note
+               </h4>
+               <ul className="text-xs text-indigo-700 space-y-2 list-disc pl-4">
+                 <li>Sick leaves require a medical certificate for &gt; 2 days.</li>
+                 <li>Casual leaves should be applied 48h in advance.</li>
+                 <li>Half-day options are available for morning/afternoon shifts.</li>
+               </ul>
+             </CardContent>
+           </Card>
+         </div>
+       </div>
+ 
+       <ReusableModal
+         isOpen={isModalOpen}
+         onClose={() => setIsModalOpen(false)}
+         onSave={handleApplyLeave}
+         title="Apply for Leave"
+         fields={leaveFormFields}
+         saveButtonText="Submit Application"
+         size="lg"
+       />
+     </div>
+   );
 }

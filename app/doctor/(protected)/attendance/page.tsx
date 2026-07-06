@@ -31,7 +31,7 @@ import {
   useClockOut,
  
 } from "@/services/admin/attendance";
-import { useDoctorById, useUpdateDoctor } from "@/services/admin/doctor";
+import { useDoctorById} from "@/services/admin/doctor";
 
 
 interface AttendanceRecord {

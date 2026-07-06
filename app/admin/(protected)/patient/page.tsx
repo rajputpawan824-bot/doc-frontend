@@ -99,6 +99,17 @@ export interface Patient {
   adhar: string;
   address: string;
   relation?: 'SELF' | 'FATHER' | 'MOTHER' | 'CHILD' | 'SPOUSE' | 'OTHER' | string;
+  familyHead?: {
+  _id: string;
+  name: string;
+  patientCode: string;
+};
+
+emergencyContact?: {
+  name?: string;
+  phone?: string;
+  relation?: string;
+};
   otherRelation?: string;
   diseases?: string[] | string;
   allergies?: string[] | string;
@@ -260,6 +271,16 @@ const getInitialData = (patient: Patient): ReusableFormData => ({
   relation: patient.relation ?? 'SELF',
   otherRelation: patient.otherRelation ?? '',
   diseases: formatList(patient.diseases),
+ 
+
+emergencyContactName:
+  patient.emergencyContact?.name ?? '',
+
+emergencyContactPhone:
+  patient.emergencyContact?.phone ?? '',
+
+emergencyContactRelation:
+  patient.emergencyContact?.relation ?? '',
   allergies: formatList(patient.allergies),
   medicalHistory: patient.medicalHistory ?? '',
 });
@@ -387,6 +408,7 @@ const PatientManagement = () => {
           label: 'Full Name',
           type: 'text',
           required: true,
+          disabled:true,
           placeholder: 'Enter patient full name',
           width: 'half',
           validation: { minLength: 2 },
@@ -396,6 +418,7 @@ const PatientManagement = () => {
           label: 'Phone Number',
           type: 'tel',
           required: true,
+          disabled:true,
           placeholder: '9876543210',
           width: 'half',
           validation: { pattern: /^[0-9]{10}$/ },
@@ -454,10 +477,37 @@ const PatientManagement = () => {
       ],
     },
     {
+  title: 'Emergency Contact',
+  icon: <Phone className="h-4 w-4" />,
+  fields: [
+    {
+      name: 'emergencyContactName',
+      label: 'Contact Name',
+      placeholder: 'Enter Contact name',
+      type: 'text',
+      width: 'half',
+    },
+    {
+      name: 'emergencyContactPhone',
+      label: 'Contact Phone',
+       placeholder: '9876543210',
+      type: 'tel',
+      width: 'half',
+    },
+    {
+      name: 'emergencyContactRelation',
+      label: 'Relation',
+       placeholder: 'Specify relation',
+      type: 'text',
+      width: 'full',
+    },
+  ],
+},
+    {
       title: 'Relation & Medical Details',
       icon: <Heart className="h-4 w-4" />,
       fields: [
-        {
+     {
           name: 'relation',
           label: 'Relation',
           type: 'select',
@@ -473,6 +523,7 @@ const PatientManagement = () => {
           placeholder: 'Specify relation',
           width: 'half',
         },
+
         {
           name: 'diseases',
           label: 'Diseases',
@@ -518,9 +569,21 @@ const PatientManagement = () => {
     void refetchNextPatientCode();
   };
 
-  const handleAddPatient = async (data: ReusableFormData) => {
-    await addPatientMutation.mutateAsync(data as Partial<Patient>);
+const handleAddPatient = async (data: ReusableFormData) => {
+  const payload = {
+    ...data,
+
+    emergencyContact: {
+      name: data.emergencyContactName,
+      phone: data.emergencyContactPhone,
+      relation: data.emergencyContactRelation,
+    },
   };
+
+  await addPatientMutation.mutateAsync(
+    payload as Partial<Patient>
+  );
+};
 
   const handleOpenEditPatient = (patient: Patient) => {
     setSelectedPatient(patient);
@@ -528,15 +591,26 @@ const PatientManagement = () => {
     setIsEditModalOpen(true);
   };
 
-  const handleEditPatient = async (data: ReusableFormData) => {
-    const patient = editPatient ?? selectedPatient;
-    if (!patient) return;
+const handleEditPatient = async (data: ReusableFormData) => {
+  const patient = editPatient ?? selectedPatient;
 
-    await updatePatientMutation.mutateAsync({
-      id: patient.id,
-      data: data as Partial<Patient>,
-    });
+  if (!patient) return;
+
+  const payload = {
+    ...data,
+
+    emergencyContact: {
+      name: data.emergencyContactName,
+      phone: data.emergencyContactPhone,
+      relation: data.emergencyContactRelation,
+    },
   };
+
+  await updatePatientMutation.mutateAsync({
+    id: patient.id,
+    data: payload as Partial<Patient>,
+  });
+};
 
   const handleOpenDetails = (patient: Patient) => {
     setDetailPatientId(patient.id);
@@ -882,6 +956,36 @@ const PatientManagement = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5 rounded-lg border bg-white p-4">
                 <DetailItem label="Relation" value={patientForDetails.relation} />
                 <DetailItem label="Other Relation" value={patientForDetails.otherRelation} />
+{patientForDetails.relation !== "SELF" && (
+  <>
+    <DetailItem
+      label="Family Head"
+      value={patientForDetails.familyHead?.name}
+    />
+
+    <DetailItem
+      label="Family Head Code"
+      value={patientForDetails.familyHead?.patientCode}
+    />
+  </>
+)}
+
+  <DetailItem
+    label="Emergency Contact Name"
+    value={patientForDetails.emergencyContact?.name}
+  />
+
+  <DetailItem
+    label="Emergency Contact Phone"
+    value={patientForDetails.emergencyContact?.phone}
+  />
+
+  <DetailItem
+    label="Emergency Contact Relation"
+    value={patientForDetails.emergencyContact?.relation}
+  />
+
+
                 <DetailItem label="Diseases" value={formatList(patientForDetails.diseases)} />
                 <DetailItem label="Allergies" value={formatList(patientForDetails.allergies)} />
                 <DetailItem label="Medical History" value={patientForDetails.medicalHistory} />

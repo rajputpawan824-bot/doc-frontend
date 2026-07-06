@@ -19,6 +19,8 @@ import {
 import Logo from "@/public/images/logo-blue.png";
 import Image from "next/image";
 import { Badge } from "@/components/ui/badge";
+import { usePatientPortalSelection } from "@/lib/hooks/usePatientPortalSelection";
+import { usePatientDashboard } from "@/services/admin/patient";
 
 const hospitalColors = {
   primary: "#1a73e8",
@@ -43,6 +45,14 @@ export default function PatientLayout({
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
   const [isChecking, setIsChecking] = useState(true);
+  const { patientId } =
+  usePatientPortalSelection();
+
+const { data: dashboardData } =
+  usePatientDashboard(patientId || "");
+
+const profile =
+  dashboardData?.profile;
 
   const navigationItems = [
     {
@@ -227,8 +237,8 @@ export default function PatientLayout({
             
             <div className="flex items-center space-x-3">
               <div className="text-right hidden sm:block">
-                <p className="text-sm font-semibold text-gray-800">John Doe</p>
-                <p className="text-[10px] text-slate-500">ID: P-10294</p>
+                <p className="text-sm font-semibold text-gray-800">    {profile?.name || "Patient"}</p>
+                <p className="text-[10px] text-slate-500">{profile?.patientCode || ""}</p>
               </div>
               <div className="h-10 w-10 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold border-2 border-white shadow-sm">
                 JD

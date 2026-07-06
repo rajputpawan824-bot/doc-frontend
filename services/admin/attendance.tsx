@@ -309,9 +309,7 @@ export const useAttendanceList = ({
     ],
 
     queryFn: async () => {
-         const response: ApiResponse<{
-  data: AttendanceListResponse;
-}> = await clientApi.get(
+const response: ApiResponse<AttendanceListResponse> = await clientApi.get(
           "/attendance/all",
           {
             params: {
@@ -330,7 +328,7 @@ export const useAttendanceList = ({
   );
 }
 
-      return response.data.data;
+      return response.data;
     },
   });
 };
