@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { format } from "date-fns";
+
 import { 
   Ticket, 
   Plus, 
@@ -92,7 +93,26 @@ const [selectedDate, setSelectedDate] = useState(
     }
   }, [isDoctorError]);
 
-  const currentToken = currentTokenData?.currentToken ?? 0;
+    const getStatusBadge = (status: string) => {
+      const statusMap: Record<string, string> = {
+        WAITING: "bg-yellow-100 text-yellow-800 border-yellow-200",
+        IN_PROGRESS: "bg-blue-100 text-blue-800 border-blue-200",
+        COMPLETED: "bg-green-100 text-green-800 border-green-200",
+        CANCELLED: "bg-red-100 text-red-800 border-red-200",
+      };
+  
+      return (
+        <Badge variant="outline" className={statusMap[status] || ""}>
+          {status}
+        </Badge>
+      );
+    };
+  
+
+  const currentToken =
+  (currentTokenData as any)?.data?.currentToken ??
+  (currentTokenData as any)?.currentToken ??
+  0;
 const tokenAppointments = Array.isArray(
   (appointments as any)?.data
 )
@@ -324,7 +344,7 @@ const tokenAppointments = Array.isArray(
                 </td>
 
                 <td className="p-2">
-                  {appointment.status}
+                  {getStatusBadge(appointment.status)}
                 </td>
               </tr>
             )
