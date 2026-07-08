@@ -67,6 +67,7 @@ export default function TokenManagementClient({
   const [selectedDoctorId, setSelectedDoctorId] = useState<string>("");
   const [doctorSearch, setDoctorSearch] = useState("");
   const [modalDoctorSearch, setModalDoctorSearch] = useState("");
+  
 const today = useMemo(
   () =>
     new Intl.DateTimeFormat("en-CA", {
@@ -75,22 +76,30 @@ const today = useMemo(
   []
 );
   const [selectedDate, setSelectedDate] = useState(today);
+const filteredDoctorsList = useMemo(() => {
+  const activeDoctors = (initialDoctors || []).filter(
+    (doctor: any) => doctor.user?.isActive === true
+  );
 
-  const filteredDoctorsList = useMemo(() => {
-    const list = initialDoctors || [];
-    if (!doctorSearch) return list;
-    return list.filter((doctor) =>
-      doctor.user?.name?.toLowerCase().includes(doctorSearch.toLowerCase())
-    );
-  }, [initialDoctors, doctorSearch]);
+  if (!doctorSearch) return activeDoctors;
 
-  const filteredModalDoctors = useMemo(() => {
-    const list = initialDoctors || [];
-    if (!modalDoctorSearch) return list;
-    return list.filter((doctor) =>
-      doctor.user?.name?.toLowerCase().includes(modalDoctorSearch.toLowerCase())
-    );
-  }, [initialDoctors, modalDoctorSearch]);
+  return activeDoctors.filter((doctor: any) =>
+    doctor.user?.name?.toLowerCase().includes(doctorSearch.toLowerCase())
+  );
+}, [initialDoctors, doctorSearch]);
+
+const filteredModalDoctors = useMemo(() => {
+  const activeDoctors = (initialDoctors || []).filter(
+    (doctor: any) => doctor.user?.isActive === true
+  );
+
+  if (!modalDoctorSearch) return activeDoctors;
+
+  return activeDoctors.filter((doctor: any) =>
+    doctor.user?.name?.toLowerCase().includes(modalDoctorSearch.toLowerCase())
+  );
+}, [initialDoctors, modalDoctorSearch]);
+
 
   // Appointment Creation State
   const queryClient = useQueryClient();

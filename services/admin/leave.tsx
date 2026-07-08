@@ -135,10 +135,25 @@ export const useCreateLeave = (options?: {
 
       return response.data.data;
     },
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["leaves"] });
-      options?.onSuccess?.(data);
-    },
+onSuccess: (data) => {
+  queryClient.invalidateQueries({
+    queryKey: ["leaves"],
+  });
+
+  queryClient.invalidateQueries({
+    queryKey: ["doctors", "on-leave"],
+  });
+
+  queryClient.invalidateQueries({
+    queryKey: ["doctors"],
+  });
+
+  queryClient.invalidateQueries({
+    queryKey: ["doctors", "dashboard-stats"],
+  });
+
+  options?.onSuccess?.(data);
+},
     onError: options?.onError,
     retry: 1,
     retryDelay: 1000,
@@ -179,10 +194,25 @@ export const useApproveLeave = (options?: {
 
       return response.data.data;
     },
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["leaves"] });
-      options?.onSuccess?.(data);
-    },
+onSuccess: (data) => {
+  queryClient.invalidateQueries({
+    queryKey: ["leaves"],
+  });
+
+  queryClient.invalidateQueries({
+    queryKey: ["doctors", "on-leave"],
+  });
+
+  queryClient.invalidateQueries({
+    queryKey: ["doctors"],
+  });
+
+  queryClient.invalidateQueries({
+    queryKey: ["doctors", "dashboard-stats"],
+  });
+
+  options?.onSuccess?.(data);
+},
     onError: options?.onError,
     retry: 1,
     retryDelay: 1000,

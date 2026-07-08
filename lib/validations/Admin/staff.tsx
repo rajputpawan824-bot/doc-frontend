@@ -44,6 +44,17 @@ export interface StaffFormData {
   start: string;
   end: string;
 };
+  documents?: File[];
+}
+
+export interface StaffDocument {
+  _id?: string;
+  fileName: string;
+  originalName: string;
+  filePath: string;
+  mimeType: string;
+  fileSize: number;
+  uploadedAt?: string;
 }
 
 export interface StaffResponse {
@@ -72,6 +83,7 @@ export interface StaffResponse {
   start?: string;
   end?: string;
 };
+  documents?: StaffDocument[];
   user: {
     _id?: string;
     id?: string;
@@ -242,10 +254,7 @@ experience: {
 
   address: {
     required: "Address is required",
-    minLength: {
-      value: 5,
-      message: "Address must be at least 5 characters",
-    },
+
     maxLength: {
       value: 255,
       message: "Address cannot exceed 255 characters",

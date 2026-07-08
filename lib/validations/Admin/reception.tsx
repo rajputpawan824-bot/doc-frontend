@@ -30,7 +30,17 @@ workingHours: {
   end: string;
 };
 
+documents?: File[];
 
+}
+
+export interface ReceptionDocument {
+  fileName: string;
+  originalName: string;
+  filePath: string;
+  mimeType: string;
+  fileSize: number;
+  uploadedAt?: string;
 }
 
 export interface ReceptionResponse {
@@ -56,6 +66,7 @@ workingHours: {
   start: string;
   end: string;
 };
+  documents?: ReceptionDocument[];
   createdAt: string;
   updatedAt: string;
   user: {
@@ -163,10 +174,7 @@ export const RECEPTION_VALIDATION_RULES: ValidationRules = {
   },
   address: {
     required: "Address is required",
-    minLength: {
-      value: 5,
-      message: "Address must be at least 5 characters",
-    },
+
   },
   deskNumber: {
     minLength: {
@@ -300,6 +308,7 @@ workingHours?: {
   start: string;
   end: string;
 };
+  documents?: ReceptionDocument[];
   isActive: boolean;
   canEditPatient: string | boolean | undefined; // Can be string, boolean, or undefined from API
   canEditPatients?: string | boolean | undefined; // Can be string, boolean, or undefined from API

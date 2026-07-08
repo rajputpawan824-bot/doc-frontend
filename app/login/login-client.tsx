@@ -223,9 +223,9 @@ const handleSubmit = (
     submitData.email = formData.email;
   }
 
-  if (formData.phone) {
-    submitData.phone = formData.phone;
-  }
+  // if (formData.phone) {
+  //   submitData.phone = formData.phone;
+  // }
 
   login(submitData);
 };
@@ -333,7 +333,7 @@ const handleSubmit = (
               {/* Mobile Number */}
               <div className="space-y-2">
                 <Label htmlFor="phone" className="text-sm font-medium">
-                  Mobile Number
+                  Mobile Number(Optional)
                 </Label>
                 <div className="relative">
                   <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />

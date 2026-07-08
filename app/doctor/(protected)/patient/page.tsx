@@ -71,6 +71,7 @@ import {
   type PatientAppointment,
 } from "@/services/admin/appointment";
 import {
+  type PrescriptionPayload,
   useCreatePrescription,
   usePrescriptionHistory,
 } from "@/services/admin/prescription";
@@ -100,6 +101,11 @@ type PrescriptionHistoryItem = {
   prescription?: string | string[];
   medicalNotes?: string | string[];
   followUpDate?: string | Date | null;
+  attachments?: {
+    _id?: string;
+    originalName: string;
+    filePath: string;
+  }[];
   createdAt?: string | Date;
   updatedAt?: string | Date;
   appointment?: {
@@ -524,6 +530,7 @@ export default function PatientsPage() {
   const [medicalNotes, setMedicalNotes] = useState("");
   const [followUpDate, setFollowUpDate] = useState("");
   const [followUpRequired, setFollowUpRequired] = useState(false);
+  const [prescriptionFiles, setPrescriptionFiles] = useState<File[]>([]);
   const [selectedAppointmentId, setSelectedAppointmentId] = useState("");
 
   const queryClient = useQueryClient();
@@ -576,6 +583,7 @@ export default function PatientsPage() {
     setMedicalNotes("");
     setFollowUpDate("");
     setFollowUpRequired(false);
+    setPrescriptionFiles([]);
     setSelectedAppointmentId("");
     setPrescriptionDialogOpen(true);
   };
@@ -628,16 +636,21 @@ export default function PatientsPage() {
       return;
     }
 
+    const payload = new FormData();
+    payload.append("prescription", prescription.trim());
+    payload.append("medicalNotes", medicalNotes.trim());
+    payload.append("followUpDate", followUpDate || "");
+    payload.append("isFollowUpRequired", String(followUpRequired));
+
+    prescriptionFiles.forEach((file) => {
+      payload.append("files", file);
+    });
+
     createPrescriptionMutation.mutate(
       {
         appointmentId: selectedAppointmentId,
        
-        data: {
-          prescription: prescription.trim(),
-          medicalNotes: medicalNotes.trim(),
-          followUpDate: followUpDate || null,
-          isFollowUpRequired: followUpRequired,
-        },
+        data: payload as unknown as PrescriptionPayload,
       },
       {
         onSuccess: () => {
@@ -647,6 +660,7 @@ export default function PatientsPage() {
           setMedicalNotes("");
           setFollowUpDate("");
           setFollowUpRequired(false);
+          setPrescriptionFiles([]);
           setSelectedAppointmentId("");
           void queryClient.invalidateQueries({
             queryKey: ["prescription-history", selectedPatient.id],
@@ -1142,6 +1156,29 @@ export default function PatientsPage() {
                               </div>
                             </div>
 
+                            <div className="space-y-2">
+                              <Label>Medical Reports</Label>
+                              {item.attachments?.length ? (
+                                <div className="space-y-2">
+                                  {item.attachments.map((attachment, attachmentIndex) => (
+                                    <a
+                                      key={attachment._id || attachmentIndex}
+                                      href={`${process.env.NEXT_PUBLIC_API_URL}${attachment.filePath}`}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="block text-sm text-blue-600 underline"
+                                    >
+                                      {attachment.originalName}
+                                    </a>
+                                  ))}
+                                </div>
+                              ) : (
+                                <p className="text-sm text-slate-500">
+                                  No medical reports uploaded
+                                </p>
+                              )}
+                            </div>
+
                             <div className="rounded-md bg-slate-50 p-3">
                               <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
                                 Follow Up Date
@@ -1301,6 +1338,18 @@ export default function PatientsPage() {
                     onCheckedChange={setFollowUpRequired}
                   />
                 </div>
+              </div>
+
+              <div className="space-y-2 rounded-lg border bg-white p-4">
+                <Label>Medical Reports</Label>
+                <Input
+                  name="files"
+                  type="file"
+                  multiple
+                  onChange={(event) =>
+                    setPrescriptionFiles(Array.from(event.target.files || []))
+                  }
+                />
               </div>
 
               <div className="flex justify-end gap-3">

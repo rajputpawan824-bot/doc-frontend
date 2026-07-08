@@ -117,8 +117,16 @@ const { data: doctorsData } =
     limit: 1000,
   });
 
-const doctors =
-  doctorsData?.data || [];
+const doctors = (
+  doctorsData?.data || []
+).filter(
+  (doctor: any) =>
+    doctor.user?.isActive === true &&
+    (
+      doctor.admin === adminId ||
+      doctor.admin?._id === adminId
+    )
+);
 
   const { data: availableSlots = [] } = useQuery({
     queryKey: ["available-slots", appointmentForm.doctorId, appointmentForm.date],
@@ -535,26 +543,13 @@ if (isLoading) {
           const formattedSlot =
             `${String(hour).padStart(2,"0")}:${minutes} ${ampm}`;
 
-          createAppointmentMutation.mutate(
-            {
-              doctor:
-                appointmentForm.doctorId,
-
-              patient:
-                patientId, // IMPORTANT
-              admin:
-                adminId,
-
-              date:
-                appointmentForm.date,
-
-              slot:
-                formattedSlot,
-
-              reason:
-                appointmentForm.reason,
-            }
-          );
+createAppointmentMutation.mutate({
+  doctor: appointmentForm.doctorId,
+  patient: patientId,
+  date: appointmentForm.date,
+  slot: formattedSlot,
+  reason: appointmentForm.reason,
+});
         }}
       >
         Book Appointment

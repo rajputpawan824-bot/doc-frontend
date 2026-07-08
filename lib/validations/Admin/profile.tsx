@@ -9,6 +9,13 @@ export interface ProfileFormData {
   name: string;
   email: string;
   phone: string;
+
+  profileImage?: File | null;
+
+  workingHours?: {
+    start: string;
+    end: string;
+  };
 }
 // Clinic Information
 export interface ClinicInfo {
@@ -19,6 +26,10 @@ export interface ClinicInfo {
   clinicPhone?: string;
 
   clinicLogo?: string;
+ workingHours?: {
+    start: string;
+    end: string;
+  };
 
 
   gstin?: string;
@@ -39,6 +50,9 @@ export interface ProfileResponse {
   name: string;
   email: string;
   phone: string;
+    profileImage?: string;
+  
+
   role: "ADMIN";
 
   isActive: boolean;

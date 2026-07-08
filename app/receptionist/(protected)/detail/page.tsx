@@ -34,6 +34,9 @@ export default function ReceptionistProfilePage() {
   const [isEditing, setIsEditing] = useState(false);
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
 const [passwordModalKey, setPasswordModalKey] = useState(0);
+const [selectedDocuments, setSelectedDocuments] = useState<File[]>([]);
+const [selectedProfileImage, setSelectedProfileImage] =
+  useState<File | null>(null);
 const {
   data: receptionist,
   isLoading,
@@ -65,6 +68,7 @@ const updateReceptionist = useUpdateReceptionist({
   onSuccess: () => {
     refetch();
     setIsEditing(false);
+    setSelectedDocuments([]);
   },
 });
 
@@ -110,6 +114,7 @@ const handleSave = () => {
     
      registrationNo: formData.registrationNo,
       experience: formData.experience,
+      documents: selectedDocuments,
     },
   });
 };
@@ -187,7 +192,10 @@ const handleUpdatePassword = (
                 <Save className="h-4 w-4" />
                 Save
               </Button>
-              <Button onClick={() => setIsEditing(false)} variant="outline" className="gap-2">
+              <Button onClick={() => {
+                setIsEditing(false);
+                setSelectedDocuments([]);
+              }} variant="outline" className="gap-2">
                 <X className="h-4 w-4" />
                 Cancel
               </Button>
@@ -462,6 +470,39 @@ Working Hours
       <div>
         <Label>Aadhaar</Label>
         <p>{receptionist.aadhaar}</p>
+      </div>
+
+      <div className="md:col-span-2">
+        <Label>Documents</Label>
+        {isEditing && (
+          <Input
+            name="documents"
+            type="file"
+            multiple
+            className="mt-2"
+            onChange={(e) =>
+              setSelectedDocuments(Array.from(e.target.files || []))
+            }
+          />
+        )}
+
+        <div className="mt-2 space-y-2">
+          {receptionist.documents?.length ? (
+            receptionist.documents.map((doc, index) => (
+              <a
+                key={doc.filePath || index}
+                href={`https://clinic-managemnet-backend.onrender.com${doc.filePath}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block text-sm text-blue-600 underline"
+              >
+                {doc.originalName}
+              </a>
+            ))
+          ) : (
+            <p className="text-sm text-slate-500">No documents uploaded</p>
+          )}
+        </div>
       </div>
 
     </CardContent>

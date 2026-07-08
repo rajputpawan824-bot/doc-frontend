@@ -37,6 +37,30 @@ interface VisitHistory {
   hasPrescription: boolean;
 }
 
+type PrescriptionAttachment = {
+  _id?: string;
+  originalName?: string;
+  fileName?: string;
+  filePath?: string;
+  date?: string | Date;
+};
+
+type PrescriptionHistoryItem = {
+  _id?: string;
+  tokenNumber?: string | number;
+  prescription?: string | string[];
+  medicalNotes?: string | string[];
+  followUpDate?: string | Date | null;
+  createdAt?: string | Date;
+  attachments?: PrescriptionAttachment[];
+  appointment?: {
+    date?: string | Date;
+    tokenNumber?: string | number;
+    doctorName?: string;
+  };
+  doctorName?: string;
+};
+
 function getDoctorName(appointment: PatientAppointment) {
   return (
     appointment.doctorName ||
@@ -117,26 +141,44 @@ export default function PatientHistoryPage() {
   isLoading: historyLoading,
 } = usePrescriptionHistory(patientId);
 
-const getHistoryItems = (value: any) => {
+const getHistoryItems = (value: unknown): PrescriptionHistoryItem[] => {
   if (!value) return [];
 
   if (Array.isArray(value)) {
-    return value;
+    return value as PrescriptionHistoryItem[];
   }
 
-  if (Array.isArray(value.history)) {
-    return value.history;
+  if (typeof value === "object") {
+    const historyValue = value as {
+      history?: PrescriptionHistoryItem[];
+      data?: unknown;
+    };
+
+    if (Array.isArray(historyValue.history)) {
+      return historyValue.history;
+    }
+
+    if (historyValue.data) {
+      return getHistoryItems(historyValue.data);
+    }
   }
 
-  if (value.data) {
-    return getHistoryItems(value.data);
-  }
 
   return [];
 };
 
 const historyItems =
   getHistoryItems(prescriptionHistory);
+
+const getAttachments = (item: PrescriptionHistoryItem): PrescriptionAttachment[] =>
+  Array.isArray(item?.attachments) ? item.attachments : [];
+
+const allAttachments = historyItems.flatMap((item) =>
+  getAttachments(item).map((attachment) => ({
+    ...attachment,
+    date: item.appointment?.date || item.createdAt,
+  })),
+);
 
 
   console.log(
@@ -159,8 +201,11 @@ const visitHistory: VisitHistory[] = appointments.map((appointment) => ({
   reason: appointment.reason || "--",
   slot: appointment.slot || appointment.time || "--",
   status: appointment.status || "--",
-  hasPrescription:
-    appointment.status === "COMPLETED",
+hasPrescription:
+  Boolean(
+    appointment.hasPrescription ||
+    appointment.prescription
+  ),
 }));
   const columns: ColumnDef<VisitHistory>[] = [
     {
@@ -282,19 +327,29 @@ const visitHistory: VisitHistory[] = appointments.map((appointment) => ({
               <CardDescription>Recently added files</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              {visitHistory.filter((visit) => visit.hasPrescription).slice(0, 2).map((visit) => (
-                <div key={visit.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-xl">
+              {allAttachments.slice(0, 2).map((attachment, index) => (
+                <a
+                  key={attachment._id || attachment.filePath || index}
+                  href={`${process.env.NEXT_PUBLIC_API_URL}${attachment.filePath}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center justify-between p-3 bg-slate-50 rounded-xl"
+                >
                   <div className="flex items-center gap-3">
                     <FileText className="h-5 w-5 text-slate-400" />
                     <div>
-                      <p className="text-sm font-bold text-slate-700">Prescription_{visit.id || "visit"}.pdf</p>
-                      <p className="text-[10px] text-slate-400">Added {visit.date}</p>
+                      <p className="text-sm font-bold text-slate-700">
+                        {attachment.originalName || attachment.fileName}
+                      </p>
+                      <p className="text-[10px] text-slate-400">
+                        Added {formatHistoryDate(attachment.date) || "-"}
+                      </p>
                     </div>
                   </div>
                   <Download className="h-4 w-4 text-blue-600 cursor-pointer" />
-                </div>
+                </a>
               ))}
-              {visitHistory.filter((visit) => visit.hasPrescription).length === 0 && (
+              {allAttachments.length === 0 && (
                 <p className="text-sm text-slate-400">No documents found.</p>
               )}
             </CardContent>
@@ -342,13 +397,14 @@ const visitHistory: VisitHistory[] = appointments.map((appointment) => ({
 
         <div className="relative space-y-5 before:absolute before:left-4 before:top-2 before:h-full before:w-px before:bg-slate-200">
 
-          {historyItems.map((item: any, index: number) => {
+          {historyItems.map((item, index: number) => {
 
             const prescriptionItems =
               splitNumberedText(item.prescription);
 
             const notesItems =
               splitNumberedText(item.medicalNotes);
+            const attachments = getAttachments(item);
 
             return (
               <div
@@ -412,6 +468,32 @@ const visitHistory: VisitHistory[] = appointments.map((appointment) => ({
                         />
                       </div>
 
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>
+                        Attachments
+                      </Label>
+
+                      {attachments.length > 0 ? (
+                        <div className="space-y-2">
+                          {attachments.map((attachment, attachmentIndex) => (
+                            <a
+                              key={attachment._id || attachment.filePath || attachmentIndex}
+                              href={`${process.env.NEXT_PUBLIC_API_URL}${attachment.filePath}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="block text-sm text-blue-600 underline"
+                            >
+                              {attachment.originalName || attachment.fileName}
+                            </a>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-sm text-slate-500">
+                          No attachments uploaded
+                        </p>
+                      )}
                     </div>
 
                     <div className="rounded-md bg-slate-50 p-3">

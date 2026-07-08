@@ -38,7 +38,7 @@ type CreateDoctorRequest = Omit<CreateDoctorPayload, "availabilityDays"> & {
   availabilityDays: string[];
 };
 
-type UpdateDoctorRequest = Partial<Omit<DoctorFormData, "availabilityDays">> & {
+type UpdateDoctorRequest = Partial<Omit<DoctorFormData, "availabilityDays" | "documents">> & {
   availabilityDays?: DoctorAvailability;
 };
 
@@ -54,6 +54,9 @@ function normalizeDoctor(doctor: DoctorApiRecord): DoctorResponse {
   return {
     ...doctor,
     id: doctor._id || doctor.id,
+ documents: Array.isArray(doctor.documents)
+  ? doctor.documents
+  : [],
     status: doctor.user?.isActive ? "active" : "inactive",
     availabilityDays:
       Array.isArray(doctor.availabilityDays)
@@ -89,33 +92,38 @@ export function useAddDoctor(options?: {
 }) {
   return useMutation<DoctorResponse, Error, DoctorFormData>({
     mutationFn: async (formData: DoctorFormData) => {
-      const payload: CreateDoctorRequest = {
-        name: formData.name.trim(),
-        email: formData.email.trim().toLowerCase(),
-        phone: formData.phone.trim(),
-        qualification: formData.qualification.trim(),
-        registrationNo: formData.registrationNo.trim(),
-        salary: Number(formData.salary),
-        shift: formData.shift,
-        gender: formData.gender,
-          joiningDate: formData.joiningDate,
-          doctorCode: formData.doctorCode,
-       
-        department: formData.department.trim(),
-        aadhaar: formData.aadhaar.replace(/[-\s]/g, ""), // Remove hyphens/spaces
-        address: formData.address.trim(),
-        experience: Number(formData.experience),
-        consultationFee: Number(formData.consultationFee),
-       availabilityDays: formData.availabilityDays.map(
-  d => d.toUpperCase()
-),
-        password: formData.password,
-       workingHours: {
-  start: formData.workingHours.start,
-  end: formData.workingHours.end,
-}
-        
-      };
+      const payload = new FormData();
+
+      payload.append("name", formData.name.trim());
+      payload.append("email", formData.email.trim().toLowerCase());
+      payload.append("phone", formData.phone.trim());
+      payload.append("qualification", formData.qualification.trim());
+      payload.append("registrationNo", formData.registrationNo.trim());
+      payload.append("salary", String(Number(formData.salary)));
+      payload.append("shift", formData.shift);
+      payload.append("gender", formData.gender);
+      payload.append("joiningDate", formData.joiningDate);
+      payload.append("doctorCode", formData.doctorCode);
+      payload.append("department", formData.department.trim());
+      payload.append("aadhaar", formData.aadhaar.replace(/[-\s]/g, ""));
+      payload.append("address", formData.address.trim());
+      payload.append("experience", String(Number(formData.experience)));
+      payload.append("consultationFee", String(Number(formData.consultationFee)));
+
+      formData.availabilityDays.forEach((day) => {
+        payload.append("availabilityDays", day.toUpperCase());
+      });
+
+      if (formData.password) {
+        payload.append("password", formData.password);
+      }
+
+      payload.append("workingHours[start]", formData.workingHours.start);
+      payload.append("workingHours[end]", formData.workingHours.end);
+
+      formData.documents?.forEach(file => {
+        payload.append("files", file);
+      });
 
       const response: ApiResponse<{ data: DoctorResponse }> =
         await clientApi.post("/doctors/create-doctor", payload);
@@ -277,16 +285,46 @@ export function useUpdateDoctor(options?: {
     { id: string; data: Partial<DoctorFormData> }
   >({
     mutationFn: async ({ id, data }) => {
-      const payload: UpdateDoctorRequest = {
-        ...data,
-      };
-      
-    if (Array.isArray(payload.availabilityDays)) {
-  payload.availabilityDays =
-    payload.availabilityDays.map(
-      d => d.toUpperCase()
-    );
+      const payload = new FormData();
+
+      if (data.name !== undefined) payload.append("name", data.name.trim());
+      if (data.email !== undefined) payload.append("email", data.email.trim().toLowerCase());
+      if (data.phone !== undefined) payload.append("phone", data.phone.trim());
+      if (data.qualification !== undefined) payload.append("qualification", data.qualification.trim());
+      if (data.registrationNo !== undefined) payload.append("registrationNo", data.registrationNo.trim());
+      if (data.salary !== undefined) payload.append("salary", String(Number(data.salary)));
+      if (data.shift !== undefined) payload.append("shift", data.shift);
+      if (data.gender !== undefined) payload.append("gender", data.gender);
+      if (data.joiningDate !== undefined) payload.append("joiningDate", data.joiningDate);
+      if (data.doctorCode !== undefined) payload.append("doctorCode", data.doctorCode);
+      if (data.department !== undefined) payload.append("department", data.department.trim());
+      if (data.aadhaar !== undefined) payload.append("aadhaar", data.aadhaar.replace(/[-\s]/g, ""));
+      if (data.address !== undefined) payload.append("address", data.address.trim());
+      if (data.experience !== undefined) payload.append("experience", String(Number(data.experience)));
+      if (data.consultationFee !== undefined) payload.append("consultationFee", String(Number(data.consultationFee)));
+
+      if (Array.isArray(data.availabilityDays)) {
+        data.availabilityDays.forEach((day) => {
+          payload.append("availabilityDays", day.toUpperCase());
+        });
+      }
+
+      if (data.workingHours?.start !== undefined) {
+        payload.append("workingHours[start]", data.workingHours.start);
+      }
+
+      if (data.workingHours?.end !== undefined) {
+        payload.append("workingHours[end]", data.workingHours.end);
+      }
+if (data.profileImage) {
+  payload.append(
+    "profileImage",
+    data.profileImage
+  );
 }
+data.documents?.forEach(file => {
+  payload.append("documents", file);
+});
       
       const response: ApiResponse<{ data: DoctorResponse }> =
         await clientApi.put(`/doctors/update/${id}`, payload);

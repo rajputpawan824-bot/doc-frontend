@@ -35,6 +35,7 @@ type RawPatient = Partial<Patient> & {
   diseases?: string | string[];
   allergies?: string[] | string;
   medicalHistory?: string;
+  medicalReports?: Patient["medicalReports"];
   isActive?: boolean;
   dateOfBirth?: string | Date;
   createdAt?: string | Date;
@@ -80,6 +81,7 @@ export type PatientCreateData = {
   diseases?: string | string[];
   allergies?: string[] | string;
   medicalHistory?: string;
+  medicalReports?: File[];
   patientCode?: string;
     emergencyContactName?: string;
   emergencyContactPhone?: string;
@@ -291,6 +293,56 @@ allergies:
   };
 }
 
+function appendOptional(payload: FormData, key: string, value: unknown) {
+  if (value === undefined || value === null || value === "") return;
+  payload.append(key, String(value));
+}
+
+function buildPatientFormData(data: PatientCreateData) {
+  const payload = buildCreatePatientPayload(data);
+  const formData = new FormData();
+
+  appendOptional(formData, "patientCode", payload.patientCode);
+  formData.append("name", payload.name);
+  formData.append("phone", payload.phone);
+  appendOptional(formData, "email", payload.email);
+  appendOptional(formData, "age", payload.age);
+  appendOptional(formData, "gender", payload.gender);
+  appendOptional(formData, "bloodGroup", payload.bloodGroup);
+  appendOptional(formData, "aadhaar", payload.aadhaar);
+  appendOptional(formData, "address", payload.address);
+  appendOptional(formData, "relation", payload.relation);
+  appendOptional(formData, "otherRelation", payload.otherRelation);
+  appendOptional(formData, "medicalHistory", payload.medicalHistory);
+  appendOptional(formData, "emergencyContact[name]", payload.emergencyContact?.name);
+  appendOptional(formData, "emergencyContact[phone]", payload.emergencyContact?.phone);
+  appendOptional(
+    formData,
+    "emergencyContact[relation]",
+    payload.emergencyContact?.relation,
+  );
+
+  const diseases = Array.isArray(payload.diseases)
+    ? payload.diseases
+    : payload.diseases
+    ? [payload.diseases]
+    : [];
+  diseases.forEach((disease) => formData.append("diseases", disease));
+
+  const allergies = Array.isArray(payload.allergies)
+    ? payload.allergies
+    : payload.allergies
+    ? [payload.allergies]
+    : [];
+  allergies.forEach((allergy) => formData.append("allergies", allergy));
+
+data.medicalReports?.forEach((file) => {
+  formData.append("files", file);
+});
+
+  return formData;
+}
+
 function normalizePatient(patient: RawPatient): Patient {
   const id = patient._id || patient.id || "";
   const isActive =
@@ -356,6 +408,10 @@ export const usePatients = (params: PatientListParams = {}) => {
         meta: Array.isArray(response.data) ? undefined : response.data.meta,
       };
     },
+      refetchOnMount: "always",
+  refetchOnWindowFocus: true,
+  staleTime: 0,
+  
     retry: 2,
     retryDelay: 1000,
   });
@@ -398,7 +454,7 @@ export function useAddPatient(options?: {
 
   return useMutation<Patient, Error, PatientCreateData>({
     mutationFn: async (formData: PatientCreateData) => {
-      const payload = buildCreatePatientPayload(formData);
+      const payload = buildPatientFormData(formData);
 
       const response: ApiResponse<RawPatientResponse> =
         await clientApi.post("/patient/create-patient-admin", payload);
@@ -421,6 +477,10 @@ export function useAddPatient(options?: {
     retryDelay: 1000,
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["patients"] });
+      queryClient.invalidateQueries({ queryKey: ["patient", data.id] });
+      queryClient.invalidateQueries({ queryKey: ["patient-dashboard", data.id] });
+      queryClient.invalidateQueries({ queryKey: ["patient-medical-history", data.id] });
+      queryClient.invalidateQueries({ queryKey: ["prescription-history", data.id] });
       options?.onSuccess?.(data);
     },
     onError: options?.onError,
@@ -435,7 +495,7 @@ export function useAddPatientProfile(options?: {
 
   return useMutation<Patient, Error, PatientCreateData>({
     mutationFn: async (formData: PatientCreateData) => {
-      const payload = buildCreatePatientPayload(formData);
+      const payload = buildPatientFormData(formData);
 
       const response: ApiResponse<RawPatientResponse> =
         await clientApi.post("/patient/create-patient", payload);
@@ -460,6 +520,9 @@ export function useAddPatientProfile(options?: {
       queryClient.invalidateQueries({ queryKey: ["clinic-profiles"] });
       queryClient.invalidateQueries({ queryKey: ["patient-dashboard"] });
       queryClient.invalidateQueries({ queryKey: ["patient", data.id] });
+      queryClient.invalidateQueries({ queryKey: ["patient-dashboard", data.id] });
+      queryClient.invalidateQueries({ queryKey: ["patient-medical-history", data.id] });
+      queryClient.invalidateQueries({ queryKey: ["prescription-history", data.id] });
       options?.onSuccess?.(data);
     },
     onError: options?.onError,
@@ -478,7 +541,7 @@ export function useUpdatePatient(options?: {
         throw new Error("Patient ID is required for update");
       }
 
-      const payload = buildCreatePatientPayload(data);
+      const payload = buildPatientFormData(data);
       const response: ApiResponse<RawPatientResponse> =
         await clientApi.put(`/patient/update/${id}`, payload);
 
@@ -501,6 +564,9 @@ export function useUpdatePatient(options?: {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["patients"] });
       queryClient.invalidateQueries({ queryKey: ["patient", data.id] });
+      queryClient.invalidateQueries({ queryKey: ["patient-dashboard", data.id] });
+      queryClient.invalidateQueries({ queryKey: ["patient-medical-history", data.id] });
+      queryClient.invalidateQueries({ queryKey: ["prescription-history", data.id] });
       options?.onSuccess?.(data);
     },
     onError: options?.onError,

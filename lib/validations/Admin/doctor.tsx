@@ -14,12 +14,19 @@ export interface DoctorFormData {
   shift: "MORNING" | "AFTERNOON" | "EVENING" | "NIGHT"|"ROTATIONAL";
   gender: "MALE" | "FEMALE" | "OTHERS";
   department: string;
+  profileImage?: File | null;
   aadhaar: string;
   address: string;
   experience: number;
   joiningDate: string;
   doctorCode: string;
   consultationFee: number;
+  documentUrl?: {
+    name: string;
+    url: string;
+    uploadedAt?: string;
+  }[];
+  documents?: File[];
   availabilityDays: string[];
   workingHours: {
     start: string;
@@ -41,10 +48,20 @@ experience: number;
   aadhaar: string;
   address: string;
   doctorCode: string;
+    profileImage?: string;
+documents?: {
+  _id?: string;
+  fileName: string;
+  originalName: string;
+  filePath: string;
+  mimeType: string;
+  fileSize: number;
+  uploadedAt?: string;
+}[];
 joiningDate: string;
   consultationFee: number;
   availabilityDays: string[];
-  documentUrl: string[];
+
   createdAt: string;
   updatedAt: string;
   workingHours?: {
@@ -57,6 +74,7 @@ joiningDate: string;
     phone: string;
     password: string;
     name: string;
+      profileImage?: string | null;
     role: "DOCTOR";
     isActive: boolean;
     isVerified: boolean;
@@ -159,10 +177,7 @@ department: {
   },
   address: {
     required: "Address is required",
-    minLength: {
-      value: 10,
-      message: "Address must be at least 10 characters",
-    },
+
     maxLength: {
       value: 200,
       message: "Address cannot exceed 200 characters",
@@ -216,6 +231,7 @@ export interface CreateDoctorPayload {
   email: string;
   phone: string;
   qualification: string;
+    profileImage?: File | null;
   registrationNo: string;
   salary: number;
   shift: "MORNING" | "AFTERNOON" | "EVENING" | "NIGHT"|"ROTATIONAL";
@@ -223,6 +239,11 @@ export interface CreateDoctorPayload {
   department: string;
   aadhaar: string;
   address: string;
+  documentUrl?: {
+    name: string;
+    url: string;
+    uploadedAt?: string;
+  }[];
    doctorCode: string;      
   joiningDate: string; 
   experience: number;

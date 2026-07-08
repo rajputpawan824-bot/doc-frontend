@@ -3,7 +3,6 @@ import {
   Shift,
   Gender,
   ReceptionFormData,
-  CreateReceptionPayload,
 } from "@/lib/validations/Admin/reception";
 import { clientApi } from "@/lib/api";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -51,6 +50,7 @@ workingHours: {
   createdAt: string;
   updatedAt?: string;
   password?: string;
+  documents?: ReceptionResponse["documents"];
 }
 
 interface RawListResponse {
@@ -68,32 +68,29 @@ export function useAddReception(options?: {
   return useMutation<ReceptionResponse, Error, ReceptionFormData>({
     mutationFn: async (formData: ReceptionFormData) => {
       const exp = formData.experience;
-      const payload: CreateReceptionPayload = {
-        name: formData.name.trim(),
-        email: formData.email.trim().toLowerCase(),
-        phone: formData.phone.trim(),
-        password: formData.password?.trim(),
-        experience: typeof exp === "string" ? Number(exp) || exp : exp,
-        salary: Number(formData.salary),
-        shift: formData.shift,
-        gender: formData.gender,
-        aadhaar: formData.aadhaar.trim(),
-        address: formData.address.trim(),
-        deskNumber: formData.deskNumber.trim(),
-    
-        receptionistCode: formData.receptionistCode?.trim(),
+      const payload = new FormData();
 
-        registrationNo: formData.registrationNo?.trim() || "",
+      payload.append("name", formData.name.trim());
+      payload.append("email", formData.email.trim().toLowerCase());
+      payload.append("phone", formData.phone.trim());
+      if (formData.password) payload.append("password", formData.password.trim());
+      payload.append("experience", String(typeof exp === "string" ? Number(exp) || exp : exp));
+      payload.append("salary", String(Number(formData.salary)));
+      payload.append("shift", formData.shift);
+      payload.append("gender", formData.gender);
+      payload.append("aadhaar", formData.aadhaar.trim());
+      payload.append("address", formData.address.trim());
+      payload.append("deskNumber", formData.deskNumber.trim());
+      payload.append("receptionistCode", formData.receptionistCode?.trim() || "");
+      payload.append("registrationNo", formData.registrationNo?.trim() || "");
+      payload.append("joiningDate", formData.joiningDate);
+      payload.append("workingHours[start]", formData.workingHours.start);
+      payload.append("workingHours[end]", formData.workingHours.end);
+      payload.append("caneditPatient", String(formData.caneditPatient ?? false));
 
-joiningDate: formData.joiningDate,
-
-workingHours: {
-  start: formData.workingHours.start,
-  end: formData.workingHours.end,
-},
-       
-        caneditPatient: formData.caneditPatient ?? false,
-      };
+      formData.documents?.forEach((file) => {
+        payload.append("files", file);
+      });
 
       const response: ApiResponse<{ data: ReceptionResponse }> =
         await clientApi.post("/receptionists/create-receptionist", payload);
@@ -160,6 +157,7 @@ export const useReceptionists = (
         address: reception.address,
         deskNumber: reception.deskNumber,
         receptionistCode: reception.receptionistCode,
+        documents: reception.documents ?? [],
 
 registrationNo: reception.registrationNo,
 
@@ -204,49 +202,53 @@ export function useUpdateReceptionist(options?: {
     { id: string; data: Partial<ReceptionFormData> }
   >({
     mutationFn: async ({ id, data }) => {
-      const updatePayload: Partial<ReceptionFormData> = {};
+      const updatePayload = new FormData();
 
-      if (data.name !== undefined) updatePayload.name = data.name.trim();
+      if (data.name !== undefined) updatePayload.append("name", data.name.trim());
       if (data.email !== undefined) {
-        updatePayload.email = data.email.trim().toLowerCase();
+        updatePayload.append("email", data.email.trim().toLowerCase());
       }
-      if (data.phone !== undefined) updatePayload.phone = data.phone.trim();
+      if (data.phone !== undefined) updatePayload.append("phone", data.phone.trim());
       if (data.experience !== undefined) {
         const exp = data.experience;
-        updatePayload.experience =
-          typeof exp === "string" ? Number(exp) || exp.trim() : exp;
+        updatePayload.append(
+          "experience",
+          String(typeof exp === "string" ? Number(exp) || exp.trim() : exp),
+        );
       }
-      if (data.salary !== undefined) updatePayload.salary = Number(data.salary);
-      if (data.shift !== undefined) updatePayload.shift = data.shift;
-      if (data.gender !== undefined) updatePayload.gender = data.gender;
+      if (data.salary !== undefined) updatePayload.append("salary", String(Number(data.salary)));
+      if (data.shift !== undefined) updatePayload.append("shift", data.shift);
+      if (data.gender !== undefined) updatePayload.append("gender", data.gender);
       if (data.aadhaar !== undefined) {
-        updatePayload.aadhaar = data.aadhaar.replace(/[-\s]/g, "");
+        updatePayload.append("aadhaar", data.aadhaar.replace(/[-\s]/g, ""));
       }
-      if (data.address !== undefined) updatePayload.address = data.address.trim();
+      if (data.address !== undefined) updatePayload.append("address", data.address.trim());
       if (data.deskNumber !== undefined) {
-        updatePayload.deskNumber = data.deskNumber.trim();
+        updatePayload.append("deskNumber", data.deskNumber.trim());
       }
       if (data.registrationNo !== undefined) {
-  updatePayload.registrationNo = data.registrationNo.trim();
+  updatePayload.append("registrationNo", data.registrationNo.trim());
 }
 
 if (data.joiningDate !== undefined) {
-  updatePayload.joiningDate = data.joiningDate;
+  updatePayload.append("joiningDate", data.joiningDate);
 }
 
 if (data.workingHours !== undefined) {
-  updatePayload.workingHours = {
-    start: data.workingHours.start,
-    end: data.workingHours.end,
-  };
+  updatePayload.append("workingHours[start]", data.workingHours.start);
+  updatePayload.append("workingHours[end]", data.workingHours.end);
 }
      
       if (data.password !== undefined) {
-        updatePayload.password = data.password.trim();
+        updatePayload.append("password", data.password.trim());
       }
       if (data.caneditPatient !== undefined) {
-        updatePayload.caneditPatient = data.caneditPatient;
+        updatePayload.append("caneditPatient", String(data.caneditPatient));
       }
+
+      data.documents?.forEach((file) => {
+        updatePayload.append("documents", file);
+      });
 
       const response: ApiResponse<{ data: ReceptionResponse }> =
         await clientApi.put(`/receptionists/update/${id}`, updatePayload);
@@ -265,6 +267,7 @@ if (data.workingHours !== undefined) {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["receptionists"] });
       queryClient.invalidateQueries({ queryKey: ["receptionist", data.id] });
+      queryClient.invalidateQueries({ queryKey: ["receptionist", "profile"] });
       options?.onSuccess?.(data);
     },
     onError: options?.onError,
@@ -342,6 +345,7 @@ export const useReceptionistById = (id: string | undefined) => {
         address: reception.address,
         deskNumber: reception.deskNumber,
         receptionistCode: reception.receptionistCode,
+        documents: reception.documents ?? [],
 
 registrationNo: reception.registrationNo,
 
@@ -400,6 +404,7 @@ export const useDeactivatedReceptionists = () => {
         address: reception.address,
         deskNumber: reception.deskNumber,
   receptionistCode: reception.receptionistCode,
+documents: reception.documents ?? [],
 
 registrationNo: reception.registrationNo,
 

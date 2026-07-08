@@ -4,10 +4,12 @@ import type { ApiResponse } from "@/lib/types/types";
 import {
   useQuery,
   useMutation,
+   useQueryClient,
 } from "@tanstack/react-query";
 
 import type {
   ProfileResponse,
+  ProfileFormData,
 } from "@/lib/validations/Admin/profile";
 
 // export function useUpdateProfile(options?: {
@@ -168,6 +170,62 @@ export const useChangePassword = () => {
       }
 
       return response;
+    },
+  });
+};
+
+
+
+export const useUpdateAdminProfile = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (
+      payload: ProfileFormData
+    ): Promise<ProfileResponse> => {
+      const formData = new FormData();
+
+      formData.append("name", payload.name);
+      formData.append("email", payload.email);
+      formData.append("phone", payload.phone);
+
+      if (payload.profileImage) {
+        formData.append(
+          "profileImage",
+          payload.profileImage
+        );
+      }
+
+      if (payload.workingHours) {
+        formData.append(
+          "workingHours",
+          JSON.stringify(payload.workingHours)
+        );
+      }
+
+      const response = (await clientApi.put(
+        "/admins/profile",
+        formData
+      )) as ApiResponse<{
+        data: ProfileResponse;
+      }>;
+
+      if (!response.success || !response.data) {
+        throw new Error(
+          getErrorMessage(
+            response.error,
+            "Failed to update profile"
+          )
+        );
+      }
+
+      return response.data.data;
+    },
+
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ["admin-profile"],
+      });
     },
   });
 };

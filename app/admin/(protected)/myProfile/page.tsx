@@ -34,6 +34,7 @@ import {
   Save,
   LogOut,
   Clock,
+  Plus,
   Award,
   Key,
   Upload,
@@ -53,7 +54,7 @@ import {
 } from "@/lib/validations/Admin/profile";
 import {   useAdminProfile,
   useSendPasswordOtp,
-  useChangePassword, } from "@/services/admin/profile";
+  useChangePassword,  useUpdateAdminProfile, } from "@/services/admin/profile";
 import { clientApi } from "@/lib/api";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { ApiResponse } from "@/lib/api";
@@ -81,12 +82,17 @@ const [verifiedOtp, setVerifiedOtp] =
 
   const [otpSent, setOtpSent] = useState(false);
   const [otpTimer, setOtpTimer] = useState(0);
+  const [selectedImage, setSelectedImage] =
+  useState<File | null>(null);
 
   const sendOtpMutation =
   useSendPasswordOtp();
 
 const changePasswordMutation =
   useChangePassword();
+
+  const updateProfileMutation =
+  useUpdateAdminProfile();
 
   // Profile form
   const {
@@ -111,11 +117,15 @@ const profile = profileData ?? null;
 
   useEffect(() => {
   if (profile) {
-    resetProfile({
-      name: profile.name || "",
-      email: profile.email || "",
-      phone: profile.phone || "",
-    });
+resetProfile({
+  name: profile.name || "",
+  email: profile.email || "",
+  phone: profile.phone || "",
+workingHours: {
+  start: profile?.clinic?.workingHours?.start || "",
+  end: profile?.clinic?.workingHours?.end || "",
+},
+});
   }
 }, [profile, resetProfile]);
 
@@ -198,8 +208,35 @@ const profile = profileData ?? null;
     };
   }, [otpTimer, otpSent]);
 
-const onProfileSubmit = async () => {
-  toast.info("Profile update not implemented yet");
+const onProfileSubmit = async (
+  data: ProfileFormData
+) => {
+  try {
+    setIsLoading(true);
+
+    await updateProfileMutation.mutateAsync({
+      name: data.name,
+      email: data.email,
+      phone: data.phone,
+        workingHours: {
+    start: data.workingHours?.start || "",
+    end: data.workingHours?.end || "",
+  },
+        profileImage: selectedImage,
+    });
+
+    toast.success(
+      "Profile updated successfully"
+    );
+  } catch (error) {
+    toast.error(
+      error instanceof Error
+        ? error.message
+        : "Failed to update profile"
+    );
+  } finally {
+    setIsLoading(false);
+  }
 };
 const handleStartPasswordReset = async () => {
   setIsLoading(true);
@@ -310,6 +347,10 @@ const handleResendOtp = async () => {
       name:profile?.name,
       email:profile?.email,
       phone:profile?.phone,
+  workingHours: {
+    start: profile?.clinic?.workingHours?.start || "",
+    end: profile?.clinic?.workingHours?.end || "",
+  },
     });
   };
 
@@ -351,16 +392,49 @@ const handleResendOtp = async () => {
                 {/* Profile Avatar */}
                 <div className="flex flex-col items-center text-center space-y-3">
                   <div className="relative">
-                    <div className="w-32 h-32 rounded-full bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center">
-                      <span className="text-4xl font-bold text-white">
-                        {profile?.name?.charAt(0) || "A"}
-                      </span>
-                    </div>
-                    {profile?.isActive && (
-                      <div className="absolute bottom-2 right-2 w-6 h-6 bg-green-500 rounded-full border-2 border-white flex items-center justify-center">
-                        <CheckCircle className="h-3 w-3 text-white" />
-                      </div>
-                    )}
+<div className="relative">
+
+<div className="w-32 h-32 rounded-full overflow-hidden border-2 border-gray-200">
+  {selectedImage ? (
+    <img
+      src={URL.createObjectURL(selectedImage)}
+      alt="Profile"
+      className="w-full h-full object-cover"
+    />
+  ) : profile?.profileImage ? (
+    <img
+      src={`https://clinic-managemnet-backend.onrender.com${profile.profileImage}`}
+      alt="Profile"
+      className="w-full h-full object-cover"
+    />
+  ) : (
+    <div className="w-full h-full bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center">
+      <span className="text-4xl font-bold text-white">
+        {profile?.name?.charAt(0) || "A"}
+      </span>
+    </div>
+  )}
+</div>
+<label className="absolute bottom-0 right-0 w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center cursor-pointer border-2 border-white">
+  <Plus className="h-4 w-4" />
+
+    <input
+      type="file"
+      accept="image/*"
+      className="hidden"
+      onChange={(e) => {
+        const file = e.target.files?.[0];
+
+        if (file) {
+          setSelectedImage(file);
+        }
+      }}
+    />
+
+  </label>
+
+</div>
+
                   </div>
                   <div>
                     <h3 className="text-xl font-semibold">
@@ -609,6 +683,28 @@ const handleResendOtp = async () => {
                             </p>
                           )}
                         </div>
+
+                        <div className="space-y-2">
+  <Label>
+    Working Hour Start
+  </Label>
+
+  <Input
+    type="time"
+    {...registerProfile("workingHours.start")}
+  />
+</div>
+
+<div className="space-y-2">
+  <Label>
+    Working Hour End
+  </Label>
+
+  <Input
+    type="time"
+    {...registerProfile("workingHours.end")}
+  />
+</div>
 
                         {/* Phone Field */}
                         <div className="space-y-2">

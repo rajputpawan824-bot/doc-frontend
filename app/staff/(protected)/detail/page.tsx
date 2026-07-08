@@ -507,6 +507,27 @@ if (!staff) {
   )}
 </div>
 
+<div className="md:col-span-2">
+  <Label>Documents</Label>
+  <div className="mt-2 space-y-2">
+    {staff?.documents?.length ? (
+      staff.documents.map((doc, index) => (
+        <a
+          key={doc._id || doc.filePath || index}
+          href={`https://clinic-managemnet-backend.onrender.com${doc.filePath}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="block text-sm text-blue-600 underline"
+        >
+          {doc.originalName}
+        </a>
+      ))
+    ) : (
+      <p className="text-sm text-slate-500">No documents uploaded</p>
+    )}
+  </div>
+</div>
+
   </CardContent>
 </Card>
 

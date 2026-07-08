@@ -7,6 +7,7 @@ import {
   ChevronRight,
   Droplets,
   Eye,
+  FileText,
   Heart,
   Phone,
   RefreshCw,
@@ -48,6 +49,7 @@ import {
   usePatients,
   useUpdatePatient,
   useUpdatePatientStatus,
+  type PatientCreateData,
 } from '@/services/admin/patient';
 
 import { useReceptionistById } from "@/services/admin/reception";
@@ -77,11 +79,15 @@ export enum PatientStatus {
 }
 
 export interface MedicalReport {
+  _id?: string;
   id: string;
   patientCode?: string;
   title: string;
   description?: string;
   fileName: string;
+  originalName?: string;
+  filePath?: string;
+  mimeType?: string;
   fileSize: number;
   fileType: string;
   uploadedBy: string;
@@ -255,6 +261,32 @@ const formatList = (value?: string[] | string) => {
 const formatDate = (value?: Date) => {
   if (!value) return '';
   return new Date(value).toLocaleDateString();
+};
+
+const renderMedicalReports = (reports?: MedicalReport[]) => {
+  if (!reports?.length) {
+    return <p className="text-sm text-slate-500">No documents uploaded</p>;
+  }
+
+  return (
+    <div className="space-y-2">
+      {reports.map((report, index) => (
+        <a
+          key={report._id || report.id || report.filePath || index}
+          href={
+            report.filePath
+              ? `${process.env.NEXT_PUBLIC_API_URL}${report.filePath}`
+              : report.downloadUrl
+          }
+          target="_blank"
+          rel="noopener noreferrer"
+          className="block text-sm text-blue-600 underline"
+        >
+          {report.originalName || report.title || report.fileName}
+        </a>
+      ))}
+    </div>
+  );
 };
 
 const getIsActive = (patient: Patient) =>
@@ -557,6 +589,20 @@ const canEditPatient = Boolean(
         },
       ],
     },
+    {
+      title: 'Documents',
+      icon: <FileText className="h-4 w-4" />,
+      fields: [
+        {
+          name: 'medicalReports',
+          label: 'Upload Documents',
+          type: 'file',
+          required: false,
+          width: 'full',
+          multiple: true,
+        },
+      ],
+    },
   ], [nextPatientCode]);
 
 
@@ -579,6 +625,9 @@ const canEditPatient = Boolean(
 const handleAddPatient = async (data: ReusableFormData) => {
   const payload = {
     ...data,
+    medicalReports: Array.isArray(data.medicalReports)
+      ? data.medicalReports.filter((file): file is File => file instanceof File)
+      : [],
 
     emergencyContact: {
       name: data.emergencyContactName,
@@ -588,7 +637,7 @@ const handleAddPatient = async (data: ReusableFormData) => {
   };
 
   await addPatientMutation.mutateAsync(
-    payload as Partial<Patient>
+    payload as PatientCreateData
   );
 };
 
@@ -605,6 +654,9 @@ const handleEditPatient = async (data: ReusableFormData) => {
 
   const payload = {
     ...data,
+    medicalReports: Array.isArray(data.medicalReports)
+      ? data.medicalReports.filter((file): file is File => file instanceof File)
+      : [],
 
     emergencyContact: {
       name: data.emergencyContactName,
@@ -615,7 +667,7 @@ const handleEditPatient = async (data: ReusableFormData) => {
 
   await updatePatientMutation.mutateAsync({
     id: patient.id,
-    data: payload as Partial<Patient>,
+    data: payload as PatientCreateData,
   });
 };
 
@@ -998,6 +1050,10 @@ const handleEditPatient = async (data: ReusableFormData) => {
                 <DetailItem label="Diseases" value={formatList(patientForDetails.diseases)} />
                 <DetailItem label="Allergies" value={formatList(patientForDetails.allergies)} />
                 <DetailItem label="Medical History" value={patientForDetails.medicalHistory} />
+                <DetailItem
+                  label="Documents"
+                  value={renderMedicalReports(patientForDetails.medicalReports)}
+                />
                 <DetailItem label="Status" value={getIsActive(patientForDetails) ? 'ACTIVE' : 'INACTIVE'} />
                 <DetailItem label="Created Date" value={formatDate(patientForDetails.createdAt)} />
                 {!getIsActive(patientForDetails) && (

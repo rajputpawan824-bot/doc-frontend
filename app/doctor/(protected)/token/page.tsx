@@ -240,10 +240,7 @@ const tokenAppointments = Array.isArray(
                   {appointmentsLoading ? "..." : tokenAppointments.length}
                 </span>
               </div>
-              <div className="flex justify-between items-center text-sm">
-                <span className="text-slate-500">Average Wait Time</span>
-                <span className="font-bold">N/A</span>
-              </div>
+
               <div className="flex justify-between items-center text-sm">
                 <span className="text-slate-500">Last Reset</span>
                 <span className="font-bold">{selectedDate}</span>
@@ -251,26 +248,7 @@ const tokenAppointments = Array.isArray(
             </CardContent>
           </Card>
 
-          <Card className="bg-slate-900 text-white border-none">
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="p-2 bg-white/10 rounded-lg">
-                  <Hash className="h-5 w-5 text-blue-400" />
-                </div>
-                <div>
-                  <p className="text-xs text-slate-400 font-medium">NEXT UP</p>
-                  <p className="text-lg font-bold">
-                    {isDoctorLoading || isTokenLoading
-                      ? "Loading..."
-                      : (currentToken + 1).toString().padStart(3, "0")}
-                  </p>
-                </div>
-              </div>
-              <p className="text-[10px] text-slate-500">
-                Next patient should be ready at the clinic entrance.
-              </p>
-            </CardContent>
-          </Card>
+
         </div>
       </div>
 

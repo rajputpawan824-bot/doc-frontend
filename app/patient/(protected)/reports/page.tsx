@@ -3,6 +3,9 @@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { usePatientById } from "@/services/admin/patient";
+import { usePatientPortalSelection } from "@/lib/hooks/usePatientPortalSelection";
+
 import { 
   FileText, 
   Download, 
@@ -10,92 +13,91 @@ import {
   Filter,
   Activity,
   Microscope,
-  CheckCircle2
+  CheckCircle2,
+  Eye,
 } from "lucide-react";
 import DataTable from "@/components/reusable/data-table";
 import { ColumnDef } from "@tanstack/react-table";
 
-interface LabReport {
-  id: string;
-  name: string;
-  date: string;
-  lab: string;
-  type: "Blood" | "Scan" | "Urine" | "Other";
-  status: "Ready" | "Pending";
+interface MedicalReport {
+  _id?: string;
+  fileName: string;
+  originalName?: string;
+  filePath?: string;
+   uploadedAt?: string | Date;
 }
-
 export default function PatientReportsPage() {
-  const reports: LabReport[] = [
-    {
-      id: "R-100",
-      name: "Complete Blood Count (CBC)",
-      date: "2026-05-14",
-      lab: "Main Clinic Lab",
-      type: "Blood",
-      status: "Ready"
-    },
-    {
-      id: "R-101",
-      name: "Chest X-Ray",
-      date: "2026-05-15",
-      lab: "Radiology Dept",
-      type: "Scan",
-      status: "Pending"
-    },
-    {
-      id: "R-098",
-      name: "Lipid Profile",
-      date: "2026-05-10",
-      lab: "Main Clinic Lab",
-      type: "Blood",
-      status: "Ready"
-    }
-  ];
 
-  const columns: ColumnDef<LabReport>[] = [
-    {
-      accessorKey: "name",
-      header: "Test Name",
-      cell: ({ row }) => (
-        <div className="flex items-center gap-3">
-          <div className="p-2 bg-slate-50 rounded-lg">
-            {row.original.type === "Blood" && <Activity className="h-4 w-4 text-red-500" />}
-            {row.original.type === "Scan" && <Microscope className="h-4 w-4 text-blue-500" />}
-            {row.original.type !== "Blood" && row.original.type !== "Scan" && <FileText className="h-4 w-4 text-slate-500" />}
-          </div>
-          <span className="font-bold text-slate-900">{row.original.name}</span>
-        </div>
-      ),
-    },
-    {
-      accessorKey: "date",
-      header: "Test Date",
-    },
-    {
-      accessorKey: "status",
-      header: "Status",
-      cell: ({ row }) => (
-        <Badge className={row.original.status === "Ready" ? "bg-green-100 text-green-700 border-none" : "bg-orange-100 text-orange-700 border-none"}>
-          {row.original.status === "Ready" ? <CheckCircle2 className="h-3 w-3 mr-1" /> : null}
-          {row.original.status}
-        </Badge>
-      ),
-    },
-    {
-      id: "actions",
-      header: "Action",
-      cell: ({ row }) => (
-        <Button 
-          variant="ghost" 
-          size="sm" 
-          className="text-blue-600 gap-2 h-8"
-          disabled={row.original.status === "Pending"}
-        >
-          <Download className="h-4 w-4" /> Download
-        </Button>
-      ),
-    }
-  ];
+
+  const { patientId } = usePatientPortalSelection();
+
+const { data: patient, isLoading } =
+  usePatientById(patientId);
+
+const reports: MedicalReport[] =
+  patient?.medicalReports || [];
+
+const columns: ColumnDef<MedicalReport>[] = [
+  {
+    accessorKey: "originalName",
+    header: "Report Name",
+
+    cell: ({ row }) => (
+      <div className="flex items-center gap-2">
+        <FileText className="h-4 w-4 text-blue-600" />
+
+        <span>
+          {row.original.originalName ||
+            row.original.fileName}
+        </span>
+      </div>
+    ),
+  },
+
+  {
+    accessorKey: "uploadedAt",
+    header: "Uploaded Date",
+
+    cell: ({ row }) =>
+      row.original.uploadedAt
+        ? new Date(
+            row.original.uploadedAt
+          ).toLocaleDateString()
+        : "-",
+  },
+
+
+  {
+    id: "view",
+
+    header: "View",
+
+    cell: ({ row }) => (
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={() =>
+          window.open(
+            `${process.env.NEXT_PUBLIC_API_URL}${row.original.filePath}`,
+            "_blank"
+          )
+        }
+      >
+        <Eye className="h-4 w-4 mr-1" />
+        View
+      </Button>
+    ),
+  },
+];
+if (isLoading) {
+  return (
+    <Card>
+      <CardContent className="py-10 text-center">
+        Loading reports...
+      </CardContent>
+    </Card>
+  );
+}
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto">
@@ -104,47 +106,25 @@ export default function PatientReportsPage() {
           <h1 className="text-2xl font-bold text-slate-900">Medical Reports</h1>
           <p className="text-slate-500">Access your lab results and diagnostic scans.</p>
         </div>
-        <Button className="w-full sm:w-auto bg-blue-600 gap-2">
-          <Filter className="h-4 w-4" /> Filter Reports
-        </Button>
+
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card className="bg-white border-none shadow-sm">
-          <CardContent className="pt-6">
-            <p className="text-xs text-slate-400 font-bold uppercase">Total Reports</p>
-            <h3 className="text-2xl font-bold text-slate-900">12</h3>
-          </CardContent>
-        </Card>
-        <Card className="bg-white border-none shadow-sm">
-          <CardContent className="pt-6">
-            <p className="text-xs text-slate-400 font-bold uppercase">Ready</p>
-            <h3 className="text-2xl font-bold text-green-600">11</h3>
-          </CardContent>
-        </Card>
-        <Card className="bg-white border-none shadow-sm">
-          <CardContent className="pt-6">
-            <p className="text-xs text-slate-400 font-bold uppercase">Pending</p>
-            <h3 className="text-2xl font-bold text-orange-600">1</h3>
-          </CardContent>
-        </Card>
-        <Card className="bg-blue-50 border-none shadow-sm">
-          <CardContent className="pt-6">
-            <p className="text-xs text-blue-600 font-bold uppercase">New This Month</p>
-            <h3 className="text-2xl font-bold text-blue-700">3</h3>
-          </CardContent>
-        </Card>
-      </div>
-
+ 
       <Card className="border-none shadow-sm overflow-hidden">
-        <CardContent className="p-0 sm:p-6">
-          <DataTable 
-            columns={columns} 
-            data={reports} 
-            searchColumn="name"
-            searchPlaceholder="Search reports..."
-          />
-        </CardContent>
+<CardContent className="p-0 sm:p-6">
+  {reports.length === 0 ? (
+    <div className="py-10 text-center text-slate-500">
+      No medical reports uploaded yet
+    </div>
+  ) : (
+    <DataTable
+      columns={columns}
+      data={reports}
+      searchColumn="originalName"
+      searchPlaceholder="Search medical reports..."
+    />
+  )}
+</CardContent>
       </Card>
     </div>
   );

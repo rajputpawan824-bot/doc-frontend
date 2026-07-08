@@ -9,6 +9,8 @@ export interface PrescriptionPayload {
   isFollowUpRequired?: boolean;
 }
 
+export type PrescriptionRequestPayload = PrescriptionPayload | FormData;
+
 
 export function usePrescription(
   appointmentId?: string
@@ -44,7 +46,7 @@ export function useCreatePrescription() {
       data,
     }: {
       appointmentId: string;
-      data: PrescriptionPayload;
+      data: PrescriptionRequestPayload;
     }) => {
       const response = await clientApi.post(
         `/appointment/${appointmentId}/addprescription`,
@@ -67,6 +69,9 @@ export function useCreatePrescription() {
           variables.appointmentId,
         ],
       });
+      queryClient.invalidateQueries({
+        queryKey: ["prescription-history"],
+      });
     },
   });
 }
@@ -81,7 +86,7 @@ export function useUpdatePrescription() {
       data,
     }: {
       appointmentId: string;
-      data: PrescriptionPayload;
+      data: PrescriptionRequestPayload;
     }) => {
       const response = await clientApi.put(
         `/appointment/${appointmentId}/updateprescription`,
@@ -103,6 +108,9 @@ export function useUpdatePrescription() {
           "prescription",
           variables.appointmentId,
         ],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["prescription-history"],
       });
     },
   });

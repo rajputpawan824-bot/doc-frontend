@@ -87,12 +87,26 @@ const statusConfigs = {
   },
 };
 
+const getTodayISTDate = () => {
+  const today = new Date();
+
+  const year = today.getFullYear();
+  const month = String(
+    today.getMonth() + 1
+  ).padStart(2, "0");
+  const day = String(
+    today.getDate()
+  ).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+};
+
 export default function StaffCredentialsPage() {
 
   const [role, setRole] = useState("ALL");
 
 const [selectedDate, setSelectedDate] =
-  useState("");
+  useState(getTodayISTDate());
 
 const [month, setMonth] =
   useState<number>();
@@ -404,15 +418,15 @@ const columns: ColumnDef<AttendanceRecord>[] = [
 
 <Card>
   <CardContent className="pt-6">
-    <div className="grid grid-cols-1 md:grid-cols-7 gap-4">
-      <Input
-        placeholder="Search employee..."
-        value={search}
-        onChange={(e) =>
-          setSearch(e.target.value)
-        }
-      />
-
+    <div className="flex flex-wrap items-center gap-3">
+<div className="w-full md:w-[220px]">
+  <Input
+    placeholder="Search employee..."
+    value={search}
+    onChange={(e) => setSearch(e.target.value)}
+  />
+</div>
+<div className="w-full md:w-[180px]">
       <Select
         value={role}
         onValueChange={setRole}
@@ -439,7 +453,9 @@ const columns: ColumnDef<AttendanceRecord>[] = [
           </SelectItem>
         </SelectContent>
       </Select>
+</div>
 
+<div className="w-full md:w-[180px]">
       <Select
         value={status}
         onValueChange={setStatus}
@@ -474,7 +490,10 @@ const columns: ColumnDef<AttendanceRecord>[] = [
           </SelectItem>
         </SelectContent>
       </Select>
+</div>
 
+
+<div className="w-full md:w-[180px]">
       <Input
         type="date"
         value={selectedDate}
@@ -482,20 +501,15 @@ const columns: ColumnDef<AttendanceRecord>[] = [
           setSelectedDate(e.target.value)
         }
       />
-
-      <div className="flex flex-wrap gap-3">
-
-  
-
-
 </div>
+
 
       <Button
         variant="outline"
         onClick={() => {
           setRole("ALL");
           setStatus("ALL");
-          setSelectedDate("");
+  setSelectedDate(getTodayISTDate());
           setSearch("");
         }}
       >

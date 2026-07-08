@@ -321,19 +321,31 @@ const SalaryManagement = () => {
 
   // ==================== MUTATIONS ====================
   // Add salary adjustment mutation
-  const addAdjustmentMutation = useAddSalaryAdjustment({
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["salary-list"] });
-      queryClient.invalidateQueries({ queryKey: ["salary-summary"] });
-      queryClient.invalidateQueries({ queryKey: ["salary-history"] });
-      toast.success("Salary adjustment added successfully");
-      setIsAdjustmentModalOpen(false);
-      setSelectedEmployee(null);
-    },
-    onError: (error) => {
-      toast.error(`Failed to add adjustment: ${error.message}`);
-    },
-  });
+const addAdjustmentMutation = useAddSalaryAdjustment({
+  onSuccess: async () => {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ["salary-list"] }),
+      queryClient.invalidateQueries({ queryKey: ["salary-history"] }),
+      queryClient.invalidateQueries({
+        queryKey: ["salary-dashboard-stats"],
+      }),
+    ]);
+
+    await Promise.all([
+      refetchList(),
+      refetchDashboardStats(),
+    ]);
+
+    toast.success("Salary adjustment added successfully");
+
+    setIsAdjustmentModalOpen(false);
+    setSelectedEmployee(null);
+  },
+
+  onError: (error) => {
+    toast.error(`Failed to add adjustment: ${error.message}`);
+  },
+});
 
   // Update salary mutation
   const updateSalaryMutation = useUpdateSalary({
@@ -754,7 +766,7 @@ const SalaryManagement = () => {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -762,7 +774,7 @@ const SalaryManagement = () => {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
+            <div className="text-lg lg:text-2xl font-bold truncate">
               {formatCurrency(salaryDashboardStats?.totalMonthlySalary || 0)}
             </div>
           </CardContent>
@@ -775,7 +787,7 @@ const SalaryManagement = () => {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
+           <div className="text-lg lg:text-2xl font-bold truncate">
               {formatCurrency(salaryDashboardStats?.averageSalary || 0)}
             </div>
           </CardContent>

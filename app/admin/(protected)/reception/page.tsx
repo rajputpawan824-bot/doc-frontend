@@ -526,6 +526,44 @@ const filteredActiveReceptionists = activeReceptionists.filter(
       ],
     },
     {
+      id: "documents",
+      size: 50,
+      title: "Documents",
+      description: "Uploaded receptionist documents",
+      icon: <Archive className="h-5 w-5 text-blue-600" />,
+      layout: "grid",
+      columns: 1,
+      fields: [
+        {
+          key: "documents",
+          label: "Uploaded Documents",
+          type: "custom",
+          width: "full",
+          format: (value) => {
+            if (!Array.isArray(value) || value.length === 0) {
+              return "No documents uploaded";
+            }
+
+            return (
+              <div className="space-y-2">
+                {value.map((doc, index) => (
+                  <a
+                    key={doc.filePath || index}
+                    href={`https://clinic-managemnet-backend.onrender.com${doc.filePath}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block text-blue-600 underline"
+                  >
+                    {doc.originalName}
+                  </a>
+                ))}
+              </div>
+            );
+          },
+        },
+      ],
+    },
+    {
       id: "system-info",
       size: 50,
       title: "System Information",
@@ -817,6 +855,20 @@ const filteredActiveReceptionists = activeReceptionists.filter(
         },
       ],
     },
+    {
+      title: "Documents",
+      icon: <Archive className="h-4 w-4" />,
+      fields: [
+        {
+          name: "documents",
+          label: "Upload Documents",
+          type: "file",
+          required: false,
+          width: "full",
+          multiple: true,
+        },
+      ],
+    },
   ];
 
   const editFormSections: FormSection[] = [
@@ -839,7 +891,7 @@ const filteredActiveReceptionists = activeReceptionists.filter(
           required: true,
           width: "half",
           validation: transformValidation(RECEPTION_VALIDATION_RULES.email),
-          disabled: true, // Email should not be editable
+         
         },
         {
           name: "salary",
@@ -970,6 +1022,20 @@ const filteredActiveReceptionists = activeReceptionists.filter(
        
       ],
     },
+    {
+      title: "Documents",
+      icon: <Archive className="h-4 w-4" />,
+      fields: [
+        {
+          name: "documents",
+          label: "Upload Documents",
+          type: "file",
+          required: false,
+          width: "full",
+          multiple: true,
+        },
+      ],
+    },
   ];
 
   const passwordFormSections: FormSection[] = [
@@ -1043,6 +1109,9 @@ joiningDate: isString(data.joiningDate)
   : "",
 
 workingHours,
+documents: Array.isArray(data.documents)
+  ? data.documents.filter((file): file is File => file instanceof File)
+  : [],
 
         
       
@@ -1098,6 +1167,9 @@ workingHours,
     if (isString(data.deskNumber)) updateData.deskNumber = data.deskNumber;
     if (isString(data.registrationNo)) updateData.registrationNo = data.registrationNo;
     if (isString(data.joiningDate))     updateData.joiningDate = data.joiningDate;
+    updateData.documents = Array.isArray(data.documents)
+      ? data.documents.filter((file): file is File => file instanceof File)
+      : [];
       if (
         isString(data.workingHourStart) &&
         isString(data.workingHourEnd)

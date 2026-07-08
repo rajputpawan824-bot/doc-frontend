@@ -223,7 +223,12 @@ class ClientApiClient {
         };
 
         if (body !== undefined) {
-          init.body = typeof body === "string" ? body : JSON.stringify(body);
+          if (body instanceof FormData) {
+            delete headers["Content-Type"];
+            init.body = body;
+          } else {
+            init.body = typeof body === "string" ? body : JSON.stringify(body);
+          }
         }
 
         console.log("🚀 DEBUG - Final Request:", {

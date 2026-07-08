@@ -124,7 +124,7 @@ function PaginatedDoctorTable({
 
   return (
     <div className="space-y-4">
-      <div className="rounded-md border">
+      <div className="rounded-md border overflow-x-auto">
         <Table>
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
@@ -512,6 +512,44 @@ const onLeaveDoctors = onLeaveData || [];
         },
       ],
     },
+
+    {
+  id: "documents",
+  title: "Documents",
+  description: "Uploaded doctor documents",
+  icon: <FileText className="h-5 w-5 text-blue-600" />,
+  layout: "grid",
+  columns: 1,
+  fields: [
+    {
+      key: "documents",
+      label: "Uploaded Documents",
+      type: "custom",
+      width: "full",
+format: (value) => {
+  if (!Array.isArray(value) || value.length === 0) {
+    return "No documents uploaded";
+  }
+
+  return (
+    <div className="space-y-2">
+      {value.map((doc: any, index: number) => (
+        <a
+          key={index}
+         href={`https://clinic-managemnet-backend.onrender.com${doc.filePath}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-blue-600 underline block"
+        >
+          {doc.originalName}
+        </a>
+      ))}
+    </div>
+  );
+},
+    },
+  ],
+},
     {
       id: "professional-details",
       title: "Professional Details",
@@ -863,6 +901,23 @@ onClick: () => {
         },
       ],
     },
+
+    {
+  title: "Documents",
+  icon: <FileText className="h-4 w-4" />,
+  fields: [
+    {
+      name: "documents",
+      label: "Upload Documents",
+      type: "file",
+      required: false,
+      width: "full",
+      accept: ".pdf,.jpg,.jpeg,.png,.doc,.docx",
+      multiple: true,
+    },
+  ],
+},
+
     {
       title: "Employment Details",
       icon: <Briefcase className="h-4 w-4" />,
@@ -992,6 +1047,15 @@ onClick: () => {
             DOCTOR_VALIDATION_RULES.registrationNo,
           ),
         },
+        {
+  name: "documents",
+  label: "Upload Additional Documents",
+  type: "file",
+  required: false,
+  width: "full",
+  accept: ".pdf,.jpg,.jpeg,.png,.doc,.docx",
+  multiple: true,
+},
         {
           name: "department",
           label: "Department",
@@ -1165,6 +1229,7 @@ onClick: () => {
     },
   ];
 
+
   // ==================== HANDLERS ====================
   const handleAddDoctor = (data: Record<string, unknown>) => {
 
@@ -1197,6 +1262,10 @@ const cleanName = String(data.name || "")
       consultationFee: Number(data.consultationFee),
       joiningDate: String(data.joiningDate || ""),
       doctorCode: String(data.doctorCode || ""),
+      
+      documents: Array.isArray(data.documents)
+        ? data.documents.filter((file): file is File => file instanceof File)
+        : [],
       availabilityDays: Array.isArray(data.availabilityDays)
       
   ? data.availabilityDays
@@ -1266,6 +1335,10 @@ const cleanName = String(data.name || "")
       address: String(data.address || ""),
       experience: Number(data.experience || ""),
       joiningDate: String(data.joiningDate || ""),
+ 
+      documents: Array.isArray(data.documents)
+        ? data.documents.filter((file): file is File => file instanceof File)
+        : [],
       availabilityDays: Array.isArray(data.availabilityDays)
   ? data.availabilityDays
   : [],
@@ -1308,6 +1381,13 @@ const handleViewDetails = async (doctorId: string) => {
   await queryClient.refetchQueries({
     queryKey: ["doctor", doctorId],
   });
+  await queryClient.refetchQueries({
+  queryKey: ["doctors", "on-leave"],
+});
+
+await queryClient.refetchQueries({
+  queryKey: ["doctors", "dashboard-stats"],
+});
 
   setIsDetailModalOpen(true);
 };
@@ -1668,10 +1748,10 @@ const handleViewDetails = async (doctorId: string) => {
   ];
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
+   <div className="container mx-auto px-4 py-6 space-y-6 overflow-x-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
+     <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0 flex-1">
           <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
             <Stethoscope className="h-8 w-8" />
             Doctor Management
@@ -1723,10 +1803,10 @@ const handleViewDetails = async (doctorId: string) => {
                     </p>
                   )}
                 </div>
-                <div
-                  className="p-3 rounded-lg"
-                  style={{ backgroundColor: stat.bgColor }}
-                >
+<div
+  className="shrink-0 p-3 rounded-lg"
+  style={{ backgroundColor: stat.bgColor }}
+>
                   <stat.icon
                     className="w-6 h-6"
                     style={{ color: stat.color }}
@@ -1760,7 +1840,8 @@ const handleViewDetails = async (doctorId: string) => {
         }}
         className="space-y-4"
       >
-        <TabsList className="grid grid-cols-3 w-full max-w-lg">
+      <div className="overflow-x-auto">
+  <TabsList className="min-w-[500px] grid grid-cols-3">
           <TabsTrigger value="active" className="flex items-center gap-2">
             <UserCheck className="h-4 w-4" />
             Active ({dashboardStats?.activeDoctors ?? 0})
@@ -1774,6 +1855,7 @@ const handleViewDetails = async (doctorId: string) => {
            On Leave ({dashboardStats?.onLeaveDoctors ?? 0})
           </TabsTrigger>
         </TabsList>
+        </div>
 
         {/* Active Doctors Tab */}
         <TabsContent value="active" className="space-y-4">
@@ -1962,6 +2044,7 @@ const handleViewDetails = async (doctorId: string) => {
                 department: selectedDoctor.department,
                 aadhaar: selectedDoctor.aadhaar,
                 experience: selectedDoctor.experience,
+                documents: selectedDoctor.documents,
               
 joiningDate: selectedDoctor.joiningDate
   ? new Intl.DateTimeFormat("en-CA", {

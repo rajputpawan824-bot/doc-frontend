@@ -5,7 +5,6 @@ import type { ApiResponse } from "@/lib/api";
 import type {
   StaffResponse,
   StaffFormData,
-  CreateStaffPayload,
   StaffCategory,
   StaffShift,
   Gender,
@@ -53,6 +52,7 @@ interface RawStaff {
   updatedAt?: string;
   isActive?: boolean;
   password?: string;
+  documents?: StaffResponse["documents"];
 }
 
 interface RawStaffListResponse {
@@ -91,36 +91,41 @@ export function useAddStaff(options?: {
   onSuccess?: (data: StaffResponse) => void;
   onError?: (error: Error) => void;
 }) {
+  const queryClient = useQueryClient();
+
   return useMutation<StaffResponse, Error, StaffFormData>({
     mutationFn: async (formData: StaffFormData) => {
-      const payload: CreateStaffPayload = {
-        name: formData.name.trim(),
-        email: formData.email.trim().toLowerCase(),
-        phone: formData.phone.trim(),
-       ...(formData.skill && {
-  skill: formData.skill.trim(),
-}),
-        category: formData.category,
-        // experience sent as number per API spec
-        experience: formData.experience ? Number(formData.experience) || formData.experience : undefined,
-        salary: Number(formData.salary),
-        shift: formData.shift,
-        gender: formData.gender,
-        aadhaar: formData.aadhaar.replace(/[-\s]/g, ""),
-        address: formData.address.trim(),
-        ...(formData.joiningDate && { joiningDate: formData.joiningDate }),
-        ...(formData.workingHours && {
-  workingHours: {
-    start: formData.workingHours.start,
-    end: formData.workingHours.end,
-  },
-}),
-        ...(formData.staffCode && { staffCode: formData.staffCode.trim() }),
-        ...(formData.department && { department: formData.department.trim() }),
-        ...(formData.registrationNo && { registrationNo: formData.registrationNo.trim() }),
-        ...(formData.roleBadge && { roleBadge: formData.roleBadge.trim() }),
-        ...(formData.password && { password: formData.password }),
-      };
+      const payload = new FormData();
+
+      payload.append("name", formData.name.trim());
+      payload.append("email", formData.email.trim().toLowerCase());
+      payload.append("phone", formData.phone.trim());
+      if (formData.skill) payload.append("skill", formData.skill.trim());
+      payload.append("category", formData.category);
+      if (formData.experience) {
+        payload.append(
+          "experience",
+          String(Number(formData.experience) || formData.experience),
+        );
+      }
+      payload.append("salary", String(Number(formData.salary)));
+      payload.append("shift", formData.shift);
+      payload.append("gender", formData.gender);
+      payload.append("aadhaar", formData.aadhaar.replace(/[-\s]/g, ""));
+      payload.append("address", formData.address.trim());
+      if (formData.joiningDate) payload.append("joiningDate", formData.joiningDate);
+      if (formData.workingHours) {
+        payload.append("workingHours[start]", formData.workingHours.start);
+        payload.append("workingHours[end]", formData.workingHours.end);
+      }
+      if (formData.staffCode) payload.append("staffCode", formData.staffCode.trim());
+      if (formData.department) payload.append("department", formData.department.trim());
+      if (formData.registrationNo) payload.append("registrationNo", formData.registrationNo.trim());
+      if (formData.roleBadge) payload.append("roleBadge", formData.roleBadge.trim());
+      if (formData.password) payload.append("password", formData.password);
+      formData.documents?.forEach((file) => {
+        payload.append("files", file);
+      });
 
       console.log("CREATE STAFF PAYLOAD", payload);
       const response: ApiResponse<{ data: StaffResponse }> =
@@ -137,7 +142,12 @@ export function useAddStaff(options?: {
     },
     retry: 1,
     retryDelay: 1000,
-    onSuccess: options?.onSuccess,
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["staff"] });
+      queryClient.invalidateQueries({ queryKey: ["staff", data._id || data.id] });
+      queryClient.invalidateQueries({ queryKey: ["staff", "profile"] });
+      options?.onSuccess?.(data);
+    },
     onError: options?.onError,
   });
 }
@@ -174,6 +184,7 @@ export const useStaffById = (id: string | undefined) => {
         status: (staff.isActive ?? staff.user?.isActive) ? "active" as const : "inactive" as const,
         lastLogin: staff.user?.lastLogin ?? null,
         experience: String(staff.experience ?? ""),
+        documents: staff.documents ?? [],
       } as StaffResponse;
     },
     retry: 2,
@@ -225,6 +236,7 @@ export const useActiveStaff = (category?: StaffCategory) => {
         isActive: staff.user?.isActive ?? true,
         status: (staff.user?.isActive ?? true) ? "active" : "inactive",
         lastLogin: staff.user?.lastLogin ?? null,
+        documents: staff.documents ?? [],
       }));
     },
     retry: 2,
@@ -298,6 +310,7 @@ export const useStaff = (params?: StaffListParams) => {
           isActive: staff.user?.isActive ?? (status !== "inactive"),
           status: (staff.user?.isActive ?? (status !== "inactive")) ? "active" : "inactive",
           lastLogin: staff.user?.lastLogin ?? null,
+          documents: staff.documents ?? [],
         })),
         pagination: response.data.pagination ?? response.data.meta ?? {
           page: response.data.currentPage ?? page,
@@ -355,6 +368,7 @@ export const useInactiveStaff = (category?: StaffCategory) => {
         isActive: staff.user?.isActive ?? false,
         status: "inactive",
         lastLogin: staff.user?.lastLogin ?? null,
+        documents: staff.documents ?? [],
       }));
     },
     retry: 2,
@@ -404,6 +418,7 @@ export const useAllStaff = (category?: StaffCategory) => {
         isActive: staff.user?.isActive ?? true,
         status: (staff.user?.isActive ?? true) ? "active" : "inactive",
         lastLogin: staff.user?.lastLogin ?? null,
+        documents: staff.documents ?? [],
       }));
     },
     retry: 2,
@@ -423,30 +438,31 @@ export function useUpdateStaff(options?: {
     { id: string; data: Partial<StaffFormData> }
   >({
     mutationFn: async ({ id, data }) => {
-      const updatePayload: Partial<StaffFormData> = {};
+      const updatePayload = new FormData();
 
-      if (data.name !== undefined) updatePayload.name = data.name.trim();
-      if (data.email !== undefined) updatePayload.email = data.email.trim().toLowerCase();
-      if (data.phone !== undefined) updatePayload.phone = data.phone.trim();
-      if (data.skill !== undefined) updatePayload.skill = data.skill.trim();
-      if (data.category !== undefined) updatePayload.category = data.category;
-      if (data.experience !== undefined) updatePayload.experience = data.experience;
-      if (data.salary !== undefined) updatePayload.salary = Number(data.salary);
-      if (data.shift !== undefined) updatePayload.shift = data.shift;
-      if (data.gender !== undefined) updatePayload.gender = data.gender;
-      if (data.aadhaar !== undefined) updatePayload.aadhaar = data.aadhaar.replace(/[-\s]/g, "");
-      if (data.address !== undefined) updatePayload.address = data.address.trim();
-      if (data.joiningDate !== undefined) updatePayload.joiningDate = data.joiningDate;
+      if (data.name !== undefined) updatePayload.append("name", data.name.trim());
+      if (data.email !== undefined) updatePayload.append("email", data.email.trim().toLowerCase());
+      if (data.phone !== undefined) updatePayload.append("phone", data.phone.trim());
+      if (data.skill !== undefined) updatePayload.append("skill", data.skill.trim());
+      if (data.category !== undefined) updatePayload.append("category", data.category);
+      if (data.experience !== undefined) updatePayload.append("experience", data.experience);
+      if (data.salary !== undefined) updatePayload.append("salary", String(Number(data.salary)));
+      if (data.shift !== undefined) updatePayload.append("shift", data.shift);
+      if (data.gender !== undefined) updatePayload.append("gender", data.gender);
+      if (data.aadhaar !== undefined) updatePayload.append("aadhaar", data.aadhaar.replace(/[-\s]/g, ""));
+      if (data.address !== undefined) updatePayload.append("address", data.address.trim());
+      if (data.joiningDate !== undefined) updatePayload.append("joiningDate", data.joiningDate);
       if (data.workingHours !== undefined) {
-  updatePayload.workingHours = {
-    start: data.workingHours.start,
-    end: data.workingHours.end,
-  };
+  updatePayload.append("workingHours[start]", data.workingHours.start);
+  updatePayload.append("workingHours[end]", data.workingHours.end);
 }
-      if (data.staffCode !== undefined) updatePayload.staffCode = data.staffCode?.trim();
-      if (data.department !== undefined) updatePayload.department = data.department?.trim();
-      if (data.registrationNo !== undefined) updatePayload.registrationNo = data.registrationNo?.trim();
-      if (data.roleBadge !== undefined) updatePayload.roleBadge = data.roleBadge?.trim();
+      if (data.staffCode !== undefined) updatePayload.append("staffCode", data.staffCode.trim());
+      if (data.department !== undefined) updatePayload.append("department", data.department.trim());
+      if (data.registrationNo !== undefined) updatePayload.append("registrationNo", data.registrationNo.trim());
+      if (data.roleBadge !== undefined) updatePayload.append("roleBadge", data.roleBadge.trim());
+      data.documents?.forEach((file) => {
+        updatePayload.append("documents", file);
+      });
 
       const response: ApiResponse<{ data: StaffResponse }> =
         await clientApi.put(`/staff/update/${id}`, updatePayload);
@@ -465,6 +481,7 @@ export function useUpdateStaff(options?: {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["staff"] });
       queryClient.invalidateQueries({ queryKey: ["staff", data._id || data.id] });
+      queryClient.invalidateQueries({ queryKey: ["staff", "profile"] });
       options?.onSuccess?.(data);
     },
     onError: options?.onError,

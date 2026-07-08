@@ -125,6 +125,15 @@ interface StaffMember {
   start: string;
   end: string;
 };
+  documents?: {
+    _id?: string;
+    fileName: string;
+    originalName: string;
+    filePath: string;
+    mimeType: string;
+    fileSize: number;
+    uploadedAt?: string;
+  }[];
   roleBadge?: string;
   createdAt: string;
   updatedAt: string;
@@ -465,6 +474,20 @@ const staffFormSections: FormSection[] = [
         placeholder: "Senior Nurse, Head Technician, etc.",
         width: "half",
         validation: transformValidation(STAFF_VALIDATION_RULES.roleBadge),
+      },
+    ],
+  },
+  {
+    title: "Documents",
+    icon: <FileText className="h-4 w-4" />,
+    fields: [
+      {
+        name: "documents",
+        label: "Upload Documents",
+        type: "file",
+        required: false,
+        width: "full",
+        multiple: true,
       },
     ],
   },
@@ -1157,6 +1180,44 @@ queryClient.invalidateQueries({
         },
       ],
     },
+    {
+      id: "documents",
+      size: 50,
+      title: "Documents",
+      description: "Uploaded staff documents",
+      icon: <FileText className="h-5 w-5 text-blue-600" />,
+      layout: "grid",
+      columns: 1,
+      fields: [
+        {
+          key: "documents",
+          label: "Uploaded Documents",
+          type: "custom",
+          width: "full",
+          format: (value) => {
+            if (!Array.isArray(value) || value.length === 0) {
+              return "No documents uploaded";
+            }
+
+            return (
+              <div className="space-y-2">
+                {value.map((doc, index) => (
+                  <a
+                    key={doc._id || doc.filePath || index}
+                    href={`https://clinic-managemnet-backend.onrender.com${doc.filePath}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block text-blue-600 underline"
+                  >
+                    {doc.originalName}
+                  </a>
+                ))}
+              </div>
+            );
+          },
+        },
+      ],
+    },
   ];
 
 
@@ -1233,6 +1294,9 @@ const detailActions: ActionButton[] =
       start: String(data.workingHourStart || ""),
       end: String(data.workingHourEnd || ""),
     },
+    documents: Array.isArray(data.documents)
+      ? data.documents.filter((file): file is File => file instanceof File)
+      : [],
   };
 
   updateStaffMutation.mutate({
@@ -1271,6 +1335,9 @@ workingHours: {
   start: String(data.workingHourStart || ""),
   end: String(data.workingHourEnd || ""),
 },
+documents: Array.isArray(data.documents)
+  ? data.documents.filter((file): file is File => file instanceof File)
+  : [],
 ...(typeof data.roleBadge === "string" && {
   roleBadge: data.roleBadge,
 }),

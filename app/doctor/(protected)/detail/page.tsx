@@ -66,6 +66,9 @@ export default function DoctorDetailsSection({
   const [isEditing, setIsEditing] = useState(false);
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
 const [passwordModalKey, setPasswordModalKey] = useState(0);
+const [selectedDocuments, setSelectedDocuments] = useState<File[]>([]);
+const [selectedProfileImage, setSelectedProfileImage] =
+  useState<File | null>(null);
 
   
 const [userId, setUserId] = useState<string>();
@@ -90,10 +93,17 @@ const {
   refetch,
 } = useDoctorById(userId);
 
+console.log("Doctor Response:", doctor);
+console.log(
+  "Doctor Profile Image:",
+  doctor?.user?.profileImage
+);
+
   const updateDoctorMutation = useUpdateDoctor({
     onSuccess: () => {
       toast.success("Profile updated successfully");
       setIsEditing(false);
+      setSelectedDocuments([]);
       refetch();
     },
     onError: (err) => {
@@ -152,13 +162,16 @@ const handleSave = () => {
       email: doctorData.email,
       registrationNo: doctorData.registrationNo,
       qualification: doctorData.qualification,
+        profileImage: selectedProfileImage,
       experience: doctorData.experience,
+      documents: selectedDocuments,
     },
   });
 };
 
   const handleCancel = () => {
     setIsEditing(false);
+    setSelectedDocuments([]);
     refetch();
   };
 const passwordFormSections: FormSection[] = [
@@ -293,12 +306,54 @@ const handleUpdatePassword = (
 
 <div className="flex flex-col md:flex-row items-center gap-6">
 
-<Avatar className="h-28 w-28 border-4 border-white/30">
-  <AvatarImage src={doctorData.image} />
-  <AvatarFallback className="bg-white/20 text-white">
-    <User className="h-12 w-12" />
-  </AvatarFallback>
-</Avatar>
+<div className="relative">
+  <p className="text-red-500">
+  {doctor?.user?.profileImage}
+</p>
+
+{/* <p className="text-red-500 break-all">
+  {doctor?.user?.profileImage
+    ? `https://clinic-managemnet-backend.onrender.com${doctor.user.profileImage}`
+    : "NO IMAGE"}
+</p> */}
+<img
+  key={doctor?.user?.profileImage}
+  src={
+    selectedProfileImage
+      ? URL.createObjectURL(selectedProfileImage)
+      : doctor?.user?.profileImage
+      ? `https://clinic-managemnet-backend.onrender.com${doctor.profileImage}`
+      : "/default-avatar.png"
+  }
+  alt="doctor"
+  className="h-28 w-28 rounded-full object-cover border-4 border-white/30"
+  onLoad={() => console.log("IMAGE LOADED")}
+  onError={(e) => {
+    console.log("IMAGE FAILED", e);
+  }}
+/>
+
+  {isEditing && (
+    <label
+      htmlFor="profile-upload"
+      className="absolute bottom-0 right-0 flex h-8 w-8 cursor-pointer items-center justify-center rounded-full bg-green-600 text-white shadow-lg hover:bg-green-700"
+    >
+      +
+
+      <input
+        id="profile-upload"
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={(e) =>
+          setSelectedProfileImage(
+            e.target.files?.[0] || null
+          )
+        }
+      />
+    </label>
+  )}
+</div>
 
 <div className="text-white">
   <h2 className="text-3xl font-bold">
@@ -521,6 +576,39 @@ Number(e.target.value)
 <div>
 <Label>Consultation Fee</Label>
 <p>₹{doctorData.consultationFee}</p>
+</div>
+
+<div className="md:col-span-2">
+<Label>Documents</Label>
+{isEditing && (
+<Input
+name="documents"
+type="file"
+multiple
+className="mt-2"
+onChange={(e) =>
+setSelectedDocuments(Array.from(e.target.files || []))
+}
+/>
+)}
+
+<div className="mt-2 space-y-2">
+{doctor?.documents?.length ? (
+doctor.documents.map((doc, index) => (
+<a
+key={doc._id || index}
+href={`https://clinic-managemnet-backend.onrender.com${doc.filePath}`}
+target="_blank"
+rel="noopener noreferrer"
+className="block text-sm text-blue-600 underline"
+>
+{doc.originalName}
+</a>
+))
+) : (
+<p className="text-sm text-slate-500">No documents uploaded</p>
+)}
+</div>
 </div>
 
 <div className="md:col-span-2">

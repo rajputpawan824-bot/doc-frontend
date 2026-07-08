@@ -8,6 +8,7 @@ import {
   Droplets,
   Eye,
   Heart,
+    FileText,
   Phone,
   RefreshCw,
   Search,
@@ -41,6 +42,7 @@ import {
   usePatientById,
   useUpdatePatient,
   type ClinicProfile,
+  
 } from "@/services/admin/patient";
 import { useRouter } from "next/navigation";
 import { 
@@ -106,6 +108,46 @@ const formatDate = (value?: Date) => {
   return new Date(value).toLocaleDateString();
 };
 
+interface MedicalReport {
+  _id?: string;
+  id?: string;
+  fileName: string;
+  originalName?: string;
+  filePath?: string;
+  mimeType?: string;
+  fileSize?: number;
+  uploadedAt?: string | Date;
+  downloadUrl?: string;
+}
+
+const renderMedicalReports = (reports?: MedicalReport[]) => {
+  if (!reports?.length) {
+    return <p className="text-sm text-slate-500">No documents uploaded</p>;
+  }
+
+  return (
+    <div className="space-y-2">
+      {reports.map((report, index) => (
+        <a
+          key={report._id || report.id || report.filePath || index}
+          href={
+            report.filePath
+              ? `${process.env.NEXT_PUBLIC_API_URL}${report.filePath}`
+              : report.downloadUrl
+          }
+          target="_blank"
+          rel="noopener noreferrer"
+          className="block text-sm text-blue-600 underline"
+        >
+          {report.originalName || report.fileName}
+        </a>
+      ))}
+    </div>
+  );
+};
+
+
+
 const getIsActive = (patient: any) =>
   patient?.user?.isActive ?? patient?.status !== "INACTIVE";
 
@@ -165,6 +207,7 @@ const enum Gender {
   FEMALE = 'FEMALE',
   OTHER = 'OTHER'
 }
+
 const bloodGroupOptions = [
   { value: "A+", label: "A+" },
   { value: "A-", label: "A-" },
@@ -207,9 +250,26 @@ const { data: activePatient } =
   const handleEditPatient = async (
   data: ReusableFormData
 ) => {
+
+
+  const payload = {
+    ...data,
+    medicalReports: Array.isArray(data.medicalReports)
+      ? data.medicalReports.filter((file): file is File => file instanceof File)
+      : [],
+
+    emergencyContact: {
+      name: data.emergencyContactName,
+      phone: data.emergencyContactPhone,
+      relation: data.emergencyContactRelation,
+    },
+  };
+
+if (!patientDetails?.id) return;
+
 await updatePatientMutation.mutateAsync({
-  id: patientId,
-  data,
+  id: patientDetails.id,
+  data: payload,
 });
 };
 
@@ -422,7 +482,24 @@ const familyMembers =
         },
       ],
     },
+                  {
+      title: 'Documents',
+      icon: <FileText className="h-4 w-4" />,
+      fields: [
+        {
+          name: 'medicalReports',
+          label: 'Upload Documents',
+          type: 'file',
+          required: false,
+          width: 'full',
+          multiple: true,
+        },
+      ],
+    },
+   
   ],[] );
+
+
 
   const handleSwitchProfile = (
   patientId: string
@@ -871,6 +948,12 @@ if (isLoading) {
             label="Medical History"
             value={patientDetails.medicalHistory}
           />
+<DetailItem
+  label="Documents"
+  value={renderMedicalReports(
+    patientDetails?.medicalReports
+  )}
+/>
 
           <DetailItem
             label="Status"

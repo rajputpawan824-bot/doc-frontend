@@ -5,7 +5,7 @@ import { Plus, X ,Eye, EyeOff} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Modal from "../ui/modal";
 
-export type FieldType = "text" | "email" | "tel" | "number" | "password" | "textarea" | "select" | "radio" | "checkbox" | "date" | "time"| "checkbox-group";
+export type FieldType = "text" | "email" | "tel"|"file" | "number" | "password" | "textarea" | "select" | "radio" | "checkbox" | "date" | "time"| "checkbox-group";
 export type FormDataValue = unknown;
 export type ReusableFormData = Record<string, FormDataValue>;
 
@@ -24,6 +24,8 @@ export interface FieldConfig {
   rows?: number; // For textarea
   min?: number; // For number input
   max?: number; // For number input
+  accept?: string; // For file input
+  multiple?: boolean; // For file input
   onChange?: (value: unknown) => void;
   step?: number; // For number input
   validation?: {
@@ -151,6 +153,20 @@ function fieldValueAsString(value: FormDataValue): string {
 
 function fieldValueAsBoolean(value: FormDataValue): boolean {
   return typeof value === "boolean" ? value : false;
+}
+
+function isDocumentList(
+  value: FormDataValue,
+): value is Array<{ name?: string; url?: string }> {
+  return (
+    Array.isArray(value) &&
+    value.some(
+      (item) =>
+        item &&
+        typeof item === "object" &&
+        ("name" in item || "url" in item),
+    )
+  );
 }
 
 function ReusableModalContent({
@@ -414,6 +430,45 @@ const handleBlur = (name: string) => {
               />
               <span className="text-sm text-slate-700">{field.label}</span>
             </label>
+          );
+
+        case "file":
+          return (
+            <div className="space-y-3">
+              {isDocumentList(formData[field.name]) && (
+                <div className="space-y-1 rounded-lg border border-slate-200 bg-slate-50 p-3">
+                  {(formData[field.name] as Array<{ name?: string; url?: string }>).map(
+                    (doc, index) => (
+                      <a
+                        key={`${doc.url || doc.name || "document"}-${index}`}
+                        href={doc.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="block text-sm text-blue-600 underline"
+                      >
+                        {doc.name || `Document ${index + 1}`}
+                      </a>
+                    ),
+                  )}
+                </div>
+              )}
+              <input
+                type="file"
+                id={field.name}
+                required={required}
+                className={commonClasses}
+                onBlur={() => handleBlur(field.name)}
+                onChange={(e) => {
+                  const files = Array.from(e.target.files || []);
+                  handleChange(field.name, files);
+                  field.onChange?.(files);
+                }}
+                placeholder={field.placeholder}
+                disabled={field.disabled}
+                accept={field.accept}
+                multiple={field.multiple}
+              />
+            </div>
           );
 
 case "checkbox-group":
