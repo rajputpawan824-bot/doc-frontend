@@ -70,72 +70,59 @@ import {
 } from "@/components/ui/dialog";
 
 const LeaveManagement = () => {
-  const [activeTab, setActiveTab] = useState<
-    "pending" | "approved" | "rejected" | "on-leave"
-  >("pending");
+  type LeaveTab = "pending" | "approved" | "rejected";
+
+  const [activeTab, setActiveTab] = useState<LeaveTab>("pending");
   const [searchQuery, setSearchQuery] = useState("");
   const today = format(new Date(), "yyyy-MM-dd");
   const [onLeaveRole, setOnLeaveRole] = useState<
     "ALL" | "DOCTOR" | "STAFF" | "RECEPTIONIST" | "ADMIN"
   >("ALL");
-const [onLeaveDate, setOnLeaveDate] = useState(
-  new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Kolkata",
-  }).format(new Date())
-);
-const [showPolicyModal, setShowPolicyModal] =
-  useState(false);
+  const [onLeaveDate, setOnLeaveDate] = useState(
+    new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Asia/Kolkata",
+    }).format(new Date()),
+  );
+  const [showPolicyModal, setShowPolicyModal] = useState(false);
 
-const [policyRole, setPolicyRole] =
-  useState<
+  const [policyRole, setPolicyRole] = useState<
     "DOCTOR" | "STAFF" | "RECEPTIONIST"
   >("DOCTOR");
 
-const [policyType, setPolicyType] =
-  useState<
-    "MONTHLY" | "YEARLY"
-  >("MONTHLY");
+  const [policyType, setPolicyType] = useState<"MONTHLY" | "YEARLY">("MONTHLY");
 
-const [allowedLeaves, setAllowedLeaves] =
-  useState("");
+  const [allowedLeaves, setAllowedLeaves] = useState("");
   const [selectedLeave, setSelectedLeave] = useState<LeaveResponse | null>(
     null,
   );
   const [isPaid, setIsPaid] = useState(true);
   const [rejectionReason, setRejectionReason] = useState("");
   const [showRejectDialog, setShowRejectDialog] = useState(false);
-  const [approveTargetLeave, setApproveTargetLeave] = useState<LeaveResponse | null>(null);
+  const [approveTargetLeave, setApproveTargetLeave] =
+    useState<LeaveResponse | null>(null);
   const [approvalIsPaid, setApprovalIsPaid] = useState<boolean | null>(null);
   const [showApproveDialog, setShowApproveDialog] = useState(false);
   const [viewLeave, setViewLeave] = useState<LeaveResponse | null>(null);
 
   const [isApplyModalOpen, setIsApplyModalOpen] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<
-  "DOCTOR" | "STAFF" | "RECEPTIONIST" | undefined
->();
+    "DOCTOR" | "STAFF" | "RECEPTIONIST" | undefined
+  >();
 
-const { data: employees = [] } =
-  useEmployeesForLeave(selectedCategory);
+  const { data: employees = [] } = useEmployeesForLeave(selectedCategory);
 
-const savePolicy = useCreateLeavePolicy({
-  onSuccess: () => {
-    toast.success("Leave policy saved");
-    setShowPolicyModal(false);
-  },
+  const savePolicy = useCreateLeavePolicy({
+    onSuccess: () => {
+      toast.success("Leave policy saved");
+      setShowPolicyModal(false);
+    },
 
-  onError: (error) => {
-    toast.error(
-      error.message ||
-      "Failed to save leave policy"
-    );
-  },
-});
+    onError: (error) => {
+      toast.error(error.message || "Failed to save leave policy");
+    },
+  });
 
-const {
-  data: leavePolicies,
-  isLoading: isPolicyLoading,
-} = useLeavePolicy();
-
+  const { data: leavePolicies, isLoading: isPolicyLoading } = useLeavePolicy();
 
   const createLeave = useCreateLeave({
     onSuccess: () => {
@@ -158,8 +145,7 @@ const {
     refetch,
   } = useAllLeaves({
     onError: (error) => {
-       toast.error(error.message || "Failed to fetch leave applications"  );
-     
+      toast.error(error.message || "Failed to fetch leave applications");
     },
   });
 
@@ -179,18 +165,18 @@ const {
     },
   });
 
-const {
-  data: onLeaveLeaves = [],
-  isLoading: isOnLeaveLoading,
-  isFetching: isOnLeaveFetching,
-  refetch: refetchOnLeave,
-} = useOnLeave({
-  userRole: onLeaveRole === "ALL" ? undefined : onLeaveRole,
-  date: onLeaveDate,
-  onError: (error) => {
-    toast.error(error.message || "Failed to fetch employees on leave");
-  },
-});
+  const {
+    data: onLeaveLeaves = [],
+    isLoading: isOnLeaveLoading,
+    isFetching: isOnLeaveFetching,
+    refetch: refetchOnLeave,
+  } = useOnLeave({
+    userRole: onLeaveRole === "ALL" ? undefined : onLeaveRole,
+    date: onLeaveDate,
+    onError: (error) => {
+      toast.error(error.message || "Failed to fetch employees on leave");
+    },
+  });
 
   const approveLeave = useApproveLeave({
     onSuccess: () => {
@@ -318,31 +304,39 @@ const {
       <TableBody>
         {leaves.map((leave) => (
           <TableRow key={leave._id}>
-            <TableCell className="font-medium">{getEmployeeName(leave)}</TableCell>
+            <TableCell className="font-medium">
+              {getEmployeeName(leave)}
+            </TableCell>
             <TableCell>{getEmployeeRole(leave)}</TableCell>
             <TableCell>
               <Badge className={getLeaveTypeColor(leave.leaveType)}>
                 {leave.leaveType.replace("_", " ")}
               </Badge>
             </TableCell>
-            <TableCell>{format(new Date(leave.fromDate), "dd MMM yyyy")}</TableCell>
-            <TableCell>{format(new Date(leave.toDate), "dd MMM yyyy")}</TableCell>
+            <TableCell>
+              {format(new Date(leave.fromDate), "dd MMM yyyy")}
+            </TableCell>
+            <TableCell>
+              {format(new Date(leave.toDate), "dd MMM yyyy")}
+            </TableCell>
             <TableCell>{getTotalDays(leave)}</TableCell>
             <TableCell>{getPaidStatus(leave)}</TableCell>
-            {showStatus && <TableCell>{getStatusBadge(leave.status)}</TableCell>}
+            {showStatus && (
+              <TableCell>{getStatusBadge(leave.status)}</TableCell>
+            )}
             <TableCell className="max-w-xs whitespace-normal">
               {leave.reason || "N/A"}
             </TableCell>
             <TableCell>
               <div className="flex justify-end gap-2">
                 <Button
-  size="sm"
-  variant="outline"
-  onClick={() => setViewLeave(leave)}
->
-  <Eye className="h-4 w-4 mr-1" />
-  View
-</Button>
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setViewLeave(leave)}
+                >
+                  <Eye className="h-4 w-4 mr-1" />
+                  View
+                </Button>
                 {actions === "pending" && (
                   <>
                     <Button
@@ -413,13 +407,9 @@ const {
             Apply Leave
           </Button>
 
-                      <Button
-                      
-  variant="outline"
-  onClick={() => setShowPolicyModal(true)}
->
-  Leave Policy
-</Button>
+          <Button variant="outline" onClick={() => setShowPolicyModal(true)}>
+            Leave Policy
+          </Button>
           <Button
             variant="outline"
             size="sm"
@@ -430,9 +420,8 @@ const {
               refetchOnLeaveToday();
             }}
             disabled={isFetching || isOnLeaveFetching || isOnLeaveTodayFetching}
-             className="hover:bg-gray-50"
+            className="hover:bg-gray-50"
           >
-
             <RefreshCw
               className={`mr-2 h-4 w-4 ${
                 isFetching || isOnLeaveFetching || isOnLeaveTodayFetching
@@ -440,7 +429,7 @@ const {
                   : ""
               }`}
             />
-             {isFetching || isOnLeaveFetching || isOnLeaveTodayFetching
+            {isFetching || isOnLeaveFetching || isOnLeaveTodayFetching
               ? "Refreshing..."
               : "Refresh"}
           </Button>
@@ -509,7 +498,9 @@ const {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">On Leave Today</CardTitle>
+            <CardTitle className="text-sm font-medium">
+              On Leave Today
+            </CardTitle>
             <Calendar className="h-4 w-4 text-blue-600" />
           </CardHeader>
           <CardContent>
@@ -518,56 +509,44 @@ const {
             </div>
           </CardContent>
         </Card>
-
-
-
       </div>
-<div className="mt-12 space-y-4">
-  <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-    Leave Policies
-  </h3>
+      <div className="mt-12 space-y-4">
+        <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+          Leave Policies
+        </h3>
 
-  <div className="flex flex-wrap gap-3 mb-15">
-    {leavePolicies?.data?.map((policy: any) => (
-      <div
-        key={policy._id}
-        className="flex items-center gap-3 rounded-full border bg-white px-4 py-2 shadow-sm"
-      >
-        <span className="font-medium text-sm">
-          {policy.role}
-        </span>
+        <div className="flex flex-wrap gap-3 mb-15">
+          {leavePolicies?.data?.map((policy: any) => (
+            <div
+              key={policy._id}
+              className="flex items-center gap-3 rounded-full border bg-white px-4 py-2 shadow-sm"
+            >
+              <span className="font-medium text-sm">{policy.role}</span>
 
-        <Badge
-          className={
-            policy.policyType === "YEARLY"
-              ? "bg-blue-100 text-blue-700 hover:bg-blue-100"
-              : "bg-green-100 text-green-700 hover:bg-green-100"
-          }
-        >
-          {policy.policyType}
-        </Badge>
+              <Badge
+                className={
+                  policy.policyType === "YEARLY"
+                    ? "bg-blue-100 text-blue-700 hover:bg-blue-100"
+                    : "bg-green-100 text-green-700 hover:bg-green-100"
+                }
+              >
+                {policy.policyType}
+              </Badge>
 
-        <span className="font-semibold text-base text-foreground">
-          {policy.allowedLeaves}
-        </span>
+              <span className="font-semibold text-base text-foreground">
+                {policy.allowedLeaves}
+              </span>
 
-        <span className="text-sm text-muted-foreground">
-          Leaves
-        </span>
+              <span className="text-sm text-muted-foreground">Leaves</span>
+            </div>
+          ))}
+        </div>
       </div>
-    ))}
-  </div>
-</div>
-      
 
       {/* Tabs Section */}
       <Tabs
         value={activeTab}
-        onValueChange={(value) =>
-          setActiveTab(
-            value as "pending" | "approved" | "rejected" | "on-leave",
-          )
-        }
+        onValueChange={(tab) => setActiveTab(tab as LeaveTab)}
       >
         <TabsList>
           <TabsTrigger value="pending">
@@ -711,12 +690,7 @@ const {
                 value={onLeaveRole}
                 onValueChange={(value) =>
                   setOnLeaveRole(
-                    value as
-                      | "ALL"
-                      | "DOCTOR"
-                      | "STAFF"
-                      | "RECEPTIONIST"
-                    
+                    value as "ALL" | "DOCTOR" | "STAFF" | "RECEPTIONIST",
                   )
                 }
               >
@@ -733,14 +707,14 @@ const {
               </Select>
             </div>
             <div className="space-y-2">
-  <div className="text-sm font-medium">Date</div>
-  <Input
-    type="date"
-    value={onLeaveDate}
-    onChange={(e) => setOnLeaveDate(e.target.value)}
-    className="w-full md:w-[180px]"
-  />
-</div>
+              <div className="text-sm font-medium">Date</div>
+              <Input
+                type="date"
+                value={onLeaveDate}
+                onChange={(e) => setOnLeaveDate(e.target.value)}
+                className="w-full md:w-[180px]"
+              />
+            </div>
           </div>
 
           <Card>
@@ -786,13 +760,12 @@ const {
             leaveType: data.leaveType as LeaveType,
             fromDate: data.fromDate as string,
             toDate: data.toDate as string,
-            reason:
-              typeof data.reason === "string" ? data.reason.trim() : "",
+            reason: typeof data.reason === "string" ? data.reason.trim() : "",
             emergencyContact:
               typeof data.emergencyContact === "string"
                 ? data.emergencyContact.trim()
                 : undefined,
-                requestedIsPaid: Boolean(data.isPaid),
+            requestedIsPaid: Boolean(data.isPaid),
             isHalfDay: Boolean(data.isHalfDay),
             halfDayType:
               typeof data.halfDayType === "string"
@@ -810,22 +783,21 @@ const {
             name: "category",
             label: "Employee Category",
             type: "select",
-              onChange: (value) => {
-    if (
-      value === "DOCTOR" ||
-      value === "STAFF" ||
-      value === "RECEPTIONIST"
-    ) {
-      setSelectedCategory(value);
-    }
-  },
+            onChange: (value) => {
+              if (
+                value === "DOCTOR" ||
+                value === "STAFF" ||
+                value === "RECEPTIONIST"
+              ) {
+                setSelectedCategory(value);
+              }
+            },
             required: true,
             options: [
-          
               { label: "Doctor", value: "DOCTOR" },
-              
+
               { label: "Receptionist", value: "RECEPTIONIST" },
-             
+
               { label: "Staff", value: "STAFF" },
             ],
             width: "half",
@@ -837,9 +809,9 @@ const {
             type: "select",
             required: true,
             options: employees.map((emp) => ({
-  label: emp.name,
-  value: emp.id,
-})),
+              label: emp.name,
+              value: emp.id,
+            })),
             width: "half",
           },
           {
@@ -876,12 +848,12 @@ const {
             width: "half",
           },
           {
-  name: "isPaid",
-  label: "Paid Leave",
-  type: "checkbox",
-  width: "half",
-  defaultValue: true,
-},
+            name: "isPaid",
+            label: "Paid Leave",
+            type: "checkbox",
+            width: "half",
+            defaultValue: true,
+          },
           {
             name: "isHalfDay",
             label: "Half Day Leave",
@@ -914,9 +886,9 @@ const {
         onOpenChange={() => setSelectedLeave(null)}
       >
         <Dialog
-  open={!!viewLeave}
-  onOpenChange={() => setViewLeave(null)}
-></Dialog>
+          open={!!viewLeave}
+          onOpenChange={() => setViewLeave(null)}
+        ></Dialog>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Leave Details</DialogTitle>
@@ -954,7 +926,9 @@ const {
                   Employee Role
                 </div>
                 <div className="text-sm font-semibold">
-                  {selectedLeave.userRole || selectedLeave.staffCategory || "N/A"}
+                  {selectedLeave.userRole ||
+                    selectedLeave.staffCategory ||
+                    "N/A"}
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
@@ -999,7 +973,9 @@ const {
                     Number of Days
                   </div>
                   <div className="text-sm font-semibold">
-                    {selectedLeave.totalDays ?? selectedLeave.numberOfDays ?? "N/A"}
+                    {selectedLeave.totalDays ??
+                      selectedLeave.numberOfDays ??
+                      "N/A"}
                   </div>
                 </div>
                 <div>
@@ -1028,10 +1004,11 @@ const {
                   Paid Status
                 </div>
                 <div className="text-sm font-semibold">
-                  {selectedLeave.status === "APPROVED" ?
-                    (selectedLeave.approvedIsPaid ? "Paid" : "Unpaid") :
-                    "Pending Decision"
-                  }
+                  {selectedLeave.status === "APPROVED"
+                    ? selectedLeave.approvedIsPaid
+                      ? "Paid"
+                      : "Unpaid"
+                    : "Pending Decision"}
                 </div>
               </div>
 
@@ -1069,13 +1046,16 @@ const {
       </Dialog>
 
       {/* Reject Dialog */}
-      <Dialog open={showApproveDialog} onOpenChange={(open) => {
-        if (!open) {
-          setShowApproveDialog(false);
-          setApproveTargetLeave(null);
-          setApprovalIsPaid(null);
-        }
-      }}>
+      <Dialog
+        open={showApproveDialog}
+        onOpenChange={(open) => {
+          if (!open) {
+            setShowApproveDialog(false);
+            setApproveTargetLeave(null);
+            setApprovalIsPaid(null);
+          }
+        }}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Approve Leave Application</DialogTitle>
@@ -1182,120 +1162,81 @@ const {
 
       {/* leave policy  */}
 
-      <Dialog
-  open={showPolicyModal}
-  onOpenChange={setShowPolicyModal}
->
-  <DialogContent>
-    <DialogHeader>
-      <DialogTitle>
-        Leave Policy
-      </DialogTitle>
-    </DialogHeader>
+      <Dialog open={showPolicyModal} onOpenChange={setShowPolicyModal}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Leave Policy</DialogTitle>
+          </DialogHeader>
 
-    <div className="space-y-4">
+          <div className="space-y-4">
+            <div>
+              <label>Role</label>
 
-      <div>
-        <label>Role</label>
+              <Select
+                value={policyRole}
+                onValueChange={(v) =>
+                  setPolicyRole(v as "DOCTOR" | "STAFF" | "RECEPTIONIST")
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
 
-        <Select
-          value={policyRole}
-          onValueChange={(v) =>
-            setPolicyRole(
-              v as
-                | "DOCTOR"
-                | "STAFF"
-                | "RECEPTIONIST"
-            )
-          }
-        >
-          <SelectTrigger>
-            <SelectValue />
-          </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="DOCTOR">Doctor</SelectItem>
 
-          <SelectContent>
-            <SelectItem value="DOCTOR">
-              Doctor
-            </SelectItem>
+                  <SelectItem value="STAFF">Staff</SelectItem>
 
-            <SelectItem value="STAFF">
-              Staff
-            </SelectItem>
+                  <SelectItem value="RECEPTIONIST">Receptionist</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
 
-            <SelectItem value="RECEPTIONIST">
-              Receptionist
-            </SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
+            <div>
+              <label>Policy Type</label>
 
-      <div>
-        <label>
-          Policy Type
-        </label>
+              <Select
+                value={policyType}
+                onValueChange={(v) => setPolicyType(v as "MONTHLY" | "YEARLY")}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
 
-        <Select
-          value={policyType}
-          onValueChange={(v) =>
-            setPolicyType(
-              v as
-                | "MONTHLY"
-                | "YEARLY"
-            )
-          }
-        >
-          <SelectTrigger>
-            <SelectValue />
-          </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="MONTHLY">Monthly</SelectItem>
 
-          <SelectContent>
-            <SelectItem value="MONTHLY">
-              Monthly
-            </SelectItem>
+                  <SelectItem value="YEARLY">Yearly</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
 
-            <SelectItem value="YEARLY">
-              Yearly
-            </SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
+            <div>
+              <label>Allowed Leaves</label>
 
-      <div>
-        <label>
-          Allowed Leaves
-        </label>
+              <Input
+                type="number"
+                value={allowedLeaves}
+                onChange={(e) => setAllowedLeaves(e.target.value)}
+              />
+            </div>
+          </div>
 
-        <Input
-          type="number"
-          value={allowedLeaves}
-          onChange={(e) =>
-            setAllowedLeaves(
-              e.target.value
-            )
-          }
-        />
-      </div>
-
-    </div>
-
-    <DialogFooter>
-      <Button
-        onClick={() =>
-          savePolicy.mutate({
-            role: policyRole,
-            policyType,
-            allowedLeaves:
-              Number(
-                allowedLeaves
-              ),
-          })
-        }
-      >
-        Save Policy
-      </Button>
-    </DialogFooter>
-  </DialogContent>
-</Dialog>
+          <DialogFooter>
+            <Button
+              onClick={() =>
+                savePolicy.mutate({
+                  role: policyRole,
+                  policyType,
+                  allowedLeaves: Number(allowedLeaves),
+                })
+              }
+            >
+              Save Policy
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
