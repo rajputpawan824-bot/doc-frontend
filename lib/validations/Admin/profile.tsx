@@ -244,7 +244,7 @@ export function formatDateForDisplay(dateString: string): string {
 export function formatSubscriptionDate(dateString: string): string {
   const date = new Date(dateString);
   const now = new Date();
-  const diffTime = Math.abs(date.getTime() - now.getTime());
+  const diffTime = Math.abs(date?.getTime() - now?.getTime());
   const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
   if (date > now) {

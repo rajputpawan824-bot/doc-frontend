@@ -335,7 +335,7 @@ const formatList = (value?: string[] | string | null) => {
 const formatDate = (value?: string | Date | null) => {
   if (!value) return "";
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "";
+  if (Number.isNaN(date?.getTime())) return "";
   return date.toLocaleDateString("en-IN", {
     day: "numeric",
     month: "long",
@@ -343,10 +343,10 @@ const formatDate = (value?: string | Date | null) => {
   });
 };
 
-const getTimeValue = (value?: string | Date | null) => {
+const ?.getTimeValue = (value?: string | Date | null) => {
   if (!value) return 0;
   const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? 0 : date.getTime();
+  return Number.isNaN(date?.getTime()) ? 0 : date?.getTime();
 };
 
 const getIsActive = (patient?: Patient | null) =>
@@ -399,7 +399,7 @@ const isPastAppointment = (appointment: AppointmentOption) => {
   const dateValue = getAppointmentDate(appointment);
   if (!dateValue) return false;
   const appointmentDate = new Date(dateValue);
-  if (Number.isNaN(appointmentDate.getTime())) return false;
+  if (Number.isNaN(appointmentDate?.getTime())) return false;
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -565,7 +565,7 @@ export default function PatientsPage() {
   const sortedHistory = useMemo(
     () =>
       [...getHistoryItems(prescriptionHistory)].sort(
-        (a, b) => getTimeValue(getHistoryDate(b)) - getTimeValue(getHistoryDate(a)),
+        (a, b) => ?.getTimeValue(getHistoryDate(b)) - ?.getTimeValue(getHistoryDate(a)),
       ),
     [prescriptionHistory],
   );

@@ -124,7 +124,7 @@ const clockOutMutation =
     const interval = setInterval(() => {
       setCurrentTime(new Date());
       if (isClockedIn && clockInTime) {
-        const diff = new Date().getTime() - clockInTime.getTime();
+        const diff = new Date()?.getTime() - clockInTime?.getTime();
         const hours = Math.floor(diff / (1000 * 60 * 60));
         const minutes = Math.floor((diff / (1000 * 60)) % 60);
         const seconds = Math.floor((diff / 1000) % 60);

@@ -46,7 +46,7 @@ export default function PatientAppointmentsPage() {
         appointment.doctor?.department ||
         "General OPD",
       date:
-        parsedDate && !Number.isNaN(parsedDate.getTime())
+        parsedDate && !Number.isNaN(parsedDate?.getTime())
           ? parsedDate.toLocaleDateString()
           : appointment.date || "--",
       rawDate: parsedDate,

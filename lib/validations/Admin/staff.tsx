@@ -270,7 +270,7 @@ experience: {
       const date = new Date(value);
       const today = new Date();
 
-      if (isNaN(date.getTime())) {
+      if (isNaN(date?.getTime())) {
         return "Invalid date format";
       }
 

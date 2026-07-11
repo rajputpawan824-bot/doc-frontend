@@ -33,6 +33,7 @@ export interface DoctorFormData {
     end: string;
   };
   password?: string;
+  
 }
 
 export interface DoctorResponse {
@@ -89,6 +90,7 @@ joiningDate: string;
   };
   // Add status field derived from user.isActive
   status?: "active" | "inactive" | "on_leave";
+  profileImageUrl?: string;
 }
 
 export const DOCTOR_VALIDATION_RULES: ValidationRules = {

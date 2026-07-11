@@ -23,14 +23,14 @@ export const getApiBaseUrl = (): string => {
     if (!url && IS_PRODUCTION) {
       throw new Error("Missing required env var: API_BASE_URL");
     }
-    return url ?? "https://clinic-managemnet-backend.onrender.com/api";
+    return url ?? "http://localhost:5050/api";
   }
 
   const url = process.env.NEXT_PUBLIC_API_BASE_URL;
   if (!url && IS_PRODUCTION) {
     throw new Error("Missing required env var: NEXT_PUBLIC_API_BASE_URL");
   }
-  return url ?? "https://clinic-managemnet-backend.onrender.com/api";
+  return url ?? "http://localhost:5050/api";
 };
 
 export const API_CONFIG = {

@@ -77,7 +77,7 @@ function getDepartment(appointment: PatientAppointment) {
 function formatDate(date?: string) {
   if (!date) return "--";
   const parsed = new Date(date);
-  return Number.isNaN(parsed.getTime()) ? date : parsed.toLocaleDateString();
+  return Number.isNaN(parsed?.getTime()) ? date : parsed.toLocaleDateString();
 }
 
 
@@ -86,7 +86,7 @@ const formatHistoryDate = (value?: string | Date | null) => {
 
   const date = new Date(value);
 
-  if (Number.isNaN(date.getTime())) return "";
+  if (Number.isNaN(date?.getTime())) return "";
 
   return date.toLocaleDateString("en-IN", {
     day: "numeric",

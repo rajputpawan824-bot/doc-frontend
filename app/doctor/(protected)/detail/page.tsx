@@ -54,6 +54,7 @@ interface DoctorDetails {
   consultationFee?: number;
   lastUpdated: string;
   updatedBy: string;
+  profileImageUrl?: string;
 }
 
 interface DoctorDetailsSectionProps {
@@ -136,9 +137,12 @@ const updateDoctorPasswordMutation =
         consultationFee: doctor.consultationFee || 0,
         lastUpdated: doctor.updatedAt,
         updatedBy: "System",
+        profileImageUrl:  doctor?.profileImageUrl,
       });
     }
   }, [doctor]);
+  console.log("Doctor Data State:", doctorData);
+  console.log('doctor', doctor)
 
   const handleInputChange = (
     field: keyof DoctorDetails,
@@ -311,6 +315,7 @@ const handleUpdatePassword = (
   {doctor?.user?.profileImage}
 </p>
 
+
 {/* <p className="text-red-500 break-all">
   {doctor?.user?.profileImage
     ? `https://clinic-managemnet-backend.onrender.com${doctor.user.profileImage}`
@@ -321,8 +326,8 @@ const handleUpdatePassword = (
   src={
     selectedProfileImage
       ? URL.createObjectURL(selectedProfileImage)
-      : doctor?.user?.profileImage
-      ? `https://clinic-managemnet-backend.onrender.com${doctor.profileImage}`
+      : doctor?.profileImageUrl
+      ? doctor.profileImageUrl
       : "/default-avatar.png"
   }
   alt="doctor"
@@ -332,6 +337,7 @@ const handleUpdatePassword = (
     console.log("IMAGE FAILED", e);
   }}
 />
+
 
   {isEditing && (
     <label

@@ -127,7 +127,7 @@ export const LEAVE_VALIDATION_RULES: ValidationRules = {
     validate: (value: unknown) => {
       if (typeof value !== "string") return "Start date must be a string";
       const date = new Date(value);
-      if (isNaN(date.getTime())) return "Start date must be a valid date";
+      if (isNaN(date?.getTime())) return "Start date must be a valid date";
       return true;
     },
   },
@@ -136,7 +136,7 @@ export const LEAVE_VALIDATION_RULES: ValidationRules = {
     validate: (value: unknown) => {
       if (typeof value !== "string") return "End date must be a string";
       const date = new Date(value);
-      if (isNaN(date.getTime())) return "End date must be a valid date";
+      if (isNaN(date?.getTime())) return "End date must be a valid date";
       return true;
     },
   },
@@ -200,6 +200,6 @@ export function calculateDaysBetween(
 ): number {
   const start = new Date(fromDate);
   const end = new Date(toDate);
-  const timeDiff = end.getTime() - start.getTime();
+  const timeDiff = end?.getTime() - start?.getTime();
   return Math.ceil(timeDiff / (1000 * 3600 * 24)) + 1;
 }
