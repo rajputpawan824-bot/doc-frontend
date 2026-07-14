@@ -170,7 +170,6 @@ class ServerApiClient {
           headers,
           signal,
           cache,
-          // @ts-expect-error — next is a Next.js fetch extension
           next,
         };
 

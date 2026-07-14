@@ -211,10 +211,14 @@ const formatValue = (value: unknown, field: FieldConfig): ReactNode => {
 
   switch (field.type) {
     case 'date':
-      return value ? format(new Date(value), 'PPP') : 'N/A';
+      return value
+        ? format(new Date(value as string | number | Date), 'PPP')
+        : 'N/A';
     
     case 'datetime':
-      return value ? format(new Date(value), 'PPpp') : 'N/A';
+      return value
+        ? format(new Date(value as string | number | Date), 'PPpp')
+        : 'N/A';
     
     case 'currency':
       return (
@@ -225,7 +229,7 @@ const formatValue = (value: unknown, field: FieldConfig): ReactNode => {
       );
     
     case 'percentage':
-      return <span>{value}%</span>;
+      return <span>{String(value)}%</span>;
     
     case 'badge':
       return (
@@ -282,7 +286,7 @@ const formatValue = (value: unknown, field: FieldConfig): ReactNode => {
               className={`w-4 h-4 ${i < Number(value) ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'}`}
             />
           ))}
-          <span className="ml-2 text-sm">({value})</span>
+          <span className="ml-2 text-sm">({String(value)})</span>
         </div>
       );
     
@@ -353,9 +357,10 @@ export function transformValidation(validationRule?: ValidationRuleLike) {
     transformed.maxLength = validationRule.maxLength.value;
   }
   
-  if (validationRule.validate) {
+  const validateFn = validationRule.validate;
+  if (validateFn) {
     transformed.custom = (value: unknown) => {
-      const result = validationRule.validate(value);
+      const result = validateFn(value);
       return result === true ? null : (result as string);
     };
   }
@@ -460,7 +465,7 @@ export default function DynamicDetailModal({
                 <div className="flex-shrink-0">
                   <img
                     src={headerImage}
-                    alt={data.name || data.title}
+                    alt={String(data.name || data.title || '')}
                     className="w-20 h-20 rounded-full object-cover border-2"
                     style={{ borderColor: headerColor }}
                   />
@@ -471,7 +476,7 @@ export default function DynamicDetailModal({
                     className="w-20 h-20 rounded-full flex items-center justify-center text-2xl font-bold text-white"
                     style={{ backgroundColor: headerColor }}
                   >
-                    {getInitials(data.name || data.title)}
+                    {getInitials(String(data.name || data.title))}
                   </div>
                 </div>
               ) : null}
@@ -480,14 +485,14 @@ export default function DynamicDetailModal({
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
                   <div>
                     <h2 className="text-2xl font-bold">
-                      {data.name || data.title || 'Untitled'}
+                      {String(data.name || data.title || 'Untitled')}
                     </h2>
                     {subtitle && (
                       <p className="text-muted-foreground mt-1">{subtitle}</p>
                     )}
-                    {(data.status || data.type) && (
+                    {(data.status != null || data.type != null) && (
                       <div className="flex items-center gap-2 mt-2">
-                        {data.status && (
+                        {data.status != null && (
                           <Badge 
                             className="capitalize"
                             style={{ 
@@ -503,12 +508,12 @@ export default function DynamicDetailModal({
                                 : '#92400e'
                             }}
                           >
-                            {data.status}
+                            {String(data.status)}
                           </Badge>
                         )}
-                        {data.type && (
+                        {data.type != null && (
                           <Badge variant="outline" className="capitalize">
-                            {data.type}
+                            {String(data.type)}
                           </Badge>
                         )}
                       </div>

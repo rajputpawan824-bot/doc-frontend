@@ -432,7 +432,7 @@ export default function FacilityManagementPage() {
           <Button
             size="sm"
             variant="ghost"
-            onClick={() => handleToggleStatus(row.original.id)}
+            // onClick={() => handleToggleStatus(row.original.id)}
             title={row.original.status === "ACTIVE" ? "Deactivate" : "Activate"}
           >
             {row.original.status === "ACTIVE" ? (
@@ -667,16 +667,16 @@ export default function FacilityManagementPage() {
       );
     } else {
       // Create new service
-      const newService: ServiceFacility = {
-        id: Date.now().toString(),
-        ...data,
-        lastUpdated: new Date().toISOString().split("T")[0],
-        createdBy: "Admin User",
-      };
+      // const newService: ServiceFacility = {
+      //   id: Date.now().toString(),
+      //   ...data,
+      //   lastUpdated: new Date().toISOString().split("T")[0],
+      //   createdBy: "Admin User",
+      // };
 
-      setServices((prev) => [newService, ...prev]);
-      toast.success("Service created successfully");
-    }
+    //   setServices((prev) => [newService, ...prev]);
+    //   toast.success("Service created successfully");
+    // }
 
     setIsModalOpen(false);
   };
@@ -875,7 +875,7 @@ export default function FacilityManagementPage() {
         </TabsContent>
       </Tabs>
 
-      {/* Service Modal */}
+      {/* Service Modal
       <ReusableModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
@@ -888,7 +888,7 @@ export default function FacilityManagementPage() {
         saveButtonText={isEditMode ? "Update Service" : "Create Service"}
         cancelButtonText="Cancel"
         validationOnChange={true}
-      />
+      /> */}
 
       {/* Delete Confirmation Modal */}
       {deleteConfirm && (
@@ -932,4 +932,4 @@ export default function FacilityManagementPage() {
       )}
     </div>
   );
-}
+}}

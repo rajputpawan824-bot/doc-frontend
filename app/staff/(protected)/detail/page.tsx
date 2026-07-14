@@ -2,7 +2,6 @@
 
 import { useState,useEffect } from "react";
 import {
-  User,
   Phone,
   Mail,
   MapPin,
@@ -26,7 +25,6 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useStaffById ,useUpdateStaff ,useUpdateStaffPassword,} from "@/services/admin/staff";
 import ReusableModal, {
   FormSection,
@@ -63,6 +61,9 @@ export default function StaffProfilePage() {
   const [isEditing, setIsEditing] = useState(false);
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
 const [passwordModalKey, setPasswordModalKey] = useState(0);
+const [selectedDocuments, setSelectedDocuments] = useState<File[]>([]);
+const [selectedProfileImage, setSelectedProfileImage] =
+  useState<File | null>(null);
 
     const [staffId, setstaffId] = useState<string>();
 
@@ -93,6 +94,7 @@ const updateStaffMutation = useUpdateStaff({
   onSuccess: () => {
     toast.success("Profile updated");
     setIsEditing(false);
+    setSelectedDocuments([]);
     refetch();
   },
 });
@@ -151,6 +153,8 @@ const handleSave = () => {
       registrationNo: formData.registrationNo,
       experience: String(formData.experience),
       phone: formData.phone,
+      profileImage: selectedProfileImage,
+      documents: selectedDocuments,
     },
   });
 };
@@ -165,6 +169,8 @@ const resetForm = () => {
     experience: Number(staff.experience || ""),
     phone: staff.phone || "",
   });
+  setSelectedDocuments([]);
+  setSelectedProfileImage(null);
 };
 
 const passwordFormSections: FormSection[] = [
@@ -255,12 +261,33 @@ if (!staff) {
 
 <div className="bg-gradient-to-r from-blue-500 via-blue-500 to-blue-500 p-8">
 <div className="flex flex-col md:flex-row items-center gap-6">
-  <Avatar className="h-28 w-28 border-4 border-white/30">
-    <AvatarImage src="" />
-    <AvatarFallback className="bg-white/20 text-white">
-      <User className="h-12 w-12" />
-    </AvatarFallback>
-  </Avatar>
+  <div className="relative">
+    <img
+      key={staff.profileImageUrl}
+      src={
+        selectedProfileImage
+          ? URL.createObjectURL(selectedProfileImage)
+          : staff.profileImageUrl || "/default-avatar.png"
+      }
+      alt="staff"
+      className="h-28 w-28 rounded-full object-cover border-4 border-white/30"
+    />
+    {isEditing && (
+      <label
+        htmlFor="staff-profile-upload"
+        className="absolute bottom-0 right-0 flex h-8 w-8 cursor-pointer items-center justify-center rounded-full bg-green-600 text-white shadow-lg hover:bg-green-700"
+      >
+        +
+        <input
+          id="staff-profile-upload"
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={(e) => setSelectedProfileImage(e.target.files?.[0] || null)}
+        />
+      </label>
+    )}
+  </div>
 
   <div className="text-white">
     <h2 className="text-3xl font-bold">
@@ -509,6 +536,17 @@ if (!staff) {
 
 <div className="md:col-span-2">
   <Label>Documents</Label>
+  {isEditing && (
+    <Input
+      name="documents"
+      type="file"
+      multiple
+      className="mt-2"
+      onChange={(e) =>
+        setSelectedDocuments(Array.from(e.target.files || []))
+      }
+    />
+  )}
   <div className="mt-2 space-y-2">
     {staff?.documents?.length ? (
       staff.documents.map((doc, index) => (

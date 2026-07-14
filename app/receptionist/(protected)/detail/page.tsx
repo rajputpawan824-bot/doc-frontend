@@ -2,7 +2,6 @@
 
 import { useEffect, useState  } from "react";
 import {
-  User,
   Phone,
   Mail,
   MapPin,
@@ -20,7 +19,6 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useReceptionistById ,  useUpdateReceptionist, useUpdateReceptionistPassword,} from "@/services/admin/reception";
 import { format } from "util";
 import ReusableModal, {
@@ -114,6 +112,7 @@ const handleSave = () => {
     
      registrationNo: formData.registrationNo,
       experience: formData.experience,
+      profileImage: selectedProfileImage,
       documents: selectedDocuments,
     },
   });
@@ -195,6 +194,8 @@ const handleUpdatePassword = (
               <Button onClick={() => {
                 setIsEditing(false);
                 setSelectedDocuments([]);
+                setSelectedProfileImage(null);
+                refetch();
               }} variant="outline" className="gap-2">
                 <X className="h-4 w-4" />
                 Cancel
@@ -212,12 +213,33 @@ const handleUpdatePassword = (
 
 <div className="flex flex-col md:flex-row items-center gap-6">
 
-<Avatar className="h-28 w-28 border-4 border-white/30">
-  <AvatarImage src="" />
-  <AvatarFallback className="bg-white/20 text-white">
-    <User className="h-12 w-12" />
-  </AvatarFallback>
-</Avatar>
+<div className="relative">
+  <img
+    key={receptionist.profileImageUrl}
+    src={
+      selectedProfileImage
+        ? URL.createObjectURL(selectedProfileImage)
+        : receptionist.profileImageUrl || "/default-avatar.png"
+    }
+    alt="receptionist"
+    className="h-28 w-28 rounded-full object-cover border-4 border-white/30"
+  />
+  {isEditing && (
+    <label
+      htmlFor="receptionist-profile-upload"
+      className="absolute bottom-0 right-0 flex h-8 w-8 cursor-pointer items-center justify-center rounded-full bg-green-600 text-white shadow-lg hover:bg-green-700"
+    >
+      +
+      <input
+        id="receptionist-profile-upload"
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={(e) => setSelectedProfileImage(e.target.files?.[0] || null)}
+      />
+    </label>
+  )}
+</div>
 
 <div className="text-white">
   <h2 className="text-3xl font-bold">

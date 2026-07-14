@@ -96,6 +96,16 @@ const combinedSchema = z.object({
 });
 type ClinicFormValues = z.infer<typeof combinedSchema>;
 
+const WORKING_DAYS = [
+  "monday",
+  "tuesday",
+  "wednesday",
+  "thursday",
+  "friday",
+  "saturday",
+  "sunday",
+] as const;
+
 export function ClinicForm({ initialData, onSubmit, mode } : {
   initialData?: ClinicFormValues;
   onSubmit: (data: ClinicFormValues) => void;
@@ -371,15 +381,7 @@ export function ClinicForm({ initialData, onSubmit, mode } : {
                     Working Hours (Optional)
                   </h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                    {[
-                      "monday",
-                      "tuesday",
-                      "wednesday",
-                      "thursday",
-                      "friday",
-                      "saturday",
-                      "sunday",
-                    ].map((day) => (
+                    {WORKING_DAYS.map((day) => (
                       <div key={day} className="space-y-2">
                         <label className="text-sm font-medium capitalize">
                           {day}

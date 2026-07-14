@@ -50,6 +50,7 @@ workingHours: {
   createdAt: string;
   updatedAt?: string;
   password?: string;
+  profileImageUrl?: string;
   documents?: ReceptionResponse["documents"];
 }
 
@@ -245,6 +246,9 @@ if (data.workingHours !== undefined) {
       if (data.caneditPatient !== undefined) {
         updatePayload.append("caneditPatient", String(data.caneditPatient));
       }
+      if (data.profileImage) {
+        updatePayload.append("profileImage", data.profileImage);
+      }
 
       data.documents?.forEach((file) => {
         updatePayload.append("documents", file);
@@ -345,6 +349,7 @@ export const useReceptionistById = (id: string | undefined) => {
         address: reception.address,
         deskNumber: reception.deskNumber,
         receptionistCode: reception.receptionistCode,
+        profileImageUrl: reception.profileImageUrl,
         documents: reception.documents ?? [],
 
 registrationNo: reception.registrationNo,

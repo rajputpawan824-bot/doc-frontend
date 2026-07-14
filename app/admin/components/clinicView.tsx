@@ -41,15 +41,15 @@ export function ClinicView({ clinicData, onEdit }: ClinicViewProps) {
     enterprise: "default",
   } as const;
 
-  const days = [
-    "monday",
-    "tuesday",
-    "wednesday",
-    "thursday",
-    "friday",
-    "saturday",
-    "sunday",
-  ];
+const days = [
+  "monday",
+  "tuesday",
+  "wednesday",
+  "thursday",
+  "friday",
+  "saturday",
+  "sunday",
+] as const;
 
   return (
     <div className="space-y-6">

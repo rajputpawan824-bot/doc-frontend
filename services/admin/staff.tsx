@@ -52,6 +52,7 @@ interface RawStaff {
   updatedAt?: string;
   isActive?: boolean;
   password?: string;
+  profileImageUrl?: string;
   documents?: StaffResponse["documents"];
 }
 
@@ -184,6 +185,7 @@ export const useStaffById = (id: string | undefined) => {
         status: (staff.isActive ?? staff.user?.isActive) ? "active" as const : "inactive" as const,
         lastLogin: staff.user?.lastLogin ?? null,
         experience: String(staff.experience ?? ""),
+        profileImageUrl: staff.profileImageUrl,
         documents: staff.documents ?? [],
       } as StaffResponse;
     },
@@ -460,6 +462,9 @@ export function useUpdateStaff(options?: {
       if (data.department !== undefined) updatePayload.append("department", data.department.trim());
       if (data.registrationNo !== undefined) updatePayload.append("registrationNo", data.registrationNo.trim());
       if (data.roleBadge !== undefined) updatePayload.append("roleBadge", data.roleBadge.trim());
+      if (data.profileImage) {
+        updatePayload.append("profileImage", data.profileImage);
+      }
       data.documents?.forEach((file) => {
         updatePayload.append("documents", file);
       });

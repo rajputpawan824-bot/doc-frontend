@@ -25,11 +25,12 @@ export interface ReceptionFormData {
 
   joiningDate: string;
 
-workingHours: {
+  workingHours: {
   start: string;
   end: string;
 };
 
+profileImage?: File | null;
 documents?: File[];
 
 }
@@ -69,6 +70,7 @@ workingHours: {
   documents?: ReceptionDocument[];
   createdAt: string;
   updatedAt: string;
+  profileImageUrl?: string;
   user: {
     id: string;
     email: string;
@@ -85,6 +87,7 @@ workingHours: {
     lastLogin: string | null;
     createdAt: string;
     updatedAt: string;
+    profileImage?: string | null;
     canEditPatient?: string; // API returns string
     canEditPatients?: string; // API returns string
   };

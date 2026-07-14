@@ -311,9 +311,7 @@ const handleUpdatePassword = (
 <div className="flex flex-col md:flex-row items-center gap-6">
 
 <div className="relative">
-  <p className="text-red-500">
-  {doctor?.user?.profileImage}
-</p>
+
 
 
 {/* <p className="text-red-500 break-all">

@@ -44,6 +44,7 @@ export interface StaffFormData {
   start: string;
   end: string;
 };
+  profileImage?: File | null;
   documents?: File[];
 }
 
@@ -84,6 +85,7 @@ export interface StaffResponse {
   end?: string;
 };
   documents?: StaffDocument[];
+  profileImageUrl?: string;
   user: {
     _id?: string;
     id?: string;
@@ -97,6 +99,7 @@ export interface StaffResponse {
     lastLogin?: string | null;
     createdAt?: string;
     updatedAt?: string;
+    profileImage?: string | null;
   };
   // Derived fields added by service layer
   status?: "active" | "inactive" | "on_leave";

@@ -111,13 +111,19 @@ export function useAddClinic(options?: {
 
       const response = await clientApi.post<{success: boolean, message: string, data?: ClinicResponse}>("/admins/create-admin", payload);
 
-      const resData = response as { success?: boolean, message?: string, data?: { success?: boolean, message?: string, data?: ClinicResponse } };
-
-      if (!response.success && !resData.data?.success) {
-        throw new Error(response.message || resData.data?.message || "Failed to create clinic");
+      if (!response.success) {
+        throw new Error(response.error || "Failed to create clinic");
       }
 
-      return resData.data?.data || response.data;
+      if (!response.data.success) {
+        throw new Error(response.data.message || "Failed to create clinic");
+      }
+
+      if (!response.data.data) {
+        throw new Error(response.data.message || "Failed to create clinic");
+      }
+
+      return response.data.data;
     },
     retry: 1,
     retryDelay: 1000,
@@ -140,13 +146,19 @@ export function useUpdateClinic(options?: {
 
       const response = await clientApi.put<{success: boolean, message: string, data?: ClinicResponse}>(`/admins/update/${id}`, payload);
 
-      const resData = response as { success?: boolean, message?: string, data?: { success?: boolean, message?: string, data?: ClinicResponse } };
-
-      if (!response.success && !resData.data?.success) {
-        throw new Error(response.message || resData.data?.message || "Failed to update clinic");
+      if (!response.success) {
+        throw new Error(response.error || "Failed to update clinic");
       }
 
-      return resData.data?.data || response.data;
+      if (!response.data.success) {
+        throw new Error(response.data.message || "Failed to update clinic");
+      }
+
+      if (!response.data.data) {
+        throw new Error(response.data.message || "Failed to update clinic");
+      }
+
+      return response.data.data;
     },
     onSuccess: options?.onSuccess,
     onError: options?.onError,
@@ -165,13 +177,15 @@ export function useDeleteClinic(options?: {
 
       const response = await clientApi.put<{success: boolean, message: string}>(`/admins/status/${id}`, payload);
 
-      const resData = response as { success?: boolean, message?: string, data?: { success?: boolean, message?: string } };
-
-      if (!response.success && !resData.data?.success) {
-        throw new Error(response.message || resData.data?.message || "Failed to disable clinic");
+      if (!response.success) {
+        throw new Error(response.error || "Failed to disable clinic");
       }
 
-      return response;
+      if (!response.data.success) {
+        throw new Error(response.data.message || "Failed to disable clinic");
+      }
+
+      return response.data;
     },
     onSuccess: options?.onSuccess,
     onError: options?.onError,

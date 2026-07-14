@@ -159,6 +159,8 @@ function DataTable<TData, TValue>({
   const [rowSelection, setRowSelection] = useState({});
   const [globalFilter, setGlobalFilter] = useState("");
 
+  // TanStack Table uses internal mutability and is incompatible with React Compiler memoization
+  // eslint-disable-next-line react-hooks/incompatible-library -- expected for useReactTable
   const table = useReactTable({
     data,
     columns,
@@ -343,7 +345,7 @@ const formatDate = (value?: string | Date | null) => {
   });
 };
 
-const ?.getTimeValue = (value?: string | Date | null) => {
+const getTimeValue = (value?: string | Date | null) => {
   if (!value) return 0;
   const date = new Date(value);
   return Number.isNaN(date?.getTime()) ? 0 : date?.getTime();
@@ -565,7 +567,7 @@ export default function PatientsPage() {
   const sortedHistory = useMemo(
     () =>
       [...getHistoryItems(prescriptionHistory)].sort(
-        (a, b) => ?.getTimeValue(getHistoryDate(b)) - ?.getTimeValue(getHistoryDate(a)),
+        (a, b) => getTimeValue(getHistoryDate(b)) - getTimeValue(getHistoryDate(a)),
       ),
     [prescriptionHistory],
   );
