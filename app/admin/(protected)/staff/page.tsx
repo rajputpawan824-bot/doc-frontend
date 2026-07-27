@@ -127,6 +127,7 @@ interface StaffMember {
 };
   documents?: {
     _id?: string;
+    
     fileName: string;
     originalName: string;
     filePath: string;
@@ -481,14 +482,21 @@ const staffFormSections: FormSection[] = [
     title: "Documents",
     icon: <FileText className="h-4 w-4" />,
     fields: [
-      {
-        name: "documents",
-        label: "Upload Documents",
-        type: "file",
-        required: false,
-        width: "full",
-        multiple: true,
-      },
+{
+  name: "documents",
+  label: "Documents",
+  type: "document-manager",
+  width: "full",
+  documentTypes: [
+    { value: "AADHAAR_CARD", label: "Aadhaar Card" },
+    { value: "EDUCATIONAL", label: "Education" },
+    { value: "EXPERIENCE_CERTIFICATE", label: "Experience Certificate" },
+    { value: "RESUME", label: "Resume/CV" },
+    { value: "JOINING_LETTER", label: "Joining Letter" },
+    { value: "BANK_DETAILS", label: "Bank Passbook/Cancelled Cheque" },
+    { value: "OTHER", label: "Other" },
+  ],
+},
     ],
   },
 ];
@@ -915,6 +923,23 @@ queryClient.invalidateQueries({
     ROTATING: "bg-gradient-to-r from-blue-100 to-purple-100 text-purple-800",
   };
 
+
+
+  const formatDocumentType = (type?: string) => {
+  const types: Record<string, string> = {
+    AADHAAR_CARD: "Aadhaar Card",
+    EDUCATIONAL: "Educational Certificate",
+    EXPERIENCE_CERTIFICATE: "Experience Certificate",
+    RESUME: "Resume",
+    JOINING_LETTER: "Joining Letter",
+    BANK_DETAILS: "Bank Details",
+    OTHER: "Other Document",
+  };
+
+  return types[type || "OTHER"] || "Other Document";
+};
+
+
   const detailSections: SectionConfig[] = [
     {
       id: "personal-info",
@@ -1180,44 +1205,54 @@ queryClient.invalidateQueries({
         },
       ],
     },
+{
+  id: "documents",
+  title: "Documents",
+  description: "Uploaded staff documents",
+  icon: <FileText className="h-5 w-5 text-blue-600" />,
+  layout: "grid",
+  columns: 1,
+  fields: [
     {
-      id: "documents",
-      size: 50,
-      title: "Documents",
-      description: "Uploaded staff documents",
-      icon: <FileText className="h-5 w-5 text-blue-600" />,
-      layout: "grid",
-      columns: 1,
-      fields: [
-        {
-          key: "documents",
-          label: "Uploaded Documents",
-          type: "custom",
-          width: "full",
-          format: (value) => {
-            if (!Array.isArray(value) || value.length === 0) {
-              return "No documents uploaded";
-            }
+      key: "documents",
+      label: "Uploaded Documents",
+      type: "custom",
+      width: "full",
+      format: (value) => {
+        if (!Array.isArray(value) || value.length === 0) {
+          return "No documents uploaded";
+        }
 
-            return (
-              <div className="space-y-2">
-                {value.map((doc, index) => (
-                  <a
-                    key={doc._id || doc.filePath || index}
-                    href={`https://clinic-managemnet-backend.onrender.com${doc.filePath}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="block text-blue-600 underline"
-                  >
-                    {doc.originalName}
-                  </a>
-                ))}
-              </div>
-            );
-          },
-        },
-      ],
+        return (
+          <div className="space-y-2">
+            {value.map((doc: any, index: number) => {
+              const count =
+                value
+                  .slice(0, index + 1)
+                  .filter((d: any) => d.documentType === doc.documentType)
+                  .length;
+
+              return (
+                <a
+                  key={index}
+                  href={doc.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-600 underline block font-medium"
+                >
+                 {doc.documentType === "OTHER"
+  ? doc.customDocumentName
+  : formatDocumentType(doc.documentType)}
+                  {count > 1 ? ` (${count})` : ""}
+                </a>
+              );
+            })}
+          </div>
+        );
+      },
     },
+  ],
+},
   ];
 
 
@@ -1268,10 +1303,11 @@ const detailActions: ActionButton[] =
     setIsDetailModalOpen(true);
   };
 
-  const handleEditStaff = (staffMember: StaffMember) => {
-    setEditingStaff(staffMember);
-    setModalOpen(true);
-  };
+const handleEditStaff = (staffMember: StaffMember) => {
+  setSelectedStaffId(staffMember.id);
+  setEditingStaff(staffMember);
+  setModalOpen(true);
+};
 
   const handleDisableStaff = (staffMember: StaffMember) => {
     setStaffToDelete(staffMember);
@@ -1294,8 +1330,22 @@ const detailActions: ActionButton[] =
       start: String(data.workingHourStart || ""),
       end: String(data.workingHourEnd || ""),
     },
-    documents: Array.isArray(data.documents)
-      ? data.documents.filter((file): file is File => file instanceof File)
+documents: Array.isArray(data.documents)
+  ? data.documents.filter(
+      (
+        doc
+      ): doc is {
+        documentType: string;
+        customDocumentName?: string;
+        file: File;
+      } =>
+        !!doc &&
+        typeof doc.documentType === "string" &&
+        doc.file instanceof File
+    )
+  : [],
+    deletedDocumentIds: Array.isArray(data.documentsDeletedIds)
+      ? data.documentsDeletedIds.filter((id): id is string => typeof id === "string")
       : [],
   };
 
@@ -1336,7 +1386,18 @@ workingHours: {
   end: String(data.workingHourEnd || ""),
 },
 documents: Array.isArray(data.documents)
-  ? data.documents.filter((file): file is File => file instanceof File)
+  ? data.documents.filter(
+      (
+        doc
+      ): doc is {
+        documentType: string;
+        customDocumentName?: string;
+        file: File;
+      } =>
+        !!doc &&
+        typeof doc.documentType === "string" &&
+        doc.file instanceof File
+    )
   : [],
 ...(typeof data.roleBadge === "string" && {
   roleBadge: data.roleBadge,
@@ -1422,6 +1483,7 @@ documents: Array.isArray(data.documents)
 
 workingHourEnd:
   editingStaff.workingHours?.end || "",
+     documents: selectedStaff?.documents || editingStaff.documents || [],
     };
   };
 

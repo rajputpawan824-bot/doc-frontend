@@ -10,6 +10,7 @@ import {
   RefreshCw,
   Search,
   Loader2,
+  Ban,
   Eye,
   Plus,
 } from "lucide-react";
@@ -44,6 +45,7 @@ import { format } from "date-fns";
 import {
   useAllLeaves,
   useApproveLeave,
+  useCancelLeave,
   useRejectLeave,
   useLeaveStats,
   useCreateLeave,
@@ -223,6 +225,21 @@ const {
     },
   });
 
+  const cancelLeave = useCancelLeave({
+  onSuccess: () => {
+    toast.success("Leave cancelled successfully");
+
+    refetch();
+    refetchStats();
+    refetchOnLeave();
+    refetchOnLeaveToday();
+  },
+
+  onError: (error) => {
+    toast.error(error.message || "Failed to cancel leave");
+  },
+});
+
   // Filter leaves based on tab and search
   const filteredLeaves = allLeaves.filter((leave) => {
     const matchesTab =
@@ -343,6 +360,22 @@ const {
   <Eye className="h-4 w-4 mr-1" />
   View
 </Button>
+{actions === "view-only" && leave.status === "APPROVED" && (
+  <Button
+    size="sm"
+    variant="destructive"
+    onClick={() => cancelLeave.mutate(leave._id)}
+    disabled={cancelLeave.isPending}
+  >
+    {cancelLeave.isPending ? (
+      <Loader2 className="h-4 w-4 animate-spin" />
+    ) : (
+      <Ban className="h-4 w-4 mr-1" />
+    )}
+
+    Cancel
+  </Button>
+)}
                 {actions === "pending" && (
                   <>
                     <Button

@@ -5,7 +5,7 @@ import { Plus, X ,Eye, EyeOff} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Modal from "../ui/modal";
 
-export type FieldType = "text" | "email" | "tel"|"file" | "number" | "password" | "textarea" | "select" | "radio" | "checkbox" | "date" | "time"| "checkbox-group";
+export type FieldType = "text" | "email" | "tel"|"file" | "number" | "password" | "textarea" | "select" | "radio" | "checkbox" | "date" | "time"| "checkbox-group"   | "document-manager"  | "patient-document-manager";
 export type FormDataValue = unknown;
 export type ReusableFormData = Record<string, FormDataValue>;
 
@@ -28,6 +28,10 @@ export interface FieldConfig {
   multiple?: boolean; // For file input
   onChange?: (value: unknown) => void;
   step?: number; // For number input
+  documentTypes?: Array<{
+  value: string;
+  label: string;
+}>;
   validation?: {
     pattern?: RegExp;
     minLength?: number;
@@ -169,6 +173,38 @@ function isDocumentList(
   );
 }
 
+type ExistingDocument = {
+  _id?: string;
+  id?: string;
+  documentType?: string;
+  documentName?: string;
+  originalName?: string;
+  fileName?: string;
+  url?: string;
+  filePath?: string;
+};
+
+function isExistingDocumentList(value: FormDataValue): value is ExistingDocument[] {
+  return Array.isArray(value) && value.every(
+    (item) => item && typeof item === "object" && !(item instanceof File),
+  );
+}
+
+function documentLabel(document: ExistingDocument, index: number): string {
+  return document.documentName || document.documentType || document.originalName || document.fileName || `Document ${index + 1}`;
+}
+
+const DOCTOR_DOCUMENT_TYPES = [
+  { value: "MBBS_DEGREE", label: "MBBS Degree" },
+  { value: "MD_MS_DEGREE", label: "MD/MS Degree" },
+  { value: "REGISTRATION_CERTIFICATE", label: "Registration Certificate" },
+  { value: "EXPERIENCE_CERTIFICATE", label: "Experience Certificate" },
+  { value: "AADHAAR_CARD", label: "Aadhaar Card" },
+  { value: "PAN_CARD", label: "PAN Card" },
+  { value: "RESUME", label: "Resume/CV" },
+  { value: "OTHER", label: "Other" },
+];
+
 function ReusableModalContent({
   cancelButtonText,
   formId,
@@ -197,7 +233,52 @@ function ReusableModalContent({
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [showPassword, setShowPassword] = useState<Record<string, boolean>>({});
   const [touched, setTouched] = useState<Record<string, boolean>>({});
+const [documentRows, setDocumentRows] = useState<
+  {
+    documentType: string;
+    customDocumentName: string;
+    file: File | null;
+  }[]
+>([
+  {
+    documentType: "",
+    customDocumentName: "",
+    file: null,
+  },
+]);
 
+  const [existingDocuments, setExistingDocuments] = useState<ExistingDocument[]>(() => {
+    const documentField = allFields.find((field) => field.type === "document-manager");
+    const documents = documentField && initialData[documentField.name];
+    return isExistingDocumentList(documents) ? documents : [];
+  });
+  const [documentPendingDeletion, setDocumentPendingDeletion] = useState<ExistingDocument | null>(null);
+
+const [patientDocumentRows, setPatientDocumentRows] = useState<
+  {
+    documentName: string;
+    file: File | null;
+  }[]
+>([
+  {
+    documentName: "",
+    file: null,
+  },
+]);
+const [existingPatientDocuments, setExistingPatientDocuments] =
+  useState<ExistingDocument[]>(() => {
+    const documentField = allFields.find(
+      field => field.type === "patient-document-manager"
+    );
+
+    const documents =
+      documentField &&
+      initialData[documentField.name];
+
+    return isExistingDocumentList(documents)
+      ? documents
+      : [];
+  });
   const validateField = (
     name: string,
     value: FormDataValue,
@@ -273,6 +354,7 @@ if (
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
     
+    console.log("FORM DATA", formData);
     if (validateForm()) {
       onSave(formData);
     }
@@ -460,8 +542,13 @@ const handleBlur = (name: string) => {
                 onBlur={() => handleBlur(field.name)}
                 onChange={(e) => {
                   const files = Array.from(e.target.files || []);
-                  handleChange(field.name, files);
-                  field.onChange?.(files);
+                    const existingFiles = Array.isArray(formData[field.name])
+    ? (formData[field.name] as File[])
+    : [];
+
+  const updatedFiles = [...existingFiles, ...files];
+handleChange(field.name, updatedFiles);
+field.onChange?.(updatedFiles);
                 }}
                 placeholder={field.placeholder}
                 disabled={field.disabled}
@@ -470,8 +557,352 @@ const handleBlur = (name: string) => {
               />
             </div>
           );
+case "document-manager": {
+  const deletedDocumentIds = formData[`${field.name}DeletedIds`];
+  const remainingExistingDocuments = existingDocuments;
 
-case "checkbox-group":
+  const updateNewDocuments = (rows: typeof documentRows) => {
+    handleChange(
+      field.name,
+      rows
+        .filter((row) => row.documentType && row.file)
+.map((row) => ({
+  documentType: row.documentType,
+  customDocumentName:
+    row.documentType === "OTHER"
+      ? row.customDocumentName.trim()
+      : "",
+  file: row.file as File,
+}))
+        .filter((row) => row.documentType),
+    );
+  };
+
+  return (
+    <div className="space-y-3">
+      {remainingExistingDocuments.map((document, index) => {
+        const id = document._id || document.id;
+        const href = document.url || document.filePath;
+        return (
+          <div key={id || `${documentLabel(document, index)}-${index}`} className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+            {href ? (
+              <a href={href} target="_blank" rel="noopener noreferrer" className="min-w-0 truncate text-sm text-blue-600 underline">
+                {documentLabel(document, index)}
+              </a>
+            ) : (
+              <span className="min-w-0 truncate text-sm text-slate-700">{documentLabel(document, index)}</span>
+            )}
+            <button
+              type="button"
+              aria-label={`Delete ${documentLabel(document, index)}`}
+              onClick={() => setDocumentPendingDeletion(document)}
+              className="shrink-0 text-lg leading-none text-slate-500 hover:text-red-600"
+            >
+              ×
+            </button>
+          </div>
+        );
+      })}
+
+      {documentRows.map((row, index) => (
+        <div
+          key={index}
+          className="flex gap-2 items-center"
+        >
+<select
+  className={commonClasses}
+  value={row.documentType}
+  onChange={(e) => {
+    const updatedRows = [...documentRows];
+
+    updatedRows[index].documentType =
+      e.target.value;
+
+    setDocumentRows(updatedRows);
+
+    updateNewDocuments(updatedRows);
+  }}
+>
+            <option value="">
+              Select Document Type
+            </option>
+
+            {(field.documentTypes || DOCTOR_DOCUMENT_TYPES).map((type) => (
+              <option
+                key={type.value}
+                value={type.value}
+              >
+                {type.label}
+              </option>
+            ))}
+</select>
+
+{row.documentType === "OTHER" && (
+  <input
+    type="text"
+    aria-label="Document Name"
+    placeholder="Document Name"
+    className={commonClasses}
+    value={row.customDocumentName}
+    onChange={(e) => {
+      const updatedRows = [...documentRows];
+      updatedRows[index].customDocumentName = e.target.value;
+      setDocumentRows(updatedRows);
+      updateNewDocuments(updatedRows);
+    }}
+  />
+)}
+
+<input
+  type="file"
+  className={commonClasses}
+  onChange={(e) => {
+    const file =
+      e.target.files?.[0] || null;
+
+    const updatedRows = [
+      ...documentRows,
+    ];
+
+    updatedRows[index].file =
+      file;
+
+    setDocumentRows(updatedRows);
+
+    updateNewDocuments(updatedRows);
+  }}
+/>
+          {index === documentRows.length - 1 ? (
+            <button
+              type="button"
+              onClick={() =>
+                setDocumentRows([
+                  ...documentRows,
+                  {
+                    documentType: "",
+                    customDocumentName: "",
+                    file: null,
+                  },
+                ])
+              }
+            >
+              +
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => {
+                setDocumentRows(
+                  documentRows.filter((_, i) => i !== index)
+                );
+                updateNewDocuments(documentRows.filter((_, i) => i !== index));
+              }}
+            >
+              -
+            </button>
+          )}
+        </div>
+      ))}
+
+      {documentPendingDeletion && (
+        <Modal
+          isOpen={true}
+          onClose={() => setDocumentPendingDeletion(null)}
+          title="Delete Document"
+          size="sm"
+          footer={
+            <div className="flex gap-3">
+              <Button type="button" variant="outline" onClick={() => setDocumentPendingDeletion(null)}>Cancel</Button>
+              <Button
+                type="button"
+                onClick={() => {
+const filePath = documentPendingDeletion.filePath;
+
+setExistingDocuments((documents) =>
+  documents.filter((document) => document !== documentPendingDeletion)
+);
+
+if (filePath) {
+  const previousPaths = Array.isArray(deletedDocumentIds)
+    ? deletedDocumentIds
+    : [];
+
+  handleChange(
+    `${field.name}DeletedIds`,
+    [...previousPaths, filePath]
+  );
+}
+                  setDocumentPendingDeletion(null);
+                }}
+                className="bg-red-600 hover:bg-red-700"
+              >
+                Delete
+              </Button>
+            </div>
+          }
+        >
+          <p className="text-slate-700">Are you sure you want to delete this document?</p>
+        </Modal>
+      )}
+
+    </div>
+  );
+}
+
+
+
+  
+case "patient-document-manager":
+  const deletedDocumentIds = formData[`${field.name}DeletedIds`];
+  return (
+    <div className="space-y-3">
+            {existingPatientDocuments.map((document, index) => {
+        const id = document._id || document.id;
+        const href = document.url || document.filePath;
+        return (
+          <div key={id || `${documentLabel(document, index)}-${index}`} className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+            {href ? (
+              <a href={href} target="_blank" rel="noopener noreferrer" className="min-w-0 truncate text-sm text-blue-600 underline">
+                {documentLabel(document, index)}
+              </a>
+            ) : (
+              <span className="min-w-0 truncate text-sm text-slate-700">{documentLabel(document, index)}</span>
+            )}
+            <button
+              type="button"
+              aria-label={`Delete ${documentLabel(document, index)}`}
+              onClick={() => setDocumentPendingDeletion(document)}
+              className="shrink-0 text-lg leading-none text-slate-500 hover:text-red-600"
+            >
+              ×
+            </button>
+          </div>
+        );
+      })}
+      {patientDocumentRows.map((row, index) => (
+        <div
+          key={index}
+          className="space-y-3 rounded-lg border border-slate-200 p-3"
+        >
+          <label className="block space-y-1">
+            <span className="text-sm font-medium text-slate-700">Document Name</span>
+            <input
+              type="text"
+              placeholder="Document Name"
+              className={commonClasses}
+              value={row.documentName}
+              onChange={(e) => {
+                const updatedRows = [...patientDocumentRows];
+                updatedRows[index].documentName = e.target.value;
+                setPatientDocumentRows(updatedRows);
+                handleChange(
+                  field.name,
+                  updatedRows.filter((row) => row.documentName.trim() && row.file),
+                );
+              }}
+            />
+          </label>
+
+          <label className="block space-y-1">
+            <span className="text-sm font-medium text-slate-700">Choose File</span>
+            <input
+              type="file"
+              className={commonClasses}
+              onChange={(e) => {
+                const updatedRows = [...patientDocumentRows];
+                updatedRows[index].file = e.target.files?.[0] || null;
+                setPatientDocumentRows(updatedRows);
+                handleChange(
+                  field.name,
+                  updatedRows.filter((row) => row.documentName.trim() && row.file),
+                );
+              }}
+            />
+          </label>
+
+          <button
+            type="button"
+            onClick={() => {
+              const updatedRows = patientDocumentRows.filter((_, i) => i !== index);
+              setPatientDocumentRows(updatedRows);
+              handleChange(
+                field.name,
+                updatedRows.filter((row) => row.documentName.trim() && row.file),
+              );
+            }}
+            className="px-3 py-2 rounded border"
+          >
+            -
+          </button>
+        </div>
+      ))}
+      <button
+        type="button"
+        onClick={() =>
+          setPatientDocumentRows([
+            ...patientDocumentRows,
+            { documentName: "", file: null },
+          ])
+        }
+        className="px-3 py-2 rounded border"
+      >
+        + Add Another
+      </button>
+      {documentPendingDeletion && (
+  <Modal
+    isOpen={true}
+    onClose={() => setDocumentPendingDeletion(null)}
+    title="Delete Document"
+    size="sm"
+    footer={
+      <div className="flex gap-3">
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => setDocumentPendingDeletion(null)}
+        >
+          Cancel
+        </Button>
+
+        <Button
+          type="button"
+          onClick={() => {
+            const filePath = documentPendingDeletion.filePath;
+
+            setExistingPatientDocuments((documents) =>
+              documents.filter(
+                (document) => document !== documentPendingDeletion
+              )
+            );
+
+            if (filePath) {
+              const previousPaths = Array.isArray(deletedDocumentIds)
+                ? deletedDocumentIds
+                : [];
+
+              handleChange(
+                `${field.name}DeletedIds`,
+                [...previousPaths, filePath]
+              );
+            }
+
+            setDocumentPendingDeletion(null);
+          }}
+          className="bg-red-600 hover:bg-red-700"
+        >
+          Delete
+        </Button>
+      </div>
+    }
+  >
+    <p className="text-slate-700">
+      Are you sure you want to delete this document?
+    </p>
+  </Modal>
+)}
+    </div>
+  );
+  case "checkbox-group":
   return (
     <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
       {field.options?.map((option) => {
@@ -564,10 +995,29 @@ case "checkbox-group":
       className={commonClasses}
         onBlur={() => handleBlur(field.name)}
       value={fieldValueAsString(formData[field.name])}
-      onChange={(e) => {
-        handleChange(field.name, e.target.value);
-        field.onChange?.(e.target.value);
-      }}
+onChange={(e) => {
+  let value = e.target.value;
+
+  // Restrict phone fields
+  if (
+    field.name === "phone" ||
+    field.name === "phoneNumber" ||
+    field.name === "emergencyContactPhone"
+  ) {
+    value = value.replace(/\D/g, "").slice(0, 10);
+  }
+
+  // Restrict Aadhaar fields
+  if (
+    field.name === "aadhaar" ||
+    field.name === "adhar"
+  ) {
+    value = value.replace(/\D/g, "").slice(0, 12);
+  }
+
+  handleChange(field.name, value);
+  field.onChange?.(value);
+}}
       placeholder={field.placeholder}
       disabled={field.disabled}
       min={field.min}

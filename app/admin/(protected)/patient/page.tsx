@@ -45,10 +45,12 @@ import ReusableModal, { FormSection, ReusableFormData } from '@/components/reusa
 import {
   useAddPatient,
   useNextPatientCode,
+   useCheckPatientPhone,
   usePatientById,
   usePatients,
   useUpdatePatient,
   useUpdatePatientStatus,
+  type FamilyProfile,
   type PatientCreateData,
 } from '@/services/admin/patient';
 
@@ -78,21 +80,22 @@ export enum PatientStatus {
 
 export interface MedicalReport {
   _id?: string;
-  id: string;
-  patientCode?: string;
-  title: string;
-  description?: string;
-  fileName: string;
-  originalName?: string;
-  filePath?: string;
-  mimeType?: string;
-  fileSize: number;
-  fileType: string;
-  uploadedBy: string;
-  uploadedAt: Date;
-  downloadUrl?: string;
-}
+  id?: string;
+  url?: string;
+  documentName: string;
 
+  fileName: string;
+
+  originalName?: string;
+
+  filePath?: string;
+
+  mimeType?: string;
+
+  fileSize: number;
+
+  uploadedAt: Date;
+}
 export interface Patient {
   id: string;
   patientCode: string;
@@ -115,6 +118,7 @@ emergencyContact?: {
   name?: string;
   phone?: string;
   relation?: string;
+  otherRelation?: string;
 };
   otherRelation?: string;
   diseases?: string[] | string;
@@ -246,6 +250,18 @@ const relationOptions = [
   { value: 'OTHER', label: 'Other' },
 ];
 
+const emergencyRelationOptions = [
+  { value: "FATHER", label: "Father" },
+  { value: "MOTHER", label: "Mother" },
+  { value: "BROTHER", label: "Brother" },
+  { value: "SISTER", label: "Sister" },
+  { value: "GUARDIAN", label: "Guardian" },
+  { value: "COUSIN", label: "Cousin" },
+  { value: "SPOUSE", label: "Spouse" },
+  { value: "FRIEND", label: "Friend" },
+  { value: "OTHER", label: "Other" },
+];
+
 const bloodGroupOptions = Object.values(BloodGroup).map((group) => ({
   value: group,
   label: group,
@@ -268,21 +284,26 @@ const renderMedicalReports = (reports?: MedicalReport[]) => {
 
   return (
     <div className="space-y-2">
-      {reports.map((report, index) => (
-        <a
-          key={report._id || report.id || report.filePath || index}
-          href={
-            report.filePath
-              ? `https://clinic-managemnet-backend.onrender.com${report.filePath}`
-              : report.downloadUrl
-          }
-          target="_blank"
-          rel="noopener noreferrer"
-          className="block text-sm text-blue-600 underline"
-        >
-          {report.originalName || report.title || report.fileName}
-        </a>
-      ))}
+{reports.map((report, index) => {
+  const count =
+    reports
+      .slice(0, index + 1)
+      .filter(r => r.documentName === report.documentName)
+      .length;
+
+  return (
+    <a
+      key={report._id || report.id || report.filePath || index}
+      href={report.url}
+      target="_blank"
+      rel="noreferrer"
+      className="block text-sm text-blue-600 underline"
+    >
+      {report.documentName}
+      {count > 1 ? ` (${count})` : ""}
+    </a>
+  );
+})}
     </div>
   );
 };
@@ -313,8 +334,14 @@ emergencyContactPhone:
 
 emergencyContactRelation:
   patient.emergencyContact?.relation ?? '',
+
+  emergencyContactOtherRelation:
+  patient.emergencyContact?.otherRelation ?? '',
+
+
   allergies: formatList(patient.allergies),
   medicalHistory: patient.medicalHistory ?? '',
+  medicalReports: patient.medicalReports ?? [],
 });
 
 const DetailItem = ({ label, value }: { label: string; value?: ReactNode }) => {
@@ -332,6 +359,17 @@ const PatientManagement = () => {
   const [activeTab, setActiveTab] = useState('active');
   const [searchQuery, setSearchQuery] = useState('');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [phoneInput, setPhoneInput] = useState("");
+  const [isPhoneModalOpen, setIsPhoneModalOpen] =
+    useState(false);
+
+const [patientPhone, setPatientPhone] =
+    useState("");
+
+const [selfExists, setSelfExists] =
+    useState(false);
+  const [familyProfiles, setFamilyProfiles] = useState<FamilyProfile[]>([]);
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
   const [editPatientId, setEditPatientId] = useState<string>('');
@@ -373,6 +411,8 @@ const PatientManagement = () => {
       alert(error.message);
     },
   });
+
+  const checkPhoneMutation = useCheckPatientPhone();
 
   const updatePatientMutation = useUpdatePatient({
     onSuccess: (patient) => {
@@ -421,7 +461,24 @@ const PatientManagement = () => {
     setLimit(nextLimit);
     setPage(1);
   };
+const handleContinue = async () => {
+    const result =
+        await checkPhoneMutation.mutateAsync(phoneInput);
+        console.log("check-phone result", result);
 
+    setPatientPhone(phoneInput);
+    setSelfExists(result.selfExists);
+    setFamilyProfiles(result.profiles);
+    setIsPhoneModalOpen(false);
+    refetchNextPatientCode();
+
+    if (result.profiles.length === 0) {
+      setIsAddModalOpen(true);
+      return;
+    }
+
+    setIsProfileModalOpen(true);
+};
   const formSections: FormSection[] = useMemo(() => [
     {
       title: 'Patient Information',
@@ -449,6 +506,7 @@ const PatientManagement = () => {
           name: 'phoneNumber',
           label: 'Phone Number',
           type: 'tel',
+          disabled:true,
           required: true,
          
           placeholder: '9876543210',
@@ -490,6 +548,52 @@ const PatientManagement = () => {
           width: 'half',
           options: bloodGroupOptions,
         },
+             {
+          name: 'relation',
+          label: 'Relation',
+          type: 'select',
+          required: true,
+          width: 'half',
+          defaultValue: 'SELF',
+         options:
+familyProfiles.length > 0
+    ? relationOptions.filter((option) => option.value !== 'SELF')
+    : [{ value: 'SELF', label: 'Self' }]
+        },
+{
+  name: 'otherRelation',
+  label: 'Other Relation',
+  type: 'text',
+  placeholder: 'Specify relation',
+  width: 'half',
+  required: (data) => data.relation === "OTHER",
+  hidden: (data) => data.relation !== "OTHER",
+},
+
+        {
+          name: 'diseases',
+          label: 'Diseases',
+          type: 'textarea',
+          placeholder: 'Diabetes, BP, Asthma, etc.',
+          width: 'full',
+          rows: 3,
+        },
+        {
+          name: 'allergies',
+          label: 'Allergies',
+          type: 'textarea',
+          placeholder: 'Medicine or food allergies',
+          width: 'full',
+          rows: 3,
+        },
+        {
+          name: 'medicalHistory',
+          label: 'Medical History',
+          type: 'textarea',
+          placeholder: 'Relevant medical history',
+          width: 'full',
+          rows: 4,
+        },
         {
           name: 'adhar',
           label: 'Aadhaar',
@@ -519,84 +623,47 @@ const PatientManagement = () => {
       type: 'text',
       width: 'half',
     },
-    {
+        {
       name: 'emergencyContactPhone',
       label: 'Contact Phone',
        placeholder: '9876543210',
       type: 'tel',
       width: 'half',
     },
-    {
-      name: 'emergencyContactRelation',
-      label: 'Relation',
-       placeholder: 'Specify relation',
-      type: 'text',
-      width: 'full',
-    },
+{
+  name: "emergencyContactRelation",
+  label: "Relation",
+  type: "select",
+  width: "half",
+  defaultValue: "FATHER",
+  options: emergencyRelationOptions,
+},
+{
+  name: "emergencyContactOtherRelation",
+  label: "Other Relation",
+  type: "text",
+  placeholder: "Specify relation",
+  width: "half",
+  required: (data) => data.emergencyContactRelation === "OTHER",
+  hidden: (data) => data.emergencyContactRelation !== "OTHER",
+},
   ],
 },
-    {
-      title: 'Relation & Medical Details',
-      icon: <Heart className="h-4 w-4" />,
-      fields: [
-     {
-          name: 'relation',
-          label: 'Relation',
-          type: 'select',
-          required: true,
-          width: 'half',
-          defaultValue: 'SELF',
-          options: relationOptions,
-        },
-        {
-          name: 'otherRelation',
-          label: 'Other Relation',
-          type: 'text',
-          placeholder: 'Specify relation',
-          width: 'half',
-        },
 
-        {
-          name: 'diseases',
-          label: 'Diseases',
-          type: 'textarea',
-          placeholder: 'Diabetes, BP, Asthma, etc.',
-          width: 'full',
-          rows: 3,
-        },
-        {
-          name: 'allergies',
-          label: 'Allergies',
-          type: 'textarea',
-          placeholder: 'Medicine or food allergies',
-          width: 'full',
-          rows: 3,
-        },
-        {
-          name: 'medicalHistory',
-          label: 'Medical History',
-          type: 'textarea',
-          placeholder: 'Relevant medical history',
-          width: 'full',
-          rows: 4,
-        },
-      ],
-    },
     {
       title: 'Documents',
       icon: <FileText className="h-4 w-4" />,
       fields: [
         {
           name: 'medicalReports',
-          label: 'Upload Documents',
-          type: 'file',
+          label: 'Documents',
+          type: 'patient-document-manager',
           required: false,
           width: 'full',
-          multiple: true,
         },
       ],
     },
-  ], [nextPatientCode]);
+], [nextPatientCode, familyProfiles]);
 
 
   const editFormSections: FormSection[] = useMemo(
@@ -610,24 +677,55 @@ const PatientManagement = () => {
   [formSections]
 );
 
-  const handleOpenAddPatient = () => {
-    setIsAddModalOpen(true);
-    void refetchNextPatientCode();
-  };
+const handleOpenAddPatient = () => {
+    setPhoneInput("");
+    setFamilyProfiles([]);
+    setIsPhoneModalOpen(true);
+};
+
+const handleAddFamilyMember = () => {
+  setIsProfileModalOpen(false);
+  setIsAddModalOpen(true);
+  void refetchNextPatientCode();
+};
+
+const handleCreateAppointment = (profile: FamilyProfile) => {
+  // TODO: Implement appointment creation for the selected profile.
+  console.log(profile);
+};
 
 const handleAddPatient = async (data: ReusableFormData) => {
+  console.log("[Patient create] complete form data", data);
+
   const payload = {
     ...data,
-    medicalReports: Array.isArray(data.medicalReports)
-      ? data.medicalReports.filter((file): file is File => file instanceof File)
-      : [],
+medicalReports:
+Array.isArray(data.medicalReports)
+  ? data.medicalReports.filter(
+      (doc) =>
+        doc.file &&
+        doc.documentName.trim()
+    )
+  : [],
+deletedDocumentIds: Array.isArray(data.medicalReportsDeletedIds)
+  ? data.medicalReportsDeletedIds.filter(
+      (id): id is string => typeof id === "string"
+    )
+  : [],
 
-    emergencyContact: {
-      name: data.emergencyContactName,
-      phone: data.emergencyContactPhone,
-      relation: data.emergencyContactRelation,
-    },
+emergencyContact: {
+  name: data.emergencyContactName,
+  phone: data.emergencyContactPhone,
+  relation: data.emergencyContactRelation,
+  otherRelation:
+    data.emergencyContactRelation === "OTHER"
+      ? data.emergencyContactOtherRelation
+      : null,
+},
   };
+
+  console.log("[Patient create] emergencyContact", payload.emergencyContact);
+  console.log("[Patient create] final payload", payload);
 
   await addPatientMutation.mutateAsync(
     payload as PatientCreateData
@@ -647,15 +745,29 @@ const handleEditPatient = async (data: ReusableFormData) => {
 
   const payload = {
     ...data,
-    medicalReports: Array.isArray(data.medicalReports)
-      ? data.medicalReports.filter((file): file is File => file instanceof File)
-      : [],
-
-    emergencyContact: {
-      name: data.emergencyContactName,
-      phone: data.emergencyContactPhone,
-      relation: data.emergencyContactRelation,
-    },
+medicalReports:
+Array.isArray(data.medicalReports)
+  ? data.medicalReports.filter(
+      (doc) =>
+        doc.file &&
+        doc.documentName.trim()
+    )
+  : [],
+deletedDocumentIds: Array.isArray(data.medicalReportsDeletedIds)
+  ? data.medicalReportsDeletedIds.filter(
+      (id): id is string => typeof id === "string"
+    )
+  : [],
+  
+emergencyContact: {
+  name: data.emergencyContactName,
+  phone: data.emergencyContactPhone,
+  relation: data.emergencyContactRelation,
+  otherRelation:
+    data.emergencyContactRelation === "OTHER"
+      ? data.emergencyContactOtherRelation
+      : null,
+},
   };
 
   await updatePatientMutation.mutateAsync({
@@ -892,14 +1004,72 @@ const handleEditPatient = async (data: ReusableFormData) => {
           </Card>
         </TabsContent>
       </Tabs>
-
+<Modal
+  isOpen={isPhoneModalOpen}
+  onClose={() => setIsPhoneModalOpen(false)}
+  title="Enter Patient Phone"
+  footer={
+    <Button
+      onClick={handleContinue}
+      className="bg-blue-600 hover:bg-blue-700 text-white"
+    >
+      Continue
+    </Button>
+  }
+>
+  <Input
+    value={phoneInput}
+    onChange={(e) => setPhoneInput(e.target.value)}
+    placeholder="Enter 10-digit phone number"
+    maxLength={10}
+  />
+</Modal>
+      <Modal
+        isOpen={isProfileModalOpen}
+        onClose={() => setIsProfileModalOpen(false)}
+        title="Select Patient Profile"
+        size="lg"
+        footer={
+          <Button onClick={handleAddFamilyMember}
+          className="bg-blue-600 hover:bg-blue-700 text-white">
+            Add Family Member
+          </Button>
+        }
+      >
+        <div className="space-y-4">
+          {familyProfiles.map((profile) => (
+            <Card key={profile._id} className="border-slate-200 shadow-sm">
+              <CardContent className="flex items-start justify-between gap-4 p-4">
+                <div className="space-y-1">
+                  <p className="font-semibold text-slate-900">{profile.name}</p>
+                  <p className="text-sm text-slate-600">Patient Code: {profile.patientCode}</p>
+                  <p className="text-sm text-slate-600">Relation: {profile.relation}</p>
+                  {profile.relation === 'OTHER' && profile.otherRelation && (
+                    <p className="text-sm text-slate-600">
+                      Other Relation: {profile.otherRelation}
+                    </p>
+                  )}
+                </div>
+                <Button onClick={() => handleCreateAppointment(profile)}
+                  className="bg-blue-600 hover:bg-blue-700 text-white">
+                  Create Appointment
+                </Button>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </Modal>
       <ReusableModal
         isOpen={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}
         onSave={handleAddPatient}
         title="Add New Patient"
         sections={formSections}
-        initialData={{ patientCode: nextPatientCode || 'Loading...', relation: 'SELF' }}
+        initialData={{
+          patientCode: nextPatientCode || 'Loading...',
+          phoneNumber: patientPhone,
+          relation: familyProfiles.length > 0 ? 'FATHER' : 'SELF',
+        }}
         size="xl"
         saveButtonText={addPatientMutation.isPending ? 'Adding...' : 'Add Patient'}
         cancelButtonText="Cancel"
@@ -1036,6 +1206,11 @@ const handleEditPatient = async (data: ReusableFormData) => {
     label="Emergency Contact Relation"
     value={patientForDetails.emergencyContact?.relation}
   />
+
+  <DetailItem
+  label="Emergency Contact Other Relation"
+  value={patientForDetails.emergencyContact?.otherRelation}
+/>
 
 
                 <DetailItem label="Diseases" value={formatList(patientForDetails.diseases)} />

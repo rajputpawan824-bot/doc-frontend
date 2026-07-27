@@ -827,7 +827,9 @@ const addAdjustmentMutation = useAddSalaryAdjustment({
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-yellow-600">
-              {formatCurrency(salaryDashboardStats?.totalAdjustments || 0)}
+              <div className="text-2xl font-bold text-yellow-600">
+  {formatCurrency(salaryDashboardStats?.totalAdjustments || 0).replace("₹", "")}
+</div>
             </div>
           </CardContent>
         </Card>

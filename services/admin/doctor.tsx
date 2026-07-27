@@ -121,9 +121,28 @@ export function useAddDoctor(options?: {
       payload.append("workingHours[start]", formData.workingHours.start);
       payload.append("workingHours[end]", formData.workingHours.end);
 
-      formData.documents?.forEach(file => {
-        payload.append("files", file);
-      });
+const documentTypes: string[] = [];
+const customDocumentNames: string[] = [];
+
+formData.documents?.forEach((doc) => {
+  payload.append("files", doc.file);
+
+  documentTypes.push(doc.documentType);
+
+  customDocumentNames.push(
+    doc.customDocumentName || ""
+  );
+});
+
+payload.append(
+  "documentTypes",
+  JSON.stringify(documentTypes)
+);
+
+payload.append(
+  "customDocumentNames",
+  JSON.stringify(customDocumentNames)
+);
 
       const response: ApiResponse<{ data: DoctorResponse }> =
         await clientApi.post("/doctors/create-doctor", payload);
@@ -322,10 +341,38 @@ if (data.profileImage) {
     data.profileImage
   );
 }
-data.documents?.forEach(file => {
-  payload.append("documents", file);
+const documentTypes: string[] = [];
+const customDocumentNames: string[] = [];
+
+(data.documents || []).forEach((doc: any) => {
+  if (doc.file instanceof File) {
+    payload.append("documents", doc.file);
+
+    documentTypes.push(doc.documentType);
+
+    customDocumentNames.push(
+      doc.customDocumentName || ""
+    );
+  }
 });
-      
+
+if (documentTypes.length > 0) {
+  payload.append(
+    "documentTypes",
+    JSON.stringify(documentTypes)
+  );
+
+  payload.append(
+    "customDocumentNames",
+    JSON.stringify(customDocumentNames)
+  );
+} 
+if (data.deletedDocumentIds?.length) {
+  payload.append(
+    "deletedDocuments",
+    JSON.stringify(data.deletedDocumentIds)
+  );
+}
       const response: ApiResponse<{ data: DoctorResponse }> =
         await clientApi.put(`/doctors/update/${id}`, payload);
 

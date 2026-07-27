@@ -124,9 +124,27 @@ export function useAddStaff(options?: {
       if (formData.registrationNo) payload.append("registrationNo", formData.registrationNo.trim());
       if (formData.roleBadge) payload.append("roleBadge", formData.roleBadge.trim());
       if (formData.password) payload.append("password", formData.password);
-      formData.documents?.forEach((file) => {
-        payload.append("files", file);
-      });
+const documentTypes: string[] = [];
+const customDocumentNames: string[] = [];
+
+formData.documents?.forEach((doc) => {
+if (!doc.file) return;
+
+payload.append("files", doc.file);
+
+  documentTypes.push(doc.documentType);
+  customDocumentNames.push(doc.customDocumentName || "");
+});
+
+payload.append(
+  "documentTypes",
+  JSON.stringify(documentTypes)
+);
+
+payload.append(
+  "customDocumentNames",
+  JSON.stringify(customDocumentNames)
+);
 
       console.log("CREATE STAFF PAYLOAD", payload);
       const response: ApiResponse<{ data: StaffResponse }> =
@@ -465,9 +483,33 @@ export function useUpdateStaff(options?: {
       if (data.profileImage) {
         updatePayload.append("profileImage", data.profileImage);
       }
-      data.documents?.forEach((file) => {
-        updatePayload.append("documents", file);
-      });
+const documentTypes: string[] = [];
+const customDocumentNames: string[] = [];
+
+data.documents?.forEach((doc) => {
+  if (!doc.file) return;
+
+updatePayload.append("documents", doc.file);
+
+  documentTypes.push(doc.documentType);
+  customDocumentNames.push(doc.customDocumentName || "");
+});
+
+updatePayload.append(
+  "documentTypes",
+  JSON.stringify(documentTypes)
+);
+
+updatePayload.append(
+  "customDocumentNames",
+  JSON.stringify(customDocumentNames)
+);
+if (data.deletedDocumentIds?.length) {
+  updatePayload.append(
+    "deletedDocuments",
+    JSON.stringify(data.deletedDocumentIds)
+  );
+}
 
       const response: ApiResponse<{ data: StaffResponse }> =
         await clientApi.put(`/staff/update/${id}`, updatePayload);

@@ -31,19 +31,32 @@ export interface ReceptionFormData {
 };
 
 profileImage?: File | null;
-documents?: File[];
+
+documents?: {
+  documentType: string;
+  customDocumentName?: string;
+  file: File | null;
+}[];
+deletedDocumentIds?: string[];
 
 }
 
 export interface ReceptionDocument {
+  _id?: string;
+
+  documentType?: string;
+  customDocumentName?: string;
+
   fileName: string;
   originalName: string;
   filePath: string;
+
   mimeType: string;
   fileSize: number;
-  uploadedAt?: string;
-}
 
+  uploadedAt?: string;
+  url?: string;
+}
 export interface ReceptionResponse {
   id: string;
   userId: string;
@@ -180,10 +193,7 @@ export const RECEPTION_VALIDATION_RULES: ValidationRules = {
 
   },
   deskNumber: {
-    minLength: {
-      value: 2,
-      message: "Desk number must be at least 2 characters",
-    },
+
     maxLength: {
       value: 20,
       message: "Desk number must be less than 20 characters",

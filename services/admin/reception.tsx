@@ -89,9 +89,27 @@ export function useAddReception(options?: {
       payload.append("workingHours[end]", formData.workingHours.end);
       payload.append("caneditPatient", String(formData.caneditPatient ?? false));
 
-      formData.documents?.forEach((file) => {
-        payload.append("files", file);
-      });
+const documentTypes: string[] = [];
+const customDocumentNames: string[] = [];
+
+formData.documents?.forEach((doc) => {
+  if (!doc.file) return;
+
+  payload.append("files", doc.file);
+
+  documentTypes.push(doc.documentType);
+  customDocumentNames.push(doc.customDocumentName || "");
+});
+
+payload.append(
+  "documentTypes",
+  JSON.stringify(documentTypes),
+);
+
+payload.append(
+  "customDocumentNames",
+  JSON.stringify(customDocumentNames),
+);
 
       const response: ApiResponse<{ data: ReceptionResponse }> =
         await clientApi.post("/receptionists/create-receptionist", payload);
@@ -250,9 +268,34 @@ if (data.workingHours !== undefined) {
         updatePayload.append("profileImage", data.profileImage);
       }
 
-      data.documents?.forEach((file) => {
-        updatePayload.append("documents", file);
-      });
+const documentTypes: string[] = [];
+const customDocumentNames: string[] = [];
+
+data.documents?.forEach((doc) => {
+  if (!doc.file) return;
+
+  updatePayload.append("documents", doc.file);
+
+  documentTypes.push(doc.documentType);
+  customDocumentNames.push(doc.customDocumentName || "");
+});
+
+updatePayload.append(
+  "documentTypes",
+  JSON.stringify(documentTypes),
+);
+
+updatePayload.append(
+  "customDocumentNames",
+  JSON.stringify(customDocumentNames),
+);
+
+if (data.deletedDocumentIds?.length) {
+  updatePayload.append(
+    "deletedDocuments",
+    JSON.stringify(data.deletedDocumentIds)
+  );
+}
 
       const response: ApiResponse<{ data: ReceptionResponse }> =
         await clientApi.put(`/receptionists/update/${id}`, updatePayload);
@@ -320,7 +363,7 @@ export const useReceptionistById = (id: string | undefined) => {
       if (!id) {
         throw new Error("Receptionist ID is required");
       }
-
+      
       const response = await clientApi.get<{ data: RawReceptionist }>(`/receptionists/${id}`);
 
       if (!response.success || !response.data) {

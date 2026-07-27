@@ -67,7 +67,15 @@ export default function DoctorDetailsSection({
   const [isEditing, setIsEditing] = useState(false);
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
 const [passwordModalKey, setPasswordModalKey] = useState(0);
-const [selectedDocuments, setSelectedDocuments] = useState<File[]>([]);
+const [selectedDocuments, setSelectedDocuments] = useState<
+  {
+    documentType: string;
+    customDocumentName?: string;
+    file: File;
+  }[]
+>([]);
+
+const [deletedDocuments, setDeletedDocuments] = useState<string[]>([]);
 const [selectedProfileImage, setSelectedProfileImage] =
   useState<File | null>(null);
 
@@ -105,6 +113,8 @@ console.log(
       toast.success("Profile updated successfully");
       setIsEditing(false);
       setSelectedDocuments([]);
+setDeletedDocuments([]);
+
       refetch();
     },
     onError: (err) => {
@@ -158,6 +168,29 @@ const updateDoctorPasswordMutation =
   
 const handleSave = () => {
   if (!doctorData || !doctor) return;
+  const hasInvalidOther = selectedDocuments.some(
+  (doc) =>
+    doc.documentType === "OTHER" &&
+    !doc.customDocumentName?.trim()
+);
+
+if (hasInvalidOther) {
+  toast.error(
+    "Please enter a document name for Other."
+  );
+  return;
+}
+
+const hasMissingFile = selectedDocuments.some(
+  (doc) => !doc.file
+);
+
+// if (hasMissingFile) {
+//   toast.error(
+//     "Please select a file for every document."
+//   );
+//   return;
+// }
 
   updateDoctorMutation.mutate({
     id: doctor.id,
@@ -169,6 +202,7 @@ const handleSave = () => {
         profileImage: selectedProfileImage,
       experience: doctorData.experience,
       documents: selectedDocuments,
+deletedDocumentIds: deletedDocuments,
     },
   });
 };
@@ -176,6 +210,8 @@ const handleSave = () => {
   const handleCancel = () => {
     setIsEditing(false);
     setSelectedDocuments([]);
+setDeletedDocuments([]);
+setSelectedProfileImage(null);
     refetch();
   };
 const passwordFormSections: FormSection[] = [
@@ -273,7 +309,22 @@ const handleUpdatePassword = (
     Change Password
   </Button>
           {!isEditing ? (
-            <Button onClick={() => setIsEditing(true)} className="gap-2">
+            <Button
+  onClick={() => {
+    setIsEditing(true);
+
+    if (selectedDocuments.length === 0) {
+      setSelectedDocuments([
+        {
+          documentType: "",
+          customDocumentName: "",
+          file: null as unknown as File,
+        },
+      ]);
+    }
+  }}
+  className="gap-2"
+>
               <Edit className="h-4 w-4" />
               Edit Profile
             </Button>
@@ -583,38 +634,187 @@ Number(e.target.value)
 </div>
 
 <div className="md:col-span-2">
-<Label>Documents</Label>
-{isEditing && (
-<Input
-name="documents"
-type="file"
-multiple
-className="mt-2"
-onChange={(e) =>
-setSelectedDocuments(Array.from(e.target.files || []))
-}
-/>
-)}
+  <Label>Documents</Label>
 
-<div className="mt-2 space-y-2">
-{doctor?.documents?.length ? (
-doctor.documents.map((doc, index) => (
-<a
-key={doc._id || index}
-href={`https://clinic-managemnet-backend.onrender.com${doc.filePath}`}
-target="_blank"
-rel="noopener noreferrer"
-className="block text-sm text-blue-600 underline"
+  {isEditing ? (
+    <>
+      {(doctor?.documents || [])
+  .filter((doc) => !deletedDocuments.includes(doc.filePath))
+  .map((doc, index) => (
+        <div
+          key={doc._id || index}
+          className="flex items-center justify-between border rounded-lg p-3 mt-2"
+        >
+          <a
+            href={doc.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-blue-600 underline"
+          >
+{doc.documentType === "OTHER"
+  ? doc.customDocumentName
+  : doc.documentType
+      ?.replaceAll("_", " ")
+      .replace(
+        /\b\w/g,
+        (c) => c.toUpperCase()
+      )}
+          </a>
+
+          <Button
+            type="button"
+            variant="destructive"
+            size="sm"
+            onClick={() => {
+              if (!doc.filePath) return;
+
+              setDeletedDocuments((prev) => [
+                ...prev,
+                doc.filePath,
+              ]);
+            }}
+          >
+            Delete
+          </Button>
+        </div>
+      ))}
+
+      {selectedDocuments.map((doc, index) => (
+        <div
+          key={index}
+          className="grid grid-cols-3 gap-2 mt-3"
+        >
+          <select
+            value={doc.documentType}
+            onChange={(e) => {
+              const updated = [...selectedDocuments];
+              updated[index].documentType =
+                e.target.value;
+              setSelectedDocuments(updated);
+            }}
+            className="border rounded px-3 py-2"
+          >
+            <option value="">
+              Select Document
+            </option>
+
+            <option value="MBBS_DEGREE">
+              MBBS Degree
+            </option>
+
+            <option value="MD_MS_DEGREE">
+              MD/MS Degree
+            </option>
+
+            <option value="REGISTRATION_CERTIFICATE">
+              Registration Certificate
+            </option>
+
+            <option value="EXPERIENCE_CERTIFICATE">
+              Experience Certificate
+            </option>
+
+            <option value="AADHAAR_CARD">
+              Aadhaar Card
+            </option>
+
+            <option value="PAN_CARD">
+              PAN Card
+            </option>
+
+            <option value="RESUME">
+              Resume
+            </option>
+
+            <option value="OTHER">
+              Other
+            </option>
+          </select>
+
+          {doc.documentType === "OTHER" && (
+            <Input
+              placeholder="Document Name"
+              value={doc.customDocumentName || ""}
+              onChange={(e) => {
+                const updated = [...selectedDocuments];
+                updated[index].customDocumentName =
+                  e.target.value;
+                setSelectedDocuments(updated);
+              }}
+            />
+          )}
+
+          <Input
+            type="file"
+            onChange={(e) => {
+              const file =
+                e.target.files?.[0];
+
+              if (!file) return;
+
+              const updated = [...selectedDocuments];
+
+              updated[index].file = file;
+
+              setSelectedDocuments(updated);
+            }}
+          />
+          <Button
+  type="button"
+  variant="outline"
+  onClick={() =>
+    setSelectedDocuments((prev) =>
+      prev.filter((_, i) => i !== index)
+    )
+  }
 >
-{doc.originalName}
-</a>
-))
-) : (
-<p className="text-sm text-slate-500">No documents uploaded</p>
-)}
-</div>
-</div>
+  Remove
+</Button>
+        </div>
+      ))}
 
+      <Button
+        type="button"
+        variant="outline"
+        className="mt-3"
+        onClick={() =>
+          setSelectedDocuments((prev) => [
+            ...prev,
+            {
+              documentType: "",
+              customDocumentName: "",
+              file: null as unknown as File,
+            },
+          ])
+        }
+      >
+        + Add Document
+      </Button>
+    </>
+  ) : (
+    <div className="space-y-2 mt-2">
+      {doctor?.documents?.length ? (
+        doctor.documents.map((doc, index) => (
+          <a
+            key={doc._id || index}
+             href={doc.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="block text-blue-600 underline"
+          >
+{doc.documentType === "OTHER"
+  ? doc.customDocumentName
+  : doc.documentType
+      ?.replaceAll("_", " ")
+      .replace(/\b\w/g, (c) => c.toUpperCase())}
+          </a>
+        ))
+      ) : (
+        <p>No documents uploaded</p>
+      )}
+    </div>
+  )}
+</div>
 <div className="md:col-span-2">
 <Label>Availability Days</Label>
 

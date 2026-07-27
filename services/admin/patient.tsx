@@ -66,6 +66,19 @@ export interface PatientListParams {
   limit?: number;
   search?: string;
 }
+export interface FamilyProfile {
+  _id: string;
+  patientCode: string;
+  name: string;
+  relation: string;
+  otherRelation?: string | null;
+  phone: string;
+}
+
+export interface CheckPatientPhoneResponse {
+  selfExists: boolean;
+  profiles: FamilyProfile[];
+}
 
 export type PatientCreateData = {
   name?: string;
@@ -81,11 +94,22 @@ export type PatientCreateData = {
   diseases?: string | string[];
   allergies?: string[] | string;
   medicalHistory?: string;
-  medicalReports?: File[];
+ medicalReports?: {
+  documentName: string;
+  file: File;
+}[];
+  deletedDocumentIds?: string[];
   patientCode?: string;
-    emergencyContactName?: string;
+  emergencyContactName?: string;
   emergencyContactPhone?: string;
   emergencyContactRelation?: string;
+  emergencyContactOtherRelation?: string;
+  emergencyContact?: {
+    name?: string;
+    phone?: string;
+    relation?: string;
+    otherRelation?: string;
+  };
 };
 
 export interface PatientCreatePayload {
@@ -107,6 +131,7 @@ export interface PatientCreatePayload {
   name?: string;
   phone?: string;
   relation?: string;
+  otherRelation?: string;
 };
 }
 export interface PatientDashboardResponse {
@@ -255,6 +280,11 @@ function normalizeStringArray(value: string[] | string | undefined) {
 
 function buildCreatePatientPayload(data: PatientCreateData): PatientCreatePayload {
   const age = data.age;
+  const emergencyContact = data.emergencyContact;
+  const emergencyContactRelation =
+    emergencyContact?.relation ?? data.emergencyContactRelation;
+  const emergencyContactOtherRelation =
+    emergencyContact?.otherRelation ?? data.emergencyContactOtherRelation;
 
   return {
     patientCode: String(data.patientCode || "").trim() || undefined,
@@ -286,9 +316,13 @@ allergies:
     medicalHistory: data.medicalHistory ?? "",
 
     emergencyContact: {
-  name: data.emergencyContactName || undefined,
-  phone: data.emergencyContactPhone || undefined,
-  relation: data.emergencyContactRelation || undefined,
+  name: (emergencyContact?.name ?? data.emergencyContactName) || undefined,
+  phone: (emergencyContact?.phone ?? data.emergencyContactPhone) || undefined,
+  relation: emergencyContactRelation || undefined,
+  otherRelation:
+    emergencyContactRelation === "OTHER"
+      ? String(emergencyContactOtherRelation || "").trim() || undefined
+      : undefined,
 },
   };
 }
@@ -321,6 +355,11 @@ function buildPatientFormData(data: PatientCreateData) {
     "emergencyContact[relation]",
     payload.emergencyContact?.relation,
   );
+  appendOptional(
+    formData,
+    "emergencyContact[otherRelation]",
+    payload.emergencyContact?.otherRelation,
+  );
 
   const diseases = Array.isArray(payload.diseases)
     ? payload.diseases
@@ -336,10 +375,26 @@ function buildPatientFormData(data: PatientCreateData) {
     : [];
   allergies.forEach((allergy) => formData.append("allergies", allergy));
 
-data.medicalReports?.forEach((file) => {
-  formData.append("files", file);
+const documentNames: string[] = [];
+
+data.medicalReports?.forEach((document) => {
+  formData.append("files", document.file);
+
+  documentNames.push(document.documentName);
 });
 
+if (documentNames.length) {
+  formData.append(
+    "documentNames",
+    JSON.stringify(documentNames)
+  );
+}
+if (data.deletedDocumentIds?.length) {
+  formData.append(
+    "deletedDocuments",
+    JSON.stringify(data.deletedDocumentIds)
+  );
+}
   return formData;
 }
 
@@ -455,6 +510,10 @@ export function useAddPatient(options?: {
   return useMutation<Patient, Error, PatientCreateData>({
     mutationFn: async (formData: PatientCreateData) => {
       const payload = buildPatientFormData(formData);
+      console.log(
+        "[Patient create] API request body",
+        Object.fromEntries(payload.entries()),
+      );
 
       const response: ApiResponse<RawPatientResponse> =
         await clientApi.post("/patient/create-patient-admin", payload);
@@ -825,5 +884,25 @@ export function usePatientMedicalHistory(
     },
 
     enabled: !!patientId,
+  });
+}
+
+
+export function useCheckPatientPhone() {
+  return useMutation<CheckPatientPhoneResponse, Error, string>({
+    mutationFn: async (phone: string) => {
+      const response = await clientApi.post<CheckPatientPhoneResponse>(
+        "/patient/check-phone",
+        { phone }
+      );
+
+      if (!response.success) {
+        throw new Error(
+          response.error || "Failed to check phone"
+        );
+      }
+
+     return unwrapData<CheckPatientPhoneResponse>(response.data);
+    },
   });
 }

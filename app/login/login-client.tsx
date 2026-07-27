@@ -98,8 +98,8 @@ const [otp, setOtp] =
   );
   const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({
-    email: "raunakt98@gmail.com",
-    password: "HaHA7bOcLX#2",
+    email: "",
+    password: "",
     phone: "",
   });
 

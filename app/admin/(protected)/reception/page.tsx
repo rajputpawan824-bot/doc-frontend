@@ -25,6 +25,7 @@ import {
   Loader2,
   ChevronLeft,
   ChevronRight,
+  FileText,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -327,6 +328,23 @@ const filteredActiveReceptionists = activeReceptionists.filter(
       r.phoneNumber.includes(searchQuery),
   );
 
+
+    const formatDocumentType = (type?: string) => {
+  const types: Record<string, string> = {
+    AADHAAR_CARD: "Aadhaar Card",
+    EDUCATIONAL: "Educational Certificate",
+    EXPERIENCE_CERTIFICATE: "Experience Certificate",
+    RESUME: "Resume",
+    JOINING_LETTER: "Joining Letter",
+    BANK_DETAILS: "Bank Details",
+    OTHER: "Other Document",
+  };
+
+  return types[type || "OTHER"] || "Other Document";
+};
+
+
+
   // ==================== DETAIL MODAL CONFIGURATION ====================
   const detailSections: SectionConfig[] = [
     {
@@ -525,44 +543,54 @@ const filteredActiveReceptionists = activeReceptionists.filter(
         },
       ],
     },
+{
+  id: "documents",
+  title: "Documents",
+  description: "Uploaded staff documents",
+  icon: <FileText className="h-5 w-5 text-blue-600" />,
+  layout: "grid",
+  columns: 1,
+  fields: [
     {
-      id: "documents",
-      size: 50,
-      title: "Documents",
-      description: "Uploaded receptionist documents",
-      icon: <Archive className="h-5 w-5 text-blue-600" />,
-      layout: "grid",
-      columns: 1,
-      fields: [
-        {
-          key: "documents",
-          label: "Uploaded Documents",
-          type: "custom",
-          width: "full",
-          format: (value) => {
-            if (!Array.isArray(value) || value.length === 0) {
-              return "No documents uploaded";
-            }
+      key: "documents",
+      label: "Uploaded Documents",
+      type: "custom",
+      width: "full",
+      format: (value) => {
+        if (!Array.isArray(value) || value.length === 0) {
+          return "No documents uploaded";
+        }
 
-            return (
-              <div className="space-y-2">
-                {value.map((doc, index) => (
-                  <a
-                    key={doc.filePath || index}
-                    href={`https://clinic-managemnet-backend.onrender.com${doc.filePath}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="block text-blue-600 underline"
-                  >
-                    {doc.originalName}
-                  </a>
-                ))}
-              </div>
-            );
-          },
-        },
-      ],
+        return (
+          <div className="space-y-2">
+            {value.map((doc: any, index: number) => {
+              const count =
+                value
+                  .slice(0, index + 1)
+                  .filter((d: any) => d.documentType === doc.documentType)
+                  .length;
+
+              return (
+                <a
+                  key={index}
+                  href={doc.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-600 underline block font-medium"
+                >
+                 {doc.documentType === "OTHER"
+  ? doc.customDocumentName
+  : formatDocumentType(doc.documentType)}
+                  {count > 1 ? ` (${count})` : ""}
+                </a>
+              );
+            })}
+          </div>
+        );
+      },
     },
+  ],
+},
     {
       id: "system-info",
       size: 50,
@@ -859,14 +887,21 @@ const filteredActiveReceptionists = activeReceptionists.filter(
       title: "Documents",
       icon: <Archive className="h-4 w-4" />,
       fields: [
-        {
-          name: "documents",
-          label: "Upload Documents",
-          type: "file",
-          required: false,
-          width: "full",
-          multiple: true,
-        },
+{
+  name: "documents",
+  label: "Documents",
+  type: "document-manager",
+  width: "full",
+  documentTypes: [
+    { value: "AADHAAR_CARD", label: "Aadhaar Card" },
+    { value: "EDUCATIONAL", label: "Education" },
+    { value: "EXPERIENCE_CERTIFICATE", label: "Experience Certificate" },
+    { value: "RESUME", label: "Resume/CV" },
+    { value: "JOINING_LETTER", label: "Joining Letter" },
+    { value: "BANK_DETAILS", label: "Bank Passbook/Cancelled Cheque" },
+    { value: "OTHER", label: "Other" },
+  ],
+},
       ],
     },
   ];
@@ -1026,14 +1061,21 @@ const filteredActiveReceptionists = activeReceptionists.filter(
       title: "Documents",
       icon: <Archive className="h-4 w-4" />,
       fields: [
-        {
-          name: "documents",
-          label: "Upload Documents",
-          type: "file",
-          required: false,
-          width: "full",
-          multiple: true,
-        },
+  {
+  name: "documents",
+  label: "Documents",
+  type: "document-manager",
+  width: "full",
+  documentTypes: [
+    { value: "AADHAAR_CARD", label: "Aadhaar Card" },
+    { value: "EDUCATIONAL", label: "Education" },
+    { value: "EXPERIENCE_CERTIFICATE", label: "Experience Certificate" },
+    { value: "RESUME", label: "Resume/CV" },
+    { value: "JOINING_LETTER", label: "Joining Letter" },
+    { value: "BANK_DETAILS", label: "Bank Passbook/Cancelled Cheque" },
+    { value: "OTHER", label: "Other" },
+  ],
+},
       ],
     },
   ];
@@ -1109,10 +1151,21 @@ joiningDate: isString(data.joiningDate)
   : "",
 
 workingHours,
-documents: Array.isArray(data.documents)
-  ? data.documents.filter((file): file is File => file instanceof File)
-  : [],
 
+documents: Array.isArray(data.documents)
+  ? data.documents.filter(
+      (
+        doc,
+      ): doc is {
+        documentType: string;
+        customDocumentName?: string;
+        file: File;
+      } =>
+        !!doc &&
+        doc.file instanceof File &&
+        typeof doc.documentType === "string",
+    )
+  : [],
         
       
     };
@@ -1167,8 +1220,23 @@ documents: Array.isArray(data.documents)
     if (isString(data.deskNumber)) updateData.deskNumber = data.deskNumber;
     if (isString(data.registrationNo)) updateData.registrationNo = data.registrationNo;
     if (isString(data.joiningDate))     updateData.joiningDate = data.joiningDate;
-    updateData.documents = Array.isArray(data.documents)
-      ? data.documents.filter((file): file is File => file instanceof File)
+updateData.documents =
+  Array.isArray(data.documents)
+    ? data.documents.filter(
+        (
+          doc,
+        ): doc is {
+          documentType: string;
+          customDocumentName?: string;
+          file: File;
+        } =>
+          !!doc &&
+          doc.file instanceof File &&
+          typeof doc.documentType === "string",
+      )
+    : [];
+    updateData.deletedDocumentIds = Array.isArray(data.documentsDeletedIds)
+      ? data.documentsDeletedIds.filter((id): id is string => typeof id === "string")
       : [];
       if (
         isString(data.workingHourStart) &&
@@ -1811,6 +1879,7 @@ workingHourStart:
 
 workingHourEnd:
   selectedReceptionist.workingHours?.end,
+                documents: selectedReceptionist.documents,
                 
               
 

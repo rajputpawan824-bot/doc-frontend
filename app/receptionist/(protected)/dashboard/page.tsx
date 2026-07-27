@@ -1,4 +1,5 @@
 "use client";
+import {useState, useEffect} from "react";
 
 import {
   Clock,
@@ -10,11 +11,27 @@ import { Card, CardContent } from "@/components/ui/card";
 import { useReceptionistById } from "@/services/admin/reception";
 
 export default function ReceptionistDashboardPage() {
+    const [userId, setUserId] = useState<string>();
+  
+    useEffect(() => {
+      const token = localStorage.getItem("access_token");
+  
+      if (token) {
+        try {
+          const payload = JSON.parse(
+            atob(token.split(".")[1])
+          );
+          setUserId(payload.id);
+        } catch (error) {
+          console.error("Failed to decode token", error);
+        }
+      }
+    }, []);
   const {
     data: receptionist,
     isLoading,
     isError,
-  } = useReceptionistById("profile");
+  } = useReceptionistById(userId);
 
   if (isLoading) {
     return <div className="p-8">Loading...</div>;

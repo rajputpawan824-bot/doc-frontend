@@ -441,6 +441,32 @@ const onLeaveDoctors = onLeaveData || [];
   //           },
   //         },
   // ==================== DETAIL MODAL CONFIGURATION ====================
+
+
+  const formatDocumentType = (type?: string) => {
+  const types: Record<string, string> = {
+    MBBS_DEGREE: "MBBS Degree",
+    MD_MS_DEGREE: "MD/MS Degree",
+    DM_MCH_DEGREE: "DM/MCh Degree",
+    REGISTRATION_CERTIFICATE: "Registration Certificate",
+    AADHAAR_CARD: "Aadhaar Card",
+    PAN_CARD: "PAN Card",
+    EXPERIENCE_CERTIFICATE: "Experience Certificate",
+    RESUME: "Resume",
+    OTHER: "Other Document",
+  };
+
+  return types[type || "OTHER"] || "Other Document";
+};
+
+const getDocumentLabel = (doc: any) => {
+  if (doc.documentType === "OTHER") {
+    return doc.customDocumentName || "Other Document";
+  }
+
+  return formatDocumentType(doc.documentType);
+};
+
   const detailSections: SectionConfig[] = [
     {
       id: "personal-info",
@@ -526,24 +552,37 @@ const onLeaveDoctors = onLeaveData || [];
       label: "Uploaded Documents",
       type: "custom",
       width: "full",
+
+
+      
 format: (value) => {
   if (!Array.isArray(value) || value.length === 0) {
     return "No documents uploaded";
   }
 
+  
   return (
     <div className="space-y-2">
-      {value.map((doc: any, index: number) => (
-        <a
-          key={index}
-         href={`https://clinic-managemnet-backend.onrender.com${doc.filePath}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-blue-600 underline block"
-        >
-          {doc.originalName}
-        </a>
-      ))}
+      {value.map((doc: any, index: number) => {
+  const count =
+    value
+      .slice(0, index + 1)
+      .filter((d: any) => d.documentType === doc.documentType)
+      .length;
+
+  return (
+    <a
+      key={index}
+      href={doc.url}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="text-blue-600 underline block font-medium"
+    >
+      {getDocumentLabel(doc)}
+      {count > 1 ? ` (${count})` : ""}
+    </a>
+  );
+})}
     </div>
   );
 },
@@ -906,15 +945,12 @@ onClick: () => {
   title: "Documents",
   icon: <FileText className="h-4 w-4" />,
   fields: [
-    {
-      name: "documents",
-      label: "Upload Documents",
-      type: "file",
-      required: false,
-      width: "full",
-      accept: ".pdf,.jpg,.jpeg,.png,.doc,.docx",
-      multiple: true,
-    },
+{
+  name: "documents",
+  label: "Documents",
+  type: "document-manager",
+  width: "full",
+}
   ],
 },
 
@@ -952,8 +988,10 @@ onClick: () => {
         {
   name: "joiningDate",
   label: "Joining Date",
+   required: true,
   type: "date",
   width: "half",
+  validation: transformValidation(DOCTOR_VALIDATION_RULES.joiningDate),
 },
 
 
@@ -962,12 +1000,14 @@ onClick: () => {
           label: "Working Hour Start",
           type: "time",
           width: "half",
+          required: true,
         },
         {
           name: "workingHourEnd",
           label: "Working Hour End",
           type: "time",
           width: "half",
+          required: true,
         },
         {
           name: "availabilityDays",
@@ -1047,14 +1087,11 @@ onClick: () => {
             DOCTOR_VALIDATION_RULES.registrationNo,
           ),
         },
-        {
+{
   name: "documents",
-  label: "Upload Additional Documents",
-  type: "file",
-  required: false,
+  label: "Documents",
+  type: "document-manager",
   width: "full",
-  accept: ".pdf,.jpg,.jpeg,.png,.doc,.docx",
-  multiple: true,
 },
         {
           name: "department",
@@ -1263,8 +1300,14 @@ const cleanName = String(data.name || "")
       joiningDate: String(data.joiningDate || ""),
       doctorCode: String(data.doctorCode || ""),
       
-      documents: Array.isArray(data.documents)
-        ? data.documents.filter((file): file is File => file instanceof File)
+documents: Array.isArray(data.documents)
+  ? data.documents as {
+      documentType: string;
+      file: File;
+    }[]
+  : [],
+      deletedDocumentIds: Array.isArray(data.documentsDeletedIds)
+        ? data.documentsDeletedIds.filter((id): id is string => typeof id === "string")
         : [],
       availabilityDays: Array.isArray(data.availabilityDays)
       
@@ -1313,6 +1356,7 @@ const cleanName = String(data.name || "")
 
   // Then use it in handleEditDoctor
   const handleEditDoctor = (data: Record<string, unknown>) => {
+    console.log("Doctor documents:", data.documents);
     if (!selectedDoctor) return;
 
  const workingHours = {
@@ -1336,9 +1380,19 @@ const cleanName = String(data.name || "")
       experience: Number(data.experience || ""),
       joiningDate: String(data.joiningDate || ""),
  
-      documents: Array.isArray(data.documents)
-        ? data.documents.filter((file): file is File => file instanceof File)
-        : [],
+documents: Array.isArray(data.documents)
+  ? data.documents as {
+      documentType: string;
+      file: File;
+    }[]
+  : [],
+
+    deletedDocumentIds: Array.isArray(data.documentsDeletedIds)
+    ? data.documentsDeletedIds.filter(
+        (id): id is string => typeof id === "string"
+      )
+    : [],
+
       availabilityDays: Array.isArray(data.availabilityDays)
   ? data.availabilityDays
   : [],

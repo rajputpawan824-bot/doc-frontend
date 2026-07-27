@@ -45,11 +45,19 @@ export interface StaffFormData {
   end: string;
 };
   profileImage?: File | null;
-  documents?: File[];
+documents?: {
+  documentType: string;
+  customDocumentName?: string;
+file: File | null;
+}[];
+  deletedDocumentIds?: string[];
 }
 
 export interface StaffDocument {
   _id?: string;
+  documentType?: string;
+  customDocumentName?: string;
+    url?: string;
   fileName: string;
   originalName: string;
   filePath: string;

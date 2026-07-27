@@ -26,7 +26,12 @@ export interface DoctorFormData {
     url: string;
     uploadedAt?: string;
   }[];
-  documents?: File[];
+documents?: {
+  documentType: string;
+  customDocumentName?: string;
+  file: File;
+}[];
+  deletedDocumentIds?: string[];
   availabilityDays: string[];
   workingHours: {
     start: string;
@@ -52,9 +57,12 @@ experience: number;
     profileImage?: string;
 documents?: {
   _id?: string;
+  documentType?: string;
+    customDocumentName?: string;
   fileName: string;
   originalName: string;
   filePath: string;
+   url?: string;   
   mimeType: string;
   fileSize: number;
   uploadedAt?: string;
@@ -119,6 +127,9 @@ export const DOCTOR_VALIDATION_RULES: ValidationRules = {
       message: "Email is invalid",
     },
   },
+  joiningDate: {
+  required: "Joining date is required",
+},
   phone: {
     required: "Phone number is required",
     pattern: {
@@ -179,10 +190,15 @@ department: {
   },
   address: {
     required: "Address is required",
+      minLength: {
+    value: 5,
+    message: "Address must be at least 5 characters",
+  },
 
     maxLength: {
       value: 200,
       message: "Address cannot exceed 200 characters",
+     
     },
   },
 experience: {

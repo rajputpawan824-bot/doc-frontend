@@ -255,14 +255,29 @@ const { data: activePatient } =
   const payload = {
     ...data,
     medicalReports: Array.isArray(data.medicalReports)
-      ? data.medicalReports.filter((file): file is File => file instanceof File)
+      ? data.medicalReports.filter(
+          (document): document is { documentName: string; file: File } =>
+            Boolean(
+              document &&
+                typeof document === "object" &&
+                "documentName" in document &&
+                "file" in document &&
+                typeof document.documentName === "string" &&
+                document.documentName.trim() &&
+                document.file instanceof File,
+            ),
+        )
       : [],
 
-    emergencyContact: {
-      name: data.emergencyContactName,
-      phone: data.emergencyContactPhone,
-      relation: data.emergencyContactRelation,
-    },
+emergencyContact: {
+  name: data.emergencyContactName,
+  phone: data.emergencyContactPhone,
+  relation: data.emergencyContactRelation,
+  otherRelation:
+    data.emergencyContactRelation === "OTHER"
+      ? data.emergencyContactOtherRelation
+      : null,
+},
   };
 
 if (!patientDetails?.id) return;
@@ -488,11 +503,10 @@ const familyMembers =
       fields: [
         {
           name: 'medicalReports',
-          label: 'Upload Documents',
-          type: 'file',
+          label: 'Documents',
+          type: 'patient-document-manager',
           required: false,
           width: 'full',
-          multiple: true,
         },
       ],
     },
