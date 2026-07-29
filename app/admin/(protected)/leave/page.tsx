@@ -93,15 +93,13 @@ const [onLeaveDate, setOnLeaveDate] = useState(
 const [showPolicyModal, setShowPolicyModal] =
   useState(false);
 
-const [policyRole, setPolicyRole] =
-  useState<
-    "DOCTOR" | "STAFF" | "RECEPTIONIST"
-  >("DOCTOR");
+const [policyRole, setPolicyRole] = useState<
+  "DOCTOR" | "STAFF" | "RECEPTIONIST" | undefined
+>();
 
-const [policyType, setPolicyType] =
-  useState<
-    "MONTHLY" | "YEARLY"
-  >("MONTHLY");
+const [policyType, setPolicyType] = useState<
+  "MONTHLY" | "YEARLY" | undefined
+>();
 
 const [allowedLeaves, setAllowedLeaves] =
   useState("");
@@ -478,10 +476,15 @@ const matchesTab =
             Apply Leave
           </Button>
 
-                      <Button
                       
+<Button
   variant="outline"
-  onClick={() => setShowPolicyModal(true)}
+  onClick={() => {
+    setPolicyRole(undefined as any);
+    setPolicyType(undefined as any);
+    setAllowedLeaves("");
+    setShowPolicyModal(true);
+  }}
 >
   Leave Policy
 </Button>
@@ -1333,9 +1336,17 @@ fields={[
 
       {/* leave policy  */}
 
-      <Dialog
+<Dialog
   open={showPolicyModal}
-  onOpenChange={setShowPolicyModal}
+  onOpenChange={(open) => {
+    setShowPolicyModal(open);
+
+    if (!open) {
+      setPolicyRole(undefined);
+      setPolicyType(undefined);
+      setAllowedLeaves("");
+    }
+  }}
 >
   <DialogContent>
     <DialogHeader>
@@ -1349,20 +1360,15 @@ fields={[
       <div>
         <label>Role</label>
 
-        <Select
-          value={policyRole}
-          onValueChange={(v) =>
-            setPolicyRole(
-              v as
-                | "DOCTOR"
-                | "STAFF"
-                | "RECEPTIONIST"
-            )
-          }
-        >
-          <SelectTrigger>
-            <SelectValue />
-          </SelectTrigger>
+<Select
+  value={policyRole}
+  onValueChange={(v) =>
+    setPolicyRole(v as "DOCTOR" | "STAFF" | "RECEPTIONIST")
+  }
+>
+  <SelectTrigger>
+    <SelectValue placeholder="Select Role" />
+  </SelectTrigger>
 
           <SelectContent>
             <SelectItem value="DOCTOR">
@@ -1385,19 +1391,15 @@ fields={[
           Policy Type
         </label>
 
-        <Select
-          value={policyType}
-          onValueChange={(v) =>
-            setPolicyType(
-              v as
-                | "MONTHLY"
-                | "YEARLY"
-            )
-          }
-        >
-          <SelectTrigger>
-            <SelectValue />
-          </SelectTrigger>
+<Select
+  value={policyType}
+  onValueChange={(v) =>
+    setPolicyType(v as "MONTHLY" | "YEARLY")
+  }
+>
+  <SelectTrigger>
+    <SelectValue placeholder="Select Policy Type" />
+  </SelectTrigger>
 
           <SelectContent>
             <SelectItem value="MONTHLY">
@@ -1430,20 +1432,23 @@ fields={[
     </div>
 
     <DialogFooter>
-      <Button
-        onClick={() =>
-          savePolicy.mutate({
-            role: policyRole,
-            policyType,
-            allowedLeaves:
-              Number(
-                allowedLeaves
-              ),
-          })
-        }
-      >
-        Save Policy
-      </Button>
+<Button 
+  disabled={
+    !policyRole ||
+    !policyType ||
+    !allowedLeaves
+  }
+  onClick={() =>
+    savePolicy.mutate({
+      role: policyRole!,
+      policyType: policyType!,
+      allowedLeaves: Number(allowedLeaves),
+    })
+  }
+  className="bg-blue-600 hover:bg-blue-700 text-white"
+>
+  Save Policy
+</Button>
     </DialogFooter>
   </DialogContent>
 </Dialog>

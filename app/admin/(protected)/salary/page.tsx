@@ -1040,15 +1040,21 @@ const addAdjustmentMutation = useAddSalaryAdjustment({
                 <Card key={record.id} className="border">
                   <CardContent className="pt-4">
                     <div className="flex items-center justify-between mb-2">
-                      <Badge
-                        className={
-                          record.type === "BONUS" || record.type === "INCREMENT"
-                            ? "bg-green-100 text-green-800"
-                            : "bg-red-100 text-red-800"
-                        }
-                      >
-                        {record.type}
-                      </Badge>
+   <Badge
+  className={
+    record.type === "BONUS"
+      ? "bg-green-100 text-green-800"
+      : record.type === "PENALTY"
+      ? "bg-red-100 text-red-800"
+      : record.type === "SALARY_UPDATE"
+      ? "bg-purple-200 text-purple-600"
+      : "bg-gray-100 text-gray-800"
+  }
+>
+  {record.type === "SALARY_UPDATE"
+    ? "Salary Updated"
+    : record.type}
+</Badge>
                       <span className="text-sm text-muted-foreground">
                         {getMonthName(record.month)} {record.year}
                       </span>

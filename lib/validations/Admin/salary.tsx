@@ -4,7 +4,7 @@ import {
   ValidationRules,
 } from "@/lib/hooks/useFormValidation";
 
-export type SalaryType = "BONUS" | "PENALTY" | "INCREMENT" | "DEDUCTION";
+export type SalaryType = "BONUS" | "PENALTY" | "INCREMENT" | "DEDUCTION" |"SALARY_UPDATE" ;
 export type UserRole = "DOCTOR" | "NURSE" | "RECEPTIONIST" | "TECHNICIAN" | "PHARMACIST" | "ADMIN" | "STAFF" | "ALL";
 
 export interface SalaryAdjustmentData {
