@@ -226,6 +226,8 @@ const DoctorsPage = ({ initialDoctors }: { initialDoctors?: DoctorResponse[] }) 
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
   const [selectedDoctorId, setSelectedDoctorId] = useState<string | null>(null);
+  const [activationErrorOpen, setActivationErrorOpen] = useState(false);
+const [activationErrorMessage, setActivationErrorMessage] = useState("");
    
   
   const [page, setPage] = useState(1);
@@ -339,9 +341,16 @@ queryClient.invalidateQueries({
       queryClient.invalidateQueries({ queryKey: ["doctors", "dashboard-stats"] });
 
     },
-    onError: (error) => {
-      toast.error(error.message || "Failed to update doctor status");
-    },
+onError: (error) => {
+    console.log("Nahi" , error);
+
+  setActivationErrorMessage(
+    error.message ||
+      "This employee cannot be activated because the joining date is in the future."
+  );
+
+  setActivationErrorOpen(true);
+},
   });
 
 
@@ -356,6 +365,10 @@ const onLeaveDoctors = onLeaveData || [];
         !searchQuery ||
         d?.user?.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         d?.user?.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            String(d?.aadhaar || "")
+        .replace(/[\s-]/g, "")
+        .includes(searchQuery.replace(/[\s-]/g, ""))||
+        
         d?.user?.phone.includes(searchQuery) ||
         d.department.toLowerCase().includes(searchQuery.toLowerCase()) ||
         d.registrationNo.toLowerCase().includes(searchQuery.toLowerCase()),
@@ -639,7 +652,7 @@ format: (value) => {
         {
           key: "experience",
           label: "Experience",
-          type: "text",
+          type: "number",
           icon: <TrendingUp className="w-4 h-4" />,
           width: "half",
         },
@@ -693,6 +706,13 @@ format: (value) => {
          
           width: "half",
           format: (value) => `₹${String(value ?? "")}`,
+        },
+        {
+          key: "slotDuration",
+          label: "Slot Duration",
+          type: "text",
+          width: "half",
+          format: (value) => value ? `${value} minutes` : "-",
         },
       ],
     },
@@ -776,7 +796,7 @@ console.log("Edit Modal Doctor:", selectedDoctor);
               <UserCheck className="w-4 h-4" />
             ),
 onClick: () => {
-  updateDoctorMutationDisabled.mutate({
+  blockDoctorMutation.mutate({
     id: selectedDoctor.id,
     isActive: selectedDoctor.status !== "active",
   });
@@ -919,7 +939,7 @@ onClick: () => {
         {
           name: "experience",
           label: "Experience",
-          type: "text",
+          type: "number",
           required: true,
           placeholder: "6 years",
           width: "half",
@@ -937,6 +957,16 @@ onClick: () => {
           // validation: transformValidation(
           //   DOCTOR_VALIDATION_RULES.consultationFee,
           // ),
+        },
+        {
+          name: "slotDuration",
+          label: "Slot Duration (minutes)",
+          type: "number",
+          required: true,
+          placeholder: "30",
+          width: "half",
+          min: 1,
+          validation: transformValidation(DOCTOR_VALIDATION_RULES.slotDuration),
         },
       ],
     },
@@ -1013,7 +1043,7 @@ onClick: () => {
           name: "availabilityDays",
           label: "Availability Days",
           type: "checkbox-group",
-          required: false,
+           required: true,
           // placeholder: "Monday, Wednesday, Friday",
           width: "full",
           // validation: transformValidation(
@@ -1149,6 +1179,15 @@ onClick: () => {
           //   DOCTOR_VALIDATION_RULES.consultationFee,
           // ),
         },
+        {
+          name: "slotDuration",
+          label: "Slot Duration (minutes)",
+          type: "number",
+          required: true,
+          width: "half",
+          min: 1,
+          validation: transformValidation(DOCTOR_VALIDATION_RULES.slotDuration),
+        },
 
         {
   name: "joiningDate",
@@ -1197,7 +1236,7 @@ onClick: () => {
           name: "experience",
           label: "Experience",
 
-          type: "text",
+          type: "number",
           required: true,
           width: "half",
           validation: transformValidation(DOCTOR_VALIDATION_RULES.experience),
@@ -1297,6 +1336,7 @@ const cleanName = String(data.name || "")
       address: String(data.address || ""),
       experience: Number(data.experience || ""),
       consultationFee: Number(data.consultationFee),
+      slotDuration: Number(data.slotDuration),
       joiningDate: String(data.joiningDate || ""),
       doctorCode: String(data.doctorCode || ""),
       
@@ -1349,9 +1389,14 @@ documents: Array.isArray(data.documents)
   queryKey: ["doctor", data.id],
 });
     },
-    onError: (error) => {
-      toast.error(error.message || "Failed to update doctor");
-    },
+onError: (error) => {
+  setActivationErrorMessage(
+    error.message ||
+      "This employee cannot be activated because the joining date is in the future."
+  );
+
+  setActivationErrorOpen(true);
+},
   });
 
   // Then use it in handleEditDoctor
@@ -1372,6 +1417,7 @@ documents: Array.isArray(data.documents)
       registrationNo: String(data.registrationNo || ""),
       salary: Number(data.salary),
       consultationFee: Number(data.consultationFee),
+      slotDuration: Number(data.slotDuration),
       shift: data.shift as DoctorFormData["shift"],
       gender: data.gender as DoctorFormData["gender"],
       department: String(data.department || ""),
@@ -1485,7 +1531,7 @@ await queryClient.refetchQueries({
     {
       id: "Index",
       accessorFn: (doctor) =>
-        `${doctor.user?.name ?? ""} ${doctor.user?.email ?? ""} ${doctor.user?.phone ?? ""} ${doctor.registrationNo ?? ""} ${doctor.id ?? ""}`.toLowerCase(),
+        `${doctor.user?.name ?? ""} ${doctor.user?.email ?? ""} ${doctor.user?.phone ?? ""} ${doctor.registrationNo ?? "N/A"} ${doctor.id ?? ""}`.toLowerCase(),
       header: "Index",
       cell: ({ row }) => row.index + 1,
       enableSorting: false,
@@ -1784,7 +1830,7 @@ await queryClient.refetchQueries({
               size="sm"
               variant="outline"
             onClick={() => {
-    updateDoctorMutationDisabled.mutate({
+    blockDoctorMutation.mutate({
       id: doctor.id,
       isActive: true,
     });
@@ -2087,6 +2133,7 @@ await queryClient.refetchQueries({
                 email: selectedDoctor.user?.email, // From user object
                 salary: selectedDoctor.salary,
                 consultationFee: selectedDoctor.consultationFee,
+                slotDuration: selectedDoctor.slotDuration,
                 shift: selectedDoctor.shift,
                 phone: selectedDoctor.user?.phone, // From user object
                 address: selectedDoctor.address,
@@ -2112,6 +2159,7 @@ joiningDate: selectedDoctor.joiningDate
             : undefined
         }
       />
+      
 
       <ReusableModal
         isOpen={isPasswordModalOpen}
@@ -2127,6 +2175,7 @@ joiningDate: selectedDoctor.joiningDate
         saveButtonColor="linear-gradient(135deg, #10b981, #059669)"
         validationOnChange={true}
       />
+      
 
       {/* Detail Modal */}
       <DynamicDetailModal
@@ -2145,6 +2194,13 @@ joiningDate: selectedDoctor.joiningDate
         showRawData={false}
         isLoading={isDetailLoading}
       />
+      <ReusableModal
+  isOpen={activationErrorOpen}
+  onClose={() => setActivationErrorOpen(false)}
+  title="Cannot Activate Employee"
+  mode="alert"
+  message={activationErrorMessage}
+/>
     </div>
   );
 };

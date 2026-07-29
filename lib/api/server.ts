@@ -190,7 +190,7 @@ class ServerApiClient {
             attempt--;
             continue;
           }
-          return this.failureResponse(401, "Unauthorized — session expired");
+          return this.failureResponse(401, "Invalid Credendials");
         }
 
         return this.parseResponse<T>(response);

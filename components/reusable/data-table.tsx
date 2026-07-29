@@ -38,21 +38,33 @@ import { ChevronLeft, ChevronRight, Settings2, Eye } from "lucide-react";
 interface DataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[];
   data: TData[];
+
+  page?: number;
+  total?: number;
+  pageSize?: number;
+  onPageChange?: (page: number) => void;
+  onPageSizeChange?: (pageSize: number) => void;
+
   searchColumn?: string;
   searchPlaceholder?: string;
   emptyMessage?: string | ReactNode;
-  onRowClick?: (rowData: TData) => void; // Add this
-  showViewButton?: boolean; // Add this
+  onRowClick?: (rowData: TData) => void;
+  showViewButton?: boolean;
 }
 
 export default function DataTable<TData, TValue>({
   columns,
   data,
+  page = 1,
+  total = data.length,
+  onPageSizeChange,
+  pageSize = 10,
+  onPageChange,
   searchColumn,
   searchPlaceholder = "Search...",
   emptyMessage = "No results.",
   onRowClick,
-  showViewButton = false, // Default to false
+  showViewButton = false,
 }: DataTableProps<TData, TValue>) {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
@@ -67,7 +79,7 @@ export default function DataTable<TData, TValue>({
   });
   const [rowSelection, setRowSelection] = useState({});
   const [globalFilter, setGlobalFilter] = useState("");
-  const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 10 });
+
 
   // Add a "View" column if showViewButton is true
   const tableColumns = showViewButton
@@ -99,22 +111,22 @@ export default function DataTable<TData, TValue>({
       columnVisibility,
       rowSelection,
       globalFilter,
-      pagination,
+      
     },
     onSortingChange: setSorting,
     onColumnFiltersChange: setColumnFilters,
     onColumnVisibilityChange: setColumnVisibility,
     onRowSelectionChange: setRowSelection,
     onGlobalFilterChange: setGlobalFilter,
-    onPaginationChange: setPagination,
+  
     getCoreRowModel: getCoreRowModel(),
-    getPaginationRowModel: getPaginationRowModel(),
+
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
   });
 
   const searchColumnObj = searchColumn ? table.getColumn(searchColumn) : null;
-  const paginationRowModel = table.getPaginationRowModel();
+
 
   return (
     <div className="space-y-4">
@@ -190,8 +202,8 @@ export default function DataTable<TData, TValue>({
             ))}
           </TableHeader>
           <TableBody>
-            {paginationRowModel.rows?.length ? (
-              paginationRowModel.rows.map((row) => (
+          {table.getRowModel().rows.length ? (
+  table.getRowModel().rows.map((row) => (
                 <TableRow
                   key={row.id}
                   data-state={row.getIsSelected() && "selected"}
@@ -236,45 +248,41 @@ export default function DataTable<TData, TValue>({
         </div>
 
         <div className="flex items-center space-x-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => table.previousPage()}
-            disabled={!table.getCanPreviousPage()}
-          >
+<Button
+  variant="outline"
+  size="sm"
+  onClick={() => onPageChange?.(page - 1)}
+  disabled={page <= 1}
+>
             <ChevronLeft className="h-4 w-4" />
             Previous
           </Button>
           <div className="flex items-center gap-1 text-sm">
             <span>Page</span>
-            <strong>
-              {table.getState().pagination.pageIndex + 1} of{" "}
-              {table.getPageCount()}
-            </strong>
+<strong>
+  {page} of {Math.ceil(total / pageSize)}
+</strong>
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => table.nextPage()}
-            disabled={!table.getCanNextPage()}
-          >
+<Button
+  variant="outline"
+  size="sm"
+  onClick={() => onPageChange?.(page + 1)}
+  disabled={page >= Math.ceil(total / pageSize)}
+>
             Next
             <ChevronRight className="h-4 w-4" />
           </Button>
-
-          <select
-            className="h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
-            value={table.getState().pagination.pageSize}
-            onChange={(e) => {
-              table.setPageSize(Number(e.target.value));
-            }}
-          >
-            {[10, 20, 30, 40, 50].map((pageSize) => (
-              <option key={pageSize} value={pageSize}>
-                Show {pageSize}
-              </option>
-            ))}
-          </select>
+<select
+  className="h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
+  value={pageSize}
+  onChange={(e) => onPageSizeChange?.(Number(e.target.value))}
+>
+  {[10, 20, 30, 40, 50].map((size) => (
+    <option key={size} value={size}>
+      Show {size}
+    </option>
+  ))}
+</select>
         </div>
       </div>
     </div>

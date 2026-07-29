@@ -106,12 +106,12 @@ export default function DashboardLayout({
       href: "/admin/token",
       color: hospitalColors.accent,
     },
-    {
-      label: "Services Management",
-      icon: <Wrench size={20} />,
-      href: "/admin/services",
-      color: hospitalColors.teal,
-    },
+    // {
+    //   label: "Services Management",
+    //   icon: <Wrench size={20} />,
+    //   href: "/admin/services",
+    //   color: hospitalColors.teal,
+    // },
     {
       label: "Login Master",
       icon: <LogIn size={20} />,

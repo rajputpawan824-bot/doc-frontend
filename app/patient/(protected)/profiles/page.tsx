@@ -473,7 +473,7 @@ const familyMembers =
 
         {
           name: 'diseases',
-          label: 'Diseases',
+          label: 'Symtoms',
           type: 'textarea',
           placeholder: 'Diabetes, BP, Asthma, etc.',
           width: 'full',
@@ -949,7 +949,7 @@ if (isLoading) {
           />
 
           <DetailItem
-            label="Diseases"
+            label="Symtoms"
             value={formatList(patientDetails.diseases)}
           />
 

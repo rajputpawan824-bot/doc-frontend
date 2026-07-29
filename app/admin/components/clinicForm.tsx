@@ -43,7 +43,7 @@ const clinicSchema = z.object({
   image: z.string().optional(),
   location: z.string().min(5, "Location must be at least 5 characters"),
   mobileNumber: z.string().regex(/^\+?[\d\s-]{10,}$/, "Invalid mobile number"),
-  password: z.string().min(6, "Password must be at least 6 characters"),
+  password: z.string().min(8, "Password must be at least 8 characters"),
   subscription: z.enum(["basic", "premium", "enterprise"]),
   isActive: z.boolean().default(true),
   workingHours: z

@@ -550,16 +550,6 @@ const addAdjustmentMutation = useAddSalaryAdjustment({
               label: "Penalty",
               color: "bg-red-100 text-red-800",
             },
-            {
-              value: "DEDUCTION",
-              label: "Deduction",
-              color: "bg-orange-100 text-orange-800",
-            },
-            {
-              value: "INCREMENT",
-              label: "Increment",
-              color: "bg-blue-100 text-blue-800",
-            },
           ],
         },
         {
@@ -1017,12 +1007,12 @@ const addAdjustmentMutation = useAddSalaryAdjustment({
 
       {/* Salary History Modal */}
       {selectedEmployeeForHistory && (
-        <ReusableModal
-          isOpen={isHistoryModalOpen}
-          onClose={() => {
-            setIsHistoryModalOpen(false);
-            setSelectedEmployeeForHistory(null);
-          }}
+<ReusableModal
+  isOpen={isHistoryModalOpen}
+  onClose={() => {
+    setIsHistoryModalOpen(false);
+    setSelectedEmployeeForHistory(null);
+  }}
           onSave={() => {}}
           title={
             <div className="flex items-center gap-2">
@@ -1033,12 +1023,12 @@ const addAdjustmentMutation = useAddSalaryAdjustment({
               </Badge>
             </div>
           }
-          sections={[]}
-          initialData={{}}
-          isEdit={false}
-          size="xl"
-          saveButtonText="Close"
-          cancelButtonText="Close"
+    sections={[]}
+  initialData={{}}
+  isEdit={false}
+  size="xl"
+  cancelButtonText="Close"
+  showSaveButton={false}
         >
           <div className="space-y-4 max-h-[500px] overflow-y-auto">
             {isLoadingHistory ? (

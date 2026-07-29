@@ -51,12 +51,13 @@ export default function ReceptionistLeavePage() {
     setSelectedYear
   ] = useState<number>();
   
-  const {
-    data: leaveBalance,
-  } = useLeaveBalance(
-    selectedMonth,
-    selectedYear
-  );
+ const {
+  data: leaveBalance,
+} = useLeaveBalance(
+  undefined,
+  selectedMonth,
+  selectedYear
+);
 
 const {
   data: history = [],

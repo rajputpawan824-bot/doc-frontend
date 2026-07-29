@@ -653,22 +653,26 @@ export function useSearchStaff(searchTerm: string, category?: StaffCategory) {
       const staffList: RawStaff[] = response.data.data ?? [];
 
       // Filter staff based on search term
-      const filteredStaff = staffList.filter((staff) => {
-        const searchLower = searchTerm.toLowerCase();
+const filteredStaff = staffList.filter((staff) => {
+  const searchLower = searchTerm.toLowerCase();
+  const normalizedSearch = searchTerm.replace(/[\s-]/g, "");
 
-        return (
-          (staff.user?.name || "").toLowerCase().includes(searchLower) ||
-          (staff.user?.email || "").toLowerCase().includes(searchLower) ||
-          (staff.user?.phone ?? "").includes(searchTerm) ||
-          (staff.staffCode &&
-            staff.staffCode.toLowerCase().includes(searchLower)) ||
-          (staff.skill && staff.skill.toLowerCase().includes(searchLower)) ||
-          (staff.department &&
-            staff.department.toLowerCase().includes(searchLower)) ||
-          (category && staff.category === category)
-        );
-      });
-
+  return (
+    (staff.user?.name || "").toLowerCase().includes(searchLower) ||
+    (staff.user?.email || "").toLowerCase().includes(searchLower) ||
+    (staff.user?.phone ?? "").includes(searchTerm) ||
+    String(staff.aadhaar || "")
+      .replace(/[\s-]/g, "")
+      .includes(normalizedSearch) ||
+    (staff.staffCode &&
+      staff.staffCode.toLowerCase().includes(searchLower)) ||
+    (staff.skill &&
+      staff.skill.toLowerCase().includes(searchLower)) ||
+    (staff.department &&
+      staff.department.toLowerCase().includes(searchLower)) ||
+    (category && staff.category === category)
+  );
+});
       return {
         data: filteredStaff.map((staff) => ({
           ...staff,

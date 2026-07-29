@@ -206,6 +206,8 @@ const ReceptionistManagement = () => {
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
   const [passwordModalKey, setPasswordModalKey] = useState(0);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  const [activationErrorOpen, setActivationErrorOpen] = useState(false);
+const [activationErrorMessage, setActivationErrorMessage] = useState("");
   const [selectedReceptionistId, setSelectedReceptionistId] = useState<
     string | null
   >(null);
@@ -310,23 +312,47 @@ const activeReceptionists = validReceptionists.filter(
   (r) => r.isActive === true,
 );
 
-const filteredActiveReceptionists = activeReceptionists.filter(
-  (r) =>
-    !searchQuery ||
-    r.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    r.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    r.phoneNumber.includes(searchQuery) ||
-    (r.deskNumber &&
-      r.deskNumber.toLowerCase().includes(searchQuery.toLowerCase())),
-);
+const filteredActiveReceptionists = activeReceptionists.filter((r) => {
+  if (!searchQuery) return true;
 
-  const filteredDeactivatedReceptionists = validDeactivatedReceptionists.filter(
-    (r) =>
-      !searchQuery ||
-      r.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      r.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      r.phoneNumber.includes(searchQuery),
+  const search = searchQuery.toLowerCase();
+  const normalizedSearch = searchQuery.replace(/[\s-]/g, "");
+
+  return (
+    r.name.toLowerCase().includes(search) ||
+    r.email.toLowerCase().includes(search) ||
+    r.phoneNumber.includes(searchQuery) ||
+    String(r.aadhaar || "")
+      .replace(/[\s-]/g, "")
+      .includes(normalizedSearch) ||
+    String(r.receptionistCode || "")
+      .toLowerCase()
+      .includes(search) ||
+    (r.deskNumber || "")
+      .toLowerCase()
+      .includes(search)
   );
+});
+
+const filteredDeactivatedReceptionists =
+  validDeactivatedReceptionists.filter((r) => {
+    if (!searchQuery) return true;
+
+    const search = searchQuery.toLowerCase();
+    const normalizedSearch = searchQuery.replace(/[\s-]/g, "");
+
+    return (
+      r.name.toLowerCase().includes(search) ||
+      r.email.toLowerCase().includes(search) ||
+      r.phoneNumber.includes(searchQuery) ||
+      String(r.aadhaar || "")
+        .replace(/[\s-]/g, "")
+        .includes(normalizedSearch) ||
+      String(r.receptionistCode || "")
+        .toLowerCase()
+        .includes(search)
+    );
+  });
 
 
     const formatDocumentType = (type?: string) => {
@@ -499,7 +525,7 @@ const filteredActiveReceptionists = activeReceptionists.filter(
         {
           key: "previousExperience",
           label: "Previous Experience",
-          type: "text",
+          type: "number",
           icon: <Briefcase className="w-4 h-4" />,
           width: "full",
         },
@@ -1353,9 +1379,18 @@ onSuccess: () => {
             queryKey: ["deactivated-receptionists"],
           });
         },
-        onError: (error) => {
-          toast.error("Failed to reactivate receptionist");
-        },
+onError: (error) => {
+  if (
+    error.message?.includes("joining date") ||
+    error.message?.includes("future")
+  ) {
+    setActivationErrorMessage(error.message);
+    setActivationErrorOpen(true);
+    return;
+  }
+
+  toast.error(error.message || "Failed to reactivate receptionist");
+},
       },
     );
   };
@@ -1926,6 +1961,20 @@ workingHourEnd:
         showRawData={false}
         isLoading={isDetailLoading}
       />
+      <ReusableModal
+  isOpen={activationErrorOpen}
+  onClose={() => setActivationErrorOpen(false)}
+  title="Cannot Activate Receptionist"
+  mode="alert"
+  message={
+    <div className="space-y-2">
+      <p>{activationErrorMessage}</p>
+    </div>
+  }
+  saveButtonText="OK"
+  onSave={() => setActivationErrorOpen(false)}
+  size="sm"
+/>
     </div>
   );
 };

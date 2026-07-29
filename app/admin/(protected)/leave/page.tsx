@@ -53,6 +53,7 @@ import {
   useOnLeave,
   useLeavePolicy,
   useCreateLeavePolicy,
+    useLeaveBalance,
 } from "@/services/admin/leave";
 
 import type {
@@ -72,9 +73,13 @@ import {
 } from "@/components/ui/dialog";
 
 const LeaveManagement = () => {
-  const [activeTab, setActiveTab] = useState<
-    "pending" | "approved" | "rejected" | "on-leave"
-  >("pending");
+const [activeTab, setActiveTab] = useState<
+  | "pending"
+  | "approved"
+  | "rejected"
+  | "cancelled"
+  | "on-leave"
+>("pending");
   const [searchQuery, setSearchQuery] = useState("");
   const today = format(new Date(), "yyyy-MM-dd");
   const [onLeaveRole, setOnLeaveRole] = useState<
@@ -103,13 +108,19 @@ const [allowedLeaves, setAllowedLeaves] =
   const [selectedLeave, setSelectedLeave] = useState<LeaveResponse | null>(
     null,
   );
-  const [isPaid, setIsPaid] = useState(true);
+  const [isPaid, setIsPaid] = useState(false);
+  const [isHalfDay, setIsHalfDay] = useState(false);
   const [rejectionReason, setRejectionReason] = useState("");
   const [showRejectDialog, setShowRejectDialog] = useState(false);
   const [approveTargetLeave, setApproveTargetLeave] = useState<LeaveResponse | null>(null);
   const [approvalIsPaid, setApprovalIsPaid] = useState<boolean | null>(null);
   const [showApproveDialog, setShowApproveDialog] = useState(false);
   const [viewLeave, setViewLeave] = useState<LeaveResponse | null>(null);
+  const [selectedEmployeeId, setSelectedEmployeeId] =
+  useState<string>();
+
+  const [fromDate, setFromDate] = useState("");
+const [toDate, setToDate] = useState("");
 
   const [isApplyModalOpen, setIsApplyModalOpen] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<
@@ -118,6 +129,11 @@ const [allowedLeaves, setAllowedLeaves] =
 
 const { data: employees = [] } =
   useEmployeesForLeave(selectedCategory);
+
+  const { data: leaveBalance } =
+  useLeaveBalance(selectedEmployeeId);
+
+  console.log("Leave Balance", leaveBalance);
 
 const savePolicy = useCreateLeavePolicy({
   onSuccess: () => {
@@ -242,14 +258,16 @@ const {
 
   // Filter leaves based on tab and search
   const filteredLeaves = allLeaves.filter((leave) => {
-    const matchesTab =
-      activeTab === "pending"
-        ? leave.status === "PENDING"
-        : activeTab === "approved"
-          ? leave.status === "APPROVED"
-          : activeTab === "rejected"
-            ? leave.status === "REJECTED"
-            : false;
+const matchesTab =
+  activeTab === "pending"
+    ? leave.status === "PENDING"
+    : activeTab === "approved"
+      ? leave.status === "APPROVED"
+      : activeTab === "rejected"
+        ? leave.status === "REJECTED"
+        : activeTab === "cancelled"
+          ? leave.status === "CANCELLED"
+          : false;
 
     const matchesSearch =
       !searchQuery ||
@@ -305,12 +323,16 @@ const {
   const getTotalDays = (leave: LeaveResponse) =>
     leave.totalDays ?? leave.numberOfDays ?? "N/A";
 
-  const getPaidStatus = (leave: LeaveResponse) =>
-    leave.status === "APPROVED"
-      ? leave.approvedIsPaid
-        ? "Paid"
-        : "Unpaid"
-      : "Pending Decision";
+ const getPaidStatus = (leave: LeaveResponse) => {
+  if (
+    leave.status === "APPROVED" ||
+    leave.status === "CANCELLED"
+  ) {
+    return leave.approvedIsPaid ? "Paid" : "Unpaid";
+  }
+
+  return "Pending Decision";
+};
 
   const renderLeaveTable = (
     leaves: LeaveResponse[],
@@ -352,14 +374,14 @@ const {
             </TableCell>
             <TableCell>
               <div className="flex justify-end gap-2">
-                <Button
+                {/* <Button
   size="sm"
   variant="outline"
   onClick={() => setViewLeave(leave)}
 >
   <Eye className="h-4 w-4 mr-1" />
   View
-</Button>
+</Button> */}
 {actions === "view-only" && leave.status === "APPROVED" && (
   <Button
     size="sm"
@@ -424,6 +446,16 @@ const {
     upcomingLeaves: 0,
     approvalRate: 0,
   };
+
+  const leaveDays =
+  fromDate && toDate
+    ? isHalfDay
+      ? 0.5
+      : Math.floor(
+          (new Date(toDate).getTime() - new Date(fromDate).getTime()) /
+            (1000 * 60 * 60 * 24)
+        ) + 1
+    : 0;
 
   return (
     <div className="space-y-6 p-6">
@@ -597,9 +629,14 @@ const {
       <Tabs
         value={activeTab}
         onValueChange={(value) =>
-          setActiveTab(
-            value as "pending" | "approved" | "rejected" | "on-leave",
-          )
+setActiveTab(
+  value as
+    | "pending"
+    | "approved"
+    | "rejected"
+    | "cancelled"
+    | "on-leave"
+)
         }
       >
         <TabsList>
@@ -621,6 +658,12 @@ const {
               {allLeaves.filter((l) => l.status === "REJECTED").length}
             </span>
           </TabsTrigger>
+          <TabsTrigger value="cancelled">
+  Cancelled
+  <span className="ml-2 rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-800">
+    {allLeaves.filter((l) => l.status === "CANCELLED").length}
+  </span>
+</TabsTrigger>
           <TabsTrigger value="on-leave">
             On Leave
             <span className="ml-2 rounded-full bg-blue-100 px-2 py-0.5 text-xs text-blue-800">
@@ -735,6 +778,39 @@ const {
           </Card>
         </TabsContent>
 
+        {/* Cancel tab */}
+
+        <TabsContent value="cancelled" className="space-y-4 mt-4">
+  <Card>
+    <CardHeader>
+      <CardTitle>Cancelled Leaves</CardTitle>
+      <CardDescription>
+        View cancelled leave applications
+      </CardDescription>
+    </CardHeader>
+
+    <CardContent>
+      {isLoading ? (
+        <div className="flex justify-center items-center h-64">
+          <Loader2 className="h-8 w-8 animate-spin" />
+        </div>
+      ) : filteredLeaves.length === 0 ? (
+        <div className="text-center py-12">
+          <Calendar className="mx-auto h-12 w-12 text-gray-400" />
+          <h3 className="mt-4 text-lg font-semibold">
+            No cancelled leaves
+          </h3>
+          <p className="text-muted-foreground">
+            No cancelled leave applications found
+          </p>
+        </div>
+      ) : (
+        renderLeaveTable(filteredLeaves, "view-only")
+      )}
+    </CardContent>
+  </Card>
+</TabsContent>
+
         {/* On Leave Tab */}
         <TabsContent value="on-leave" className="space-y-4 mt-4">
           <div className="flex flex-col gap-3 md:flex-row md:items-end">
@@ -838,109 +914,151 @@ const {
         }}
         title="Apply Leave on Behalf of Employee"
         saveButtonText="Submit Application"
-        fields={[
-          {
-            name: "category",
-            label: "Employee Category",
-            type: "select",
-              onChange: (value) => {
-    if (
-      value === "DOCTOR" ||
-      value === "STAFF" ||
-      value === "RECEPTIONIST"
-    ) {
-      setSelectedCategory(value);
-    }
+fields={[
+  // Row 1
+  {
+    name: "category",
+    label: "Employee Category",
+    type: "select",
+    required: true,
+    width: "half",
+   
+    onChange: (value) => {
+      if (
+        value === "DOCTOR" ||
+        value === "STAFF" ||
+        value === "RECEPTIONIST"
+      ) {
+        setSelectedCategory(value);
+      }
+    },
+    options: [
+      { label: "Doctor", value: "DOCTOR" },
+      { label: "Receptionist", value: "RECEPTIONIST" },
+      { label: "Staff", value: "STAFF" },
+    ],
   },
-            required: true,
-            options: [
-          
-              { label: "Doctor", value: "DOCTOR" },
-              
-              { label: "Receptionist", value: "RECEPTIONIST" },
-             
-              { label: "Staff", value: "STAFF" },
-            ],
-            width: "half",
-            defaultValue: "ALL",
-          },
-          {
-            name: "userId",
-            label: "Select Employee",
-            type: "select",
-            required: true,
-            options: employees.map((emp) => ({
-  label: emp.name,
-  value: emp.id,
-})),
-            width: "half",
-          },
-          {
-            name: "leaveType",
-            label: "Leave Type",
-            type: "select",
-            required: true,
-            options: [
-              { label: "Sick Leave", value: "SICK" },
-              { label: "Casual Leave", value: "CASUAL" },
-              { label: "Emergency Leave", value: "EMERGENCY" },
-            ],
-            width: "half",
-          },
-          {
-            name: "emergencyContact",
-            label: "Emergency Contact",
-            type: "tel",
-            placeholder: "Enter 10-digit number",
-            width: "half",
-          },
-          {
-            name: "fromDate",
-            label: "Start Date",
-            type: "date",
-            required: true,
-            width: "half",
-          },
-          {
-            name: "toDate",
-            label: "End Date",
-            type: "date",
-            required: true,
-            width: "half",
-          },
-          {
-  name: "isPaid",
-  label: "Paid Leave",
+
+  {
+    name: "userId",
+    label: "Select Employee",
+    type: "select",
+    required: true,
+    width: "half",
+    onChange: (value) => {
+      setSelectedEmployeeId(value as string);
+    },
+    options: employees.map((emp) => ({
+      label: emp.name,
+      value: emp.id,
+    })),
+  },
+
+  // Row 2
+  {
+    name: "leaveType",
+    label: "Leave Type",
+    type: "select",
+    required: true,
+    width: "half",
+    options: [
+      { label: "Sick Leave", value: "SICK" },
+      { label: "Casual Leave", value: "CASUAL" },
+      { label: "Emergency Leave", value: "EMERGENCY" },
+    ],
+  },
+
+  {
+    name: "reason",
+    label: "Reason",
+    type: "textarea",
+    required: true,
+    width: "half",
+    rows: 3,
+    placeholder: "Please explain the reason...",
+  },
+
+  // Row 3
+{
+  name: "fromDate",
+  label: "Start Date",
+  type: "date",
+  required: true,
+  width: "half",
+  onChange: (value) => {
+    setFromDate(value as string);
+  },
+},
+
+{
+  name: "toDate",
+  label: "End Date",
+  type: "date",
+  required: true,
+  width: "half",
+  onChange: (value) => {
+    setToDate(value as string);
+  },
+},
+
+  // Row 4
+  {
+    name: "isPaid",
+    label: "Paid Leave",
+    type: "checkbox",
+    width: "half",
+    defaultValue: false,
+    onChange: (value) => {
+      setIsPaid(Boolean(value));
+    },
+  },
+
+{
+  name: "isHalfDay",
+  label: "Half Day Leave",
   type: "checkbox",
   width: "half",
-  defaultValue: true,
+  defaultValue: false,
+  onChange: (value) => {
+    setIsHalfDay(Boolean(value));
+  },
 },
-          {
-            name: "isHalfDay",
-            label: "Half Day Leave",
-            type: "checkbox",
-            width: "half",
-          },
-          {
-            name: "halfDayType",
-            label: "Shift Option",
-            type: "select",
-            options: [
-              { label: "First Half", value: "FIRST_HALF" },
-              { label: "Second Half", value: "SECOND_HALF" },
-            ],
-            width: "half",
-          },
-          {
-            name: "reason",
-            label: "Reason",
-            type: "textarea",
-            required: true,
-            placeholder: "Please explain the reason for leave...",
-            rows: 3,
-          },
-        ]}
-      />
+  // Row 5
+  {
+    name: "halfDayType",
+    label: "Shift Option",
+    type: "select",
+    width: "half",
+    hidden: (formData) => !formData.isHalfDay,
+    options: [
+      { label: "First Half", value: "FIRST_HALF" },
+      { label: "Second Half", value: "SECOND_HALF" },
+    ],
+  },
+]}
+        > 
+                {selectedEmployeeId && leaveBalance && (
+    <div className="rounded-lg border bg-blue-50 p-3">
+      <div className="flex items-center justify-between">
+        <span className="font-medium">
+          Remaining Paid Leaves
+        </span>
+
+        <span className="text-lg font-bold text-blue-700">
+{
+  Math.max(
+    0,
+    leaveBalance.remainingLeaves -
+      (isPaid ? leaveDays : 0)
+  )
+}
+        </span>
+      </div>
+    </div>
+  )}
+        
+   </ReusableModal>
+
 
       <Dialog
         open={!!selectedLeave}

@@ -485,13 +485,21 @@ export const useEmployeesForLeave = (
 };
 
 
-export const useLeaveBalance = (  month?: number,
+export const useLeaveBalance = (
+  userId?: string,
+  month?: number,
   year?: number,
-  status?: string) => {
+  status?: string
+) => {
   return useQuery({
-    queryKey: ["leave-balance",     month,
-      year,
-      status,],
+  queryKey: [
+  "leave-balance",
+  userId,
+  month,
+  year,
+  status,
+],
+enabled: true,
 
     queryFn: async () => {
             const params =
@@ -523,11 +531,12 @@ export const useLeaveBalance = (  month?: number,
         }>(
           "/leave/leave-balance",
            {
-      params: {
-        month,
-        year,
-        status,
-      },
+ params: {
+  userId,
+  month,
+  year,
+  status,
+},
     }
         );
 

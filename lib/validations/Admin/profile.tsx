@@ -50,7 +50,8 @@ export interface ProfileResponse {
   name: string;
   email: string;
   phone: string;
-    profileImage?: string;
+     profileImage?: string;
+  profileImageUrl?: string;
   
 
   role: "ADMIN";

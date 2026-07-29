@@ -109,6 +109,7 @@ export function useAddDoctor(options?: {
       payload.append("address", formData.address.trim());
       payload.append("experience", String(Number(formData.experience)));
       payload.append("consultationFee", String(Number(formData.consultationFee)));
+      payload.append("slotDuration", String(Number(formData.slotDuration)));
 
       formData.availabilityDays.forEach((day) => {
         payload.append("availabilityDays", day.toUpperCase());
@@ -321,6 +322,7 @@ export function useUpdateDoctor(options?: {
       if (data.address !== undefined) payload.append("address", data.address.trim());
       if (data.experience !== undefined) payload.append("experience", String(Number(data.experience)));
       if (data.consultationFee !== undefined) payload.append("consultationFee", String(Number(data.consultationFee)));
+      if (data.slotDuration !== undefined) payload.append("slotDuration", String(Number(data.slotDuration)));
 
       if (Array.isArray(data.availabilityDays)) {
         data.availabilityDays.forEach((day) => {
@@ -408,25 +410,35 @@ export function useUpdateDoctorDisable(options?: {
   const queryClient = useQueryClient();
 
   return useMutation<DoctorResponse, Error, UpdateDoctorStatusPayload>({
-    mutationFn: async ({ id, isActive }) => {
-      const response: ApiResponse<{ data: DoctorResponse }> =
-        await clientApi.put(`/doctors/${id}/disable`, {
-          isActive,
-        });
+mutationFn: async ({ id, isActive }) => {
+  const response = await clientApi.put(`/doctors/${id}/disable`, {
+    isActive,
+  });
 
-      if (!response.success || !response.data) {
-        throw new Error(
-          getErrorMessage(response.error, "Failed to update doctor"),
-        );
-      }
+  if (!response.success) {
+    throw new Error(
+      getErrorMessage(response.error, "Failed to update doctor")
+    );
+  }
 
-      return response.data.data;
-    },
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["doctors"] });
-      queryClient.invalidateQueries({ queryKey: ["doctor", data.id] });
-      options?.onSuccess?.(data);
-    },
+  return {
+    id,
+    status: isActive ? "active" : "inactive",
+  } as DoctorResponse;
+},
+onSuccess: (data) => {
+  queryClient.invalidateQueries({
+    queryKey: ["doctors"],
+  });
+
+  if (data?.id) {
+    queryClient.invalidateQueries({
+      queryKey: ["doctor", data.id],
+    });
+  }
+
+  options?.onSuccess?.(data);
+},
     onError: options?.onError,
   });
 }

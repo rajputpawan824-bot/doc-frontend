@@ -25,7 +25,7 @@ import {
   LeaveType, 
   HalfDayType 
 } from "@/lib/validations/Admin/leave";
-import { useCreateLeave ,useMyLeaves,useLeaveBalance } from "@/services/admin/leave";
+import { useCreateLeave ,useMyLeaves, useLeaveBalance } from "@/services/admin/leave";
 import { format } from "date-fns";
 
 export default function DoctorLeavePage() {
@@ -53,12 +53,13 @@ export default function DoctorLeavePage() {
     setSelectedYear
   ] = useState<number>();
   
-  const {
-    data: leaveBalance,
-  } = useLeaveBalance(
-    selectedMonth,
-    selectedYear
-  );
+ const {
+  data: leaveBalance,
+} = useLeaveBalance(
+  undefined,
+  selectedMonth,
+  selectedYear
+);
 
 const {
   data: history = [],

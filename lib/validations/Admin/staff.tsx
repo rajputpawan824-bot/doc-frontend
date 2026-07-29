@@ -263,16 +263,20 @@ experience: {
     },
   },
 
-  address: {
-    required: "Address is required",
-
-    maxLength: {
-      value: 255,
-      message: "Address cannot exceed 255 characters",
-    },
+address: {
+  required: "Address is required",
+  minLength: {
+    value: 5,
+    message: "Address must be at least 5 characters",
   },
+  maxLength: {
+    value: 200,
+    message: "Address cannot exceed 200 characters",
+  },
+},
 
   joiningDate: {
+     required: "Joining date is required",
     validate: (value: unknown) => {
       if (!value) return true; // Optional field
 
@@ -283,10 +287,6 @@ experience: {
 
       if (isNaN(date?.getTime())) {
         return "Invalid date format";
-      }
-
-      if (date > today) {
-        return "Joining date cannot be in the future";
       }
 
       // Check if date is not too far in the past (more than 50 years)
@@ -335,38 +335,10 @@ registrationNo: {
   },
 
   password: {
-    pattern: {
-      value:
-        /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/,
-      message:
-        "Password must be at least 8 characters with uppercase, lowercase, number and special character",
-    },
-    validate: (value: unknown) => {
-      if (!value) return true; // Password is optional (can be auto-generated)
-
-      if (typeof value !== "string") return "Password must be a string";
-
-      if (value.length < 8) {
-        return "Password must be at least 8 characters";
-      }
-
-      if (!/[A-Z]/.test(value)) {
-        return "Password must contain at least one uppercase letter";
-      }
-
-      if (!/[a-z]/.test(value)) {
-        return "Password must contain at least one lowercase letter";
-      }
-
-      if (!/\d/.test(value)) {
-        return "Password must contain at least one number";
-      }
-
-      if (!/[@$!%*?&]/.test(value)) {
-        return "Password must contain at least one special character (@$!%*?&)";
-      }
-
-      return true;
+    required: "Password is required",
+    minLength: {
+      value: 8,
+      message: "Password must be at least 8 characters",
     },
   },
 };

@@ -1,6 +1,7 @@
 'use client';
 
 import { ReactNode, useMemo, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   CheckCircle,
   ChevronLeft,
@@ -31,6 +32,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import Modal from '@/components/ui/modal';
 import {
   Table,
@@ -53,6 +55,9 @@ import {
   type FamilyProfile,
   type PatientCreateData,
 } from '@/services/admin/patient';
+import { useDoctors } from '@/services/admin/doctor';
+import { clientApi } from '@/lib/api/client';
+import { toast } from 'sonner';
 
 export enum Gender {
   MALE = 'MALE',
@@ -250,6 +255,14 @@ const relationOptions = [
   { value: 'OTHER', label: 'Other' },
 ];
 
+interface AvailableSlotsResponse {
+  doctorAvailable: boolean;
+  workingHours?: { start?: string; end?: string };
+  slotDuration?: number;
+  bookedSlots?: string[];
+  availableSlots: string[];
+}
+
 const emergencyRelationOptions = [
   { value: "FATHER", label: "Father" },
   { value: "MOTHER", label: "Mother" },
@@ -356,6 +369,10 @@ const DetailItem = ({ label, value }: { label: string; value?: ReactNode }) => {
 };
 
 const PatientManagement = () => {
+  const today = useMemo(
+    () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date()),
+    [],
+  );
   const [activeTab, setActiveTab] = useState('active');
   const [searchQuery, setSearchQuery] = useState('');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -370,6 +387,15 @@ const [selfExists, setSelfExists] =
     useState(false);
   const [familyProfiles, setFamilyProfiles] = useState<FamilyProfile[]>([]);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const [isAppointmentModalOpen, setIsAppointmentModalOpen] = useState(false);
+  const [appointmentPatientName, setAppointmentPatientName] = useState('');
+  const [appointmentForm, setAppointmentForm] = useState({
+    patientId: '',
+    doctorId: '',
+    date: '',
+    slot: '',
+    reason: '',
+  });
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
   const [editPatientId, setEditPatientId] = useState<string>('');
@@ -390,6 +416,63 @@ const [selfExists, setSelfExists] =
     refetch: refetchNextPatientCode,
   } = useNextPatientCode();
 
+  const queryClient = useQueryClient();
+  const { data: doctorsResponse } = useDoctors({ limit: 1000 });
+  const doctors = (doctorsResponse?.data ?? []).filter(
+    (doctor) => doctor.user?.isActive !== false,
+  );
+
+  const { data: availableSlotsResponse, isFetching: isSlotsLoading } = useQuery({
+    queryKey: ['available-slots', appointmentForm.doctorId, appointmentForm.date],
+    queryFn: async (): Promise<AvailableSlotsResponse> => {
+      const response = await clientApi.get<AvailableSlotsResponse>(
+        `/appointment/available-slots?doctorId=${appointmentForm.doctorId}&date=${appointmentForm.date}`,
+      );
+
+      if (!response.success) {
+        throw new Error(response.error || 'Failed to load available slots');
+      }
+
+      if (!response.data) {
+        throw new Error('Failed to load available slots');
+      }
+
+      return (response.data as any).data;
+    },
+    enabled: !!appointmentForm.doctorId && !!appointmentForm.date,
+  });
+console.log("availableSlotsResponse", availableSlotsResponse);
+  const createAppointmentMutation = useMutation({
+    mutationFn: async () => {
+      const response = await clientApi.post('/appointment/create-appointment', {
+        patient: appointmentForm.patientId,
+        doctor: appointmentForm.doctorId,
+        date: appointmentForm.date,
+        slot: appointmentForm.slot,
+        reason: appointmentForm.reason,
+      });
+
+      if (!response.success) {
+        throw new Error(response.error || 'Failed to create appointment');
+      }
+
+      return response.data;
+    },
+    onSuccess: () => {
+      toast.success('Appointment booked successfully');
+      setIsAppointmentModalOpen(false);
+      setAppointmentPatientName('');
+      setAppointmentForm({ patientId: '', doctorId: '', date: '', slot: '', reason: '' });
+      void refetch();
+      void queryClient.invalidateQueries({ queryKey: ['patients'] });
+      void queryClient.invalidateQueries({ queryKey: ['patient-appointments'] });
+      void queryClient.invalidateQueries({ queryKey: ['patient-dashboard'] });
+      void queryClient.invalidateQueries({ queryKey: ['doctor-appointments'] });
+      void queryClient.invalidateQueries({ queryKey: ['available-slots'] });
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
   const {
     data: detailPatient,
     isFetching: isDetailFetching,
@@ -402,10 +485,19 @@ const [selfExists, setSelfExists] =
   } = usePatientById(editPatientId);
 
   const addPatientMutation = useAddPatient({
-    onSuccess: () => {
+    onSuccess: (patient) => {
       setIsAddModalOpen(false);
       void refetch();
       void refetchNextPatientCode();
+      setAppointmentPatientName(patient.name);
+      setAppointmentForm({
+        patientId: patient.id,
+        doctorId: '',
+        date: '',
+        slot: '',
+        reason: '',
+      });
+      setIsAppointmentModalOpen(true);
     },
     onError: (error) => {
       alert(error.message);
@@ -572,7 +664,7 @@ familyProfiles.length > 0
 
         {
           name: 'diseases',
-          label: 'Diseases',
+          label: 'Symtoms',
           type: 'textarea',
           placeholder: 'Diabetes, BP, Asthma, etc.',
           width: 'full',
@@ -635,7 +727,7 @@ familyProfiles.length > 0
   label: "Relation",
   type: "select",
   width: "half",
-  defaultValue: "FATHER",
+ 
   options: emergencyRelationOptions,
 },
 {
@@ -665,16 +757,39 @@ familyProfiles.length > 0
     },
 ], [nextPatientCode, familyProfiles]);
 
+const patientForDetails = detailPatient;
+const patientForEdit = editPatient ?? selectedPatient;
 
-  const editFormSections: FormSection[] = useMemo(
+
+const editFormSections: FormSection[] = useMemo(
   () =>
     formSections.map((section) => ({
       ...section,
-      fields: section.fields.filter(
-        (field) => field.name !== 'patientCode'
-      ),
+      fields: section.fields
+        .filter((field) => field.name !== "patientCode")
+        .map((field) => {
+          if (field.name === "relation") {
+            return {
+              ...field,
+              disabled: true,
+              options: patientForEdit?.relation
+                ? [
+                    {
+                      value: patientForEdit.relation,
+                      label:
+                        relationOptions.find(
+                          (r) => r.value === patientForEdit.relation
+                        )?.label || patientForEdit.relation,
+                    },
+                  ]
+                : [{ value: "SELF", label: "Self" }],
+            };
+          }
+
+          return field;
+        }),
     })),
-  [formSections]
+  [formSections, patientForEdit]
 );
 
 const handleOpenAddPatient = () => {
@@ -690,8 +805,28 @@ const handleAddFamilyMember = () => {
 };
 
 const handleCreateAppointment = (profile: FamilyProfile) => {
-  // TODO: Implement appointment creation for the selected profile.
-  console.log(profile);
+  setIsProfileModalOpen(false);
+  setAppointmentPatientName(profile.name);
+  setAppointmentForm({
+    patientId: profile._id,
+    doctorId: '',
+    date: '',
+    slot: '',
+    reason: '',
+  });
+  setIsAppointmentModalOpen(true);
+};
+
+const handleBookAppointment = (patient: Patient) => {
+  setAppointmentPatientName(patient.name);
+  setAppointmentForm({
+    patientId: patient.id,
+    doctorId: '',
+    date: '',
+    slot: '',
+    reason: '',
+  });
+  setIsAppointmentModalOpen(true);
 };
 
 const handleAddPatient = async (data: ReusableFormData) => {
@@ -836,18 +971,18 @@ emergencyContact: {
     },
     
     
-    {
-      accessorKey: 'status',
-      header: 'Status',
-      cell: ({ row }) => {
-        const isActive = getIsActive(row.original);
-        return (
-          <Badge className={isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}>
-            {isActive ? 'ACTIVE' : 'INACTIVE'}
-          </Badge>
-        );
-      },
-    },
+    // {
+    //   accessorKey: 'status',
+    //   header: 'Status',
+    //   cell: ({ row }) => {
+    //     const isActive = getIsActive(row.original);
+    //     return (
+    //       <Badge className={isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}>
+    //         {isActive ? 'ACTIVE' : 'INACTIVE'}
+    //       </Badge>
+    //     );
+    //   },
+    // },
     {
       id: 'actions',
       header: 'Actions',
@@ -875,7 +1010,17 @@ emergencyContact: {
     <UserCog className="h-4 w-4" />
   </Button>
 )}
-            <Button
+            {isActive && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => handleBookAppointment(patient)}
+                title="Book appointment"
+              >
+                Book Appointment
+              </Button>
+            )}
+            {/* <Button
               size="sm"
               variant="outline"
               onClick={() => handleToggleStatus(patient)}
@@ -885,7 +1030,7 @@ emergencyContact: {
                 : 'text-green-600 hover:text-green-700 hover:bg-green-50 border-green-200'}
             >
               {isActive ? <Trash2 className="h-4 w-4" /> : <CheckCircle className="h-4 w-4" />}
-            </Button>
+            </Button> */}
           </div>
         );
       },
@@ -898,8 +1043,7 @@ emergencyContact: {
   });
   const activeCount = patients.filter(getIsActive).length;
   const inactiveCount = patients.filter((patient) => !getIsActive(patient)).length;
-  const patientForDetails = detailPatient;
-  const patientForEdit = editPatient ?? selectedPatient;
+
 
   return (
     <div className="container mx-auto p-6 space-y-6">
@@ -953,15 +1097,12 @@ emergencyContact: {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList className="grid grid-cols-2 w-full max-w-md">
+        <TabsList className="grid grid-cols-1 w-full max-w-md">
           <TabsTrigger value="active" className="flex items-center gap-2">
             <CheckCircle className="h-4 w-4" />
             Active Patients ({activeCount})
           </TabsTrigger>
-          <TabsTrigger value="inactive" className="flex items-center gap-2">
-            <XCircle className="h-4 w-4" />
-            Deactivated Patients ({inactiveCount})
-          </TabsTrigger>
+ 
         </TabsList>
 
         <TabsContent value={activeTab} className="space-y-4">
@@ -1059,6 +1200,107 @@ emergencyContact: {
           ))}
         </div>
       </Modal>
+      <Modal
+        isOpen={isAppointmentModalOpen}
+        onClose={() => setIsAppointmentModalOpen(false)}
+        title="Book Appointment"
+        size="lg"
+        footer={
+          <>
+            <Button variant="outline" onClick={() => setIsAppointmentModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => createAppointmentMutation.mutate()}
+              disabled={
+                !appointmentForm.patientId ||
+                !appointmentForm.doctorId ||
+                !appointmentForm.date ||
+                !appointmentForm.slot ||
+                availableSlotsResponse?.doctorAvailable === false ||
+                createAppointmentMutation.isPending
+              }
+            >
+              {createAppointmentMutation.isPending ? 'Booking...' : 'Create Appointment'}
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-5">
+          <div className="rounded-md bg-slate-50 p-3 text-sm text-slate-700">
+            Patient: <span className="font-medium">{appointmentPatientName}</span>
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Doctor</label>
+            <select
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              value={appointmentForm.doctorId}
+              onChange={(event) => setAppointmentForm((current) => ({
+                ...current,
+                doctorId: event.target.value,
+                slot: '',
+              }))}
+            >
+              <option value="">Select doctor</option>
+              {doctors.map((doctor) => (
+                <option key={doctor.id} value={doctor.id}>
+                  {doctor.user?.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Date</label>
+            <Input
+              type="date"
+              min={today}
+              value={appointmentForm.date}
+              disabled={!appointmentForm.doctorId}
+              onChange={(event) => setAppointmentForm((current) => ({
+                ...current,
+                date: event.target.value,
+                slot: '',
+              }))}
+            />
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Available Slots</label>
+            {!appointmentForm.doctorId || !appointmentForm.date ? (
+              <p className="text-sm text-slate-500">Choose a doctor and date to load available slots.</p>
+            ) : isSlotsLoading ? (
+              <p className="text-sm text-slate-500">Loading available slots...</p>
+            ) : availableSlotsResponse?.doctorAvailable === false ? (
+              <p className="text-sm text-red-600">Doctor unavailable on selected day.</p>
+            ) : (availableSlotsResponse?.availableSlots ?? []).length ? (
+              <div className="flex flex-wrap gap-2">
+                {(availableSlotsResponse?.availableSlots ?? []).map((slot) => (
+                  <Button
+                    key={slot}
+                    type="button"
+                    variant={appointmentForm.slot === slot ? 'default' : 'outline'}
+                    onClick={() => setAppointmentForm((current) => ({ ...current, slot }))}
+                  >
+                    {slot}
+                  </Button>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-slate-500">No slots available for this date.</p>
+            )}
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Reason (optional)</label>
+            <Textarea
+              value={appointmentForm.reason}
+              onChange={(event) => setAppointmentForm((current) => ({
+                ...current,
+                reason: event.target.value,
+              }))}
+              placeholder="Reason for visit"
+            />
+          </div>
+        </div>
+      </Modal>
       <ReusableModal
         isOpen={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}
@@ -1120,7 +1362,7 @@ emergencyContact: {
         Edit Details
       </Button>
     )}
-            <Button
+            {/* <Button
               variant="outline"
               onClick={() => handleToggleStatus(patientForDetails)}
               className={getIsActive(patientForDetails)
@@ -1133,7 +1375,7 @@ emergencyContact: {
                 <CheckCircle className="mr-2 h-4 w-4" />
               )}
               {getIsActive(patientForDetails) ? 'Deactivate' : 'Activate'}
-            </Button>
+            </Button> */}
           </>
         ) : undefined}
       >
@@ -1148,9 +1390,9 @@ emergencyContact: {
                 <p className="text-sm text-slate-500">Patient Code</p>
                 <p className="text-lg font-semibold text-blue-700">{patientForDetails.patientCode}</p>
               </div>
-              <Badge className={getIsActive(patientForDetails) ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}>
+              {/* <Badge className={getIsActive(patientForDetails) ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}>
                 {getIsActive(patientForDetails) ? 'ACTIVE' : 'INACTIVE'}
-              </Badge>
+              </Badge> */}
             </div>
 
             <div className="space-y-4">
@@ -1213,14 +1455,14 @@ emergencyContact: {
 />
 
 
-                <DetailItem label="Diseases" value={formatList(patientForDetails.diseases)} />
+                <DetailItem label="Symtoms" value={formatList(patientForDetails.diseases)} />
                 <DetailItem label="Allergies" value={formatList(patientForDetails.allergies)} />
                 <DetailItem label="Medical History" value={patientForDetails.medicalHistory} />
                 <DetailItem
                   label="Documents"
                   value={renderMedicalReports(patientForDetails.medicalReports)}
                 />
-                <DetailItem label="Status" value={getIsActive(patientForDetails) ? 'ACTIVE' : 'INACTIVE'} />
+                {/* <DetailItem label="Status" value={getIsActive(patientForDetails) ? 'ACTIVE' : 'INACTIVE'} /> */}
                 <DetailItem label="Created Date" value={formatDate(patientForDetails.createdAt)} />
                 {!getIsActive(patientForDetails) && (
   <DetailItem

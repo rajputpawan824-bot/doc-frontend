@@ -244,31 +244,19 @@ export function getMonthName(month: number): string {
 
 export function getMonthYearOptions() {
   const options = [];
-  const now = new Date();
-  const currentYear = now.getFullYear();
-  const currentMonth = now.getMonth() + 1;
-  
-  // Add current month
-  options.push({
-    value: { month: currentMonth, year: currentYear },
-    label: `${getMonthName(currentMonth)} ${currentYear}`,
-  });
-  
-  // Add previous 11 months
-  for (let i = 1; i <= 11; i++) {
-    let month = currentMonth - i;
-    let year = currentYear;
-    
-    if (month < 1) {
-      month += 12;
-      year -= 1;
+
+  // Change these years if you want a larger/smaller range
+  const startYear = 2020;
+  const endYear = 2035;
+
+  for (let year = endYear; year >= startYear; year--) {
+    for (let month = 12; month >= 1; month--) {
+      options.push({
+        value: { month, year },
+        label: `${getMonthName(month)} ${year}`,
+      });
     }
-    
-    options.push({
-      value: { month, year },
-      label: `${getMonthName(month)} ${year}`,
-    });
   }
-  
+
   return options;
 }

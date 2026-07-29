@@ -5,7 +5,7 @@ import { Plus, X ,Eye, EyeOff} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Modal from "../ui/modal";
 
-export type FieldType = "text" | "email" | "tel"|"file" | "number" | "password" | "textarea" | "select" | "radio" | "checkbox" | "date" | "time"| "checkbox-group"   | "document-manager"  | "patient-document-manager";
+export type FieldType = "text" | "email" | "tel"|"file" | "number" | "password" | "textarea" | "select" | "radio" | "checkbox" | "date" | "time"| "checkbox-group"   | "document-manager"  | "patient-document-manager" | "custom";
 export type FormDataValue = unknown;
 export type ReusableFormData = Record<string, FormDataValue>;
 
@@ -49,9 +49,11 @@ export interface FormSection {
 interface ReusableModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (data: ReusableFormData) => void;
+ onSave?: (data: ReusableFormData) => void;
   title: string | ReactNode;
   sections?: FormSection[];
+    mode?: "form" | "alert";
+  message?: ReactNode;
   fields?: FieldConfig[]; // Alternative flat structure
   initialData?: ReusableFormData;
   isEdit?: boolean;
@@ -61,6 +63,7 @@ interface ReusableModalProps {
   saveButtonColor?: string;
   validationOnChange?: boolean;
   children?: ReactNode;
+showSaveButton?: boolean;
 }
 
 
@@ -79,8 +82,11 @@ export default function ReusableModal({
   cancelButtonText,
   saveButtonColor,
   validationOnChange = false,
-   children,
-}: ReusableModalProps) {
+    mode = "form",
+  message,
+children,
+showSaveButton = true,
+}: ReusableModalProps){
   const formId = useId();
   const formSections = useMemo(
     () =>
@@ -97,34 +103,49 @@ export default function ReusableModal({
   }
 
   return (
-    <ReusableModalContent
-      key={contentKey}
-      cancelButtonText={cancelButtonText}
-      formId={formId}
-      formSections={formSections}
-      initialData={initialData}
-      isEdit={isEdit}
-      isOpen={isOpen}
-      onClose={onClose}
-      onSave={onSave}
-      saveButtonColor={saveButtonColor}
-      saveButtonText={saveButtonText}
-      size={size}
-      title={title}
-      validationOnChange={validationOnChange}
-    >
-     {children}
-  </ReusableModalContent>
+<ReusableModalContent
+  key={contentKey}
+  cancelButtonText={cancelButtonText}
+  formId={formId}
+  formSections={formSections}
+  initialData={initialData}
+  isEdit={isEdit}
+  isOpen={isOpen}
+  onClose={onClose}
+  onSave={onSave}
+  mode={mode}
+  message={message}
+  saveButtonColor={saveButtonColor}
+  saveButtonText={saveButtonText}
+  showSaveButton={showSaveButton}
+  size={size}
+  title={title}
+  validationOnChange={validationOnChange}
+>
+  {children}
+</ReusableModalContent>
   );
 }
 
-interface ReusableModalContentProps extends Required<Pick<ReusableModalProps, "isOpen" | "onClose" | "onSave" | "isEdit" | "size" | "validationOnChange">> {
+interface ReusableModalContentProps
+  extends Required<
+    Pick<
+      ReusableModalProps,
+      "isOpen" | "onClose" | "isEdit" | "size" | "validationOnChange"
+    >
+  > {
+  onSave?: (data: ReusableFormData) => void;
+
+  mode?: "form" | "alert";
+  message?: ReactNode;
+
   cancelButtonText?: string;
   formId: string;
   formSections: FormSection[];
   initialData: ReusableFormData;
   saveButtonColor?: string;
   saveButtonText?: string;
+  showSaveButton: boolean;
   title: string | ReactNode;
 }
 
@@ -214,8 +235,11 @@ function ReusableModalContent({
   isOpen,
   onClose,
   onSave,
+  mode = "form",
+message,
   saveButtonColor,
   saveButtonText,
+  showSaveButton,
   size,
   title,
   validationOnChange,
@@ -355,9 +379,9 @@ if (
     e.preventDefault();
     
     console.log("FORM DATA", formData);
-    if (validateForm()) {
-      onSave(formData);
-    }
+ if (validateForm()) {
+  onSave?.(formData);
+}
   };
 
 const handleChange = (name: string, value: FormDataValue) => {
@@ -431,19 +455,20 @@ const handleBlur = (name: string) => {
       switch (field.type) {
         case "textarea":
           return (
-            <textarea
-              id={field.name}
-              required={required}
-              className={`${commonClasses} resize-vertical min-h-[100px]`}
-              value={fieldValueAsString(formData[field.name])}
-          onChange={(e) => {
-  handleChange(field.name, e.target.value);
-  field.onChange?.(e.target.value);
-}}
-              placeholder={field.placeholder}
-              disabled={field.disabled}
-              rows={field.rows || 4}
-            />
+<textarea
+  id={field.name}
+  required={required}
+  className={`${commonClasses} resize-vertical min-h-[100px]`}
+  value={fieldValueAsString(formData[field.name])}
+  onChange={(e) => {
+    handleChange(field.name, e.target.value);
+    field.onChange?.(e.target.value);
+  }}
+  onBlur={() => handleBlur(field.name)}
+  placeholder={field.placeholder}
+  disabled={field.disabled}
+  rows={field.rows || 4}
+/>
           );
 
         case "select":
@@ -1048,32 +1073,57 @@ onChange={(e) => {
       onClose={onClose}
       title={typeof title === "string" ? title : ""}
       size={size}
-      footer={
-        <div className="flex gap-3">
-          <Button
-            variant="outline"
-            onClick={onClose}
-            type="button"
-            className="hover:bg-slate-100"
-          >
-            <X className="w-4 h-4 mr-2" />
-            {cancelButtonText || "Cancel"}
-          </Button>
-          <Button
-            form={formId}
-            type="submit"
-            className="hover:scale-105 transition-transform"
-            style={{
-              background: saveButtonColor || "linear-gradient(135deg, #1a73e8, #0ea5e9)"
-            }}
-          >
-            <Plus className="w-4 h-4 mr-2" />
-            {saveButtonText || (isEdit ? "Update" : "Create")}
-          </Button>
-        </div>
-      }
+footer={
+  mode === "alert" ? (
+    <div className="flex justify-end">
+<Button
+  onClick={onClose}
+  className="bg-blue-600 hover:bg-blue-700 text-white"
+>
+  OK
+</Button>
+    </div>
+  ) : (
+<div className="flex gap-3">
+  <Button
+    variant="outline"
+    onClick={onClose}
+    type="button"
+    className="hover:bg-slate-100"
+  >
+    <X className="w-4 h-4 mr-2" />
+    {cancelButtonText || "Cancel"}
+  </Button>
+
+  {showSaveButton && (
+    <Button
+      form={formId}
+      type="submit"
+      className="hover:scale-105 transition-transform"
+      style={{
+        background:
+          saveButtonColor ||
+          "linear-gradient(135deg,#1a73e8,#0ea5e9)",
+      }}
     >
-      <form id={formId} onSubmit={handleSubmit} className="space-y-6">
+      <Plus className="w-4 h-4 mr-2" />
+      {saveButtonText || (isEdit ? "Update" : "Create")}
+    </Button>
+  )}
+</div>
+  )
+}
+    >
+    {mode === "alert" ? (
+  <div className="py-4 text-slate-700">
+    {message}
+  </div>
+) : (
+  <form
+    id={formId}
+    onSubmit={handleSubmit}
+    className="space-y-6"
+  >
         {formSections.map((section, sectionIndex) => (
           <div key={sectionIndex} className="space-y-6">
             {section.title && (
@@ -1093,6 +1143,7 @@ onChange={(e) => {
           </div>
         ))}
       </form>
+)}
         {children}
     </Modal>
   );

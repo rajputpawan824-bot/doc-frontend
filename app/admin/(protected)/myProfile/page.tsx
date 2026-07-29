@@ -395,15 +395,14 @@ const handleResendOtp = async () => {
 <div className="relative">
 
 <div className="w-32 h-32 rounded-full overflow-hidden border-2 border-gray-200">
-  {selectedImage ? (
+  {selectedImage || profile?.profileImageUrl ? (
     <img
-      src={URL.createObjectURL(selectedImage)}
-      alt="Profile"
-      className="w-full h-full object-cover"
-    />
-  ) : profile?.profileImage ? (
-    <img
-      src={`https://clinic-managemnet-backend.onrender.com${profile.profileImage}`}
+      key={profile?.profileImageUrl}
+      src={
+        selectedImage
+          ? URL.createObjectURL(selectedImage)
+          : profile?.profileImageUrl || "/default-avatar.png"
+      }
       alt="Profile"
       className="w-full h-full object-cover"
     />
@@ -572,20 +571,13 @@ const handleResendOtp = async () => {
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-gray-600">Account Status</span>
-                  <Badge
+                  <Badge 
                     variant={profile?.isActive ? "default" : "secondary"}
                   >
                     {profile?.isActive ? "Active" : "Inactive"}
                   </Badge>
                 </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-600">Role Level</span>
-                  <Badge variant="outline">
-                    {profile?.role === "ADMIN"
-                      ? "Full Access"
-                      : "Limited Access"}
-                  </Badge>
-                </div>
+ 
               </CardContent>
             </Card>
           </div>
@@ -737,19 +729,12 @@ const handleResendOtp = async () => {
                         <Button
                           type="submit"
                           disabled={isLoading}
-                          className="flex-1 md:flex-none"
+                          className="flex-1 md:flex-none bg-blue-600 hover:bg-blue-700 text-white"
                         >
                           <Save className="h-4 w-4 mr-2" />
                           {isLoading ? "Saving..." : "Save Changes"}
                         </Button>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={handleResetProfile}
-                          disabled={isLoading}
-                        >
-                          Reset
-                        </Button>
+     
                       </div>
                     </form>
                   </TabsContent>
@@ -802,9 +787,10 @@ const handleResendOtp = async () => {
                           <Button
                             onClick={handleStartPasswordReset}
                             disabled={isLoading}
-                            className="w-full"
+                            className="w-full bg-blue-600 hover:bg-blue-700 text-white"
                           >
                             <Key className="h-4 w-4 mr-2" />
+                           
                             Send OTP to Email
                           </Button>
                         </div>
@@ -932,9 +918,9 @@ const handleResendOtp = async () => {
                                   {...registerResetPassword("newPassword", {
                                     required: "New password is required",
                                     minLength: {
-                                      value: 6,
+                                      value: 8,
                                       message:
-                                        "Password must be at least 6 characters",
+                                        "Password must be at least 8 characters",
                                     },
                                   })}
                                   className={

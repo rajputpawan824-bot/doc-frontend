@@ -325,6 +325,7 @@ const staffFormSections: FormSection[] = [
   required: true,
   placeholder: "Enter password",
   width: "half",
+    validation: transformValidation(STAFF_VALIDATION_RULES.password),
 },
       {
         name: "aadhaar",
@@ -448,8 +449,10 @@ const staffFormSections: FormSection[] = [
         name: "joiningDate",
         label: "Joining Date",
         type: "date",
+        required:true,
         placeholder: "Select joining date",
         width: "half",
+         validation: transformValidation(STAFF_VALIDATION_RULES.joiningDate),
       },
 
       {
@@ -558,6 +561,8 @@ const [passwordModalKey, setPasswordModalKey] = useState(0);
   const [limit, setLimit] = useState(10);
  const [searchQuery, setSearchQuery] = useState("");
 const [debouncedSearch] = useDebounce(searchQuery, 500);
+const [activationErrorOpen, setActivationErrorOpen] = useState(false);
+const [activationErrorMessage, setActivationErrorMessage] = useState("");
 
   const [filterActive, setFilterActive] = useState<
     "active" | "inactive" | "all"
@@ -647,19 +652,28 @@ queryClient.invalidateQueries({
     },
   });
 
-  const enableStaffMutation = useEnableStaff({
-    onSuccess: (data) => {
-          console.log("ENABLE SUCCESS");
-      toast.success("Staff enabled successfully");
-      setDeleteModalOpen(false);
-      setStaffToDelete(null);
-      queryClient.invalidateQueries({ queryKey: ["staff"] });
-      queryClient.invalidateQueries({ queryKey: ["staff", "dashboard-stats"] });
-    },
-    onError: (error) => {
-      toast.error(error.message || "Failed to enable staff");
-    },
-  });
+const enableStaffMutation = useEnableStaff({
+  onSuccess: () => {
+    toast.success("Staff enabled successfully");
+    setDeleteModalOpen(false);
+    setStaffToDelete(null);
+
+    queryClient.invalidateQueries({ queryKey: ["staff"] });
+    queryClient.invalidateQueries({
+      queryKey: ["staff", "dashboard-stats"],
+    });
+  },
+
+  onError: (error) => {
+    setDeleteModalOpen(false);
+
+    setActivationErrorMessage(
+      error.message || "Failed to enable staff"
+    );
+
+    setActivationErrorOpen(true);
+  },
+});
 
   // Get staff data from API response
   const staff = staffResponse?.data || [];
@@ -1062,7 +1076,7 @@ queryClient.invalidateQueries({
         {
           key: "experience",
           label: "Experience",
-          type: "text",
+          type: "number",
           icon: <TrendingUp className="w-4 h-4" />,
           width: "half",
         },
@@ -1314,11 +1328,24 @@ const handleEditStaff = (staffMember: StaffMember) => {
     setDeleteModalOpen(true);
   };
 
-  const handleEnableStaff = (staffMember: StaffMember) => {
-    setStaffToDelete(staffMember);
-    // For enable, we'll show the delete modal but with enable action
-    setDeleteModalOpen(true);
-  };
+const handleEnableStaff = (staffMember: StaffMember) => {
+  const joiningDate = new Date(staffMember.joiningDate!);
+  const today = new Date();
+
+  today.setHours(0, 0, 0, 0);
+  joiningDate.setHours(0, 0, 0, 0);
+
+  if (joiningDate > today) {
+    setActivationErrorMessage(
+      "This employee cannot be activated because the joining date is in the future. Please update the joining date before activating."
+    );
+    setActivationErrorOpen(true);
+    return;
+  }
+
+  setStaffToDelete(staffMember);
+  setDeleteModalOpen(true);
+};
 
   const handleSave = (data: Record<string, unknown>) => {
     console.log("clicked");
@@ -1777,6 +1804,14 @@ initialData={
         showRawData={false}
         isLoading={isDetailLoading}
       />
+      <ReusableModal
+  isOpen={activationErrorOpen}
+  onClose={() => setActivationErrorOpen(false)}
+  title="Cannot Activate Employee"
+  mode="alert"
+  message={activationErrorMessage}
+  size="sm"
+/>
     </div>
   );
 };

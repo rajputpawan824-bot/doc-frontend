@@ -21,6 +21,7 @@ export interface DoctorFormData {
   joiningDate: string;
   doctorCode: string;
   consultationFee: number;
+  slotDuration: number;
   documentUrl?: {
     name: string;
     url: string;
@@ -69,6 +70,7 @@ documents?: {
 }[];
 joiningDate: string;
   consultationFee: number;
+  slotDuration: number;
   availabilityDays: string[];
 
   createdAt: string;
@@ -224,6 +226,16 @@ experience: {
       return true;
     },
   },
+  slotDuration: {
+    required: "Slot duration is required",
+    validate: (value: unknown) => {
+      const numValue = Number(value);
+      if (!Number.isFinite(numValue) || numValue <= 0) {
+        return "Slot duration must be greater than zero";
+      }
+      return true;
+    },
+  },
 availabilityDays: {
   required: "Availability days are required",
   validate: (value: unknown) => {
@@ -266,6 +278,7 @@ export interface CreateDoctorPayload {
   joiningDate: string; 
   experience: number;
   consultationFee: number;
+  slotDuration: number;
   availabilityDays: string[];
   password?: string;
   workingHours: {

@@ -124,7 +124,7 @@ const years = Array.from(
 
 const [page, setPage] =
   useState(1);
-
+const [limit, setLimit] = useState(10);
 const [search, setSearch] =
   useState("");
 
@@ -144,7 +144,7 @@ const {
   data: attendanceList,
 } = useAttendanceList({
   page,
-  limit: 10,
+  limit,
   role,
   status,
   date: selectedDate,
@@ -535,12 +535,19 @@ const columns: ColumnDef<AttendanceRecord>[] = [
         <CardContent>
 <DataTable
   columns={columns}
-    data={attendanceList?.data || []}
+  data={attendanceList?.data || []}
+  page={page}
+  total={attendanceList?.total || 0}
+  pageSize={limit}
+  onPageChange={setPage}
+  onPageSizeChange={(newLimit) => {
+    setLimit(newLimit);
+    setPage(1);
+  }}
   searchColumn="employeeName"
   searchPlaceholder="Search employee..."
   emptyMessage="No attendance records found"
 />
-
         </CardContent>
       </Card>
 

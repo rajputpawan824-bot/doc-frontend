@@ -1041,7 +1041,7 @@ export default function PatientsPage() {
 
                 <DetailSection title="Medical Information">
                   <DetailItem
-                    label="Diseases"
+                    label="Symtoms"
                     value={formatList(patientForDetails.diseases)}
                   />
                   <DetailItem

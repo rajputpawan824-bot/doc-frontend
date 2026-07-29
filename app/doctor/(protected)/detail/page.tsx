@@ -307,9 +307,9 @@ const handleUpdatePassword = (
   >
     <Key className="h-4 w-4 mr-2" />
     Change Password
-  </Button>
+  </Button >
           {!isEditing ? (
-            <Button
+            <Button className="flex-1 bg-blue-600 hover:bg-blue-700 text-white gap-2"
   onClick={() => {
     setIsEditing(true);
 
@@ -323,9 +323,10 @@ const handleUpdatePassword = (
       ]);
     }
   }}
-  className="gap-2"
+  
 >
-              <Edit className="h-4 w-4" />
+              <Edit className="h-4 w-4"
+               />
               Edit Profile
             </Button>
           ) : (

@@ -7,7 +7,6 @@ import {
   Minus,
   RotateCcw,
   Clock,
-  Calendar,
   Users,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -26,19 +25,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
-import { usePatients } from "@/services/admin/patient";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { clientApi } from "@/lib/api/client";
 import {
   Table,
   TableBody,
@@ -66,7 +54,6 @@ export default function TokenManagementClient({
 }: TokenManagementClientProps) {
   const [selectedDoctorId, setSelectedDoctorId] = useState<string>("");
   const [doctorSearch, setDoctorSearch] = useState("");
-  const [modalDoctorSearch, setModalDoctorSearch] = useState("");
   const today = useMemo(
   () =>
     new Intl.DateTimeFormat("en-CA", {
@@ -87,67 +74,6 @@ const filteredDoctorsList = useMemo(() => {
     doctor.user?.name?.toLowerCase().includes(doctorSearch.toLowerCase())
   );
 }, [initialDoctors, doctorSearch]);
-
-const filteredModalDoctors = useMemo(() => {
-  const activeDoctors = (initialDoctors || []).filter(
-    (doctor: any) => doctor.user?.isActive === true
-  );
-
-  if (!modalDoctorSearch) return activeDoctors;
-
-  return activeDoctors.filter((doctor: any) =>
-    doctor.user?.name?.toLowerCase().includes(modalDoctorSearch.toLowerCase())
-  );
-}, [initialDoctors, modalDoctorSearch]);
-
-  // Appointment Creation State
-  const queryClient = useQueryClient();
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [appointmentForm, setAppointmentForm] = useState({
-    patientId: "",
-    doctorId: "",
-    date: "",
-    slot: "",
-    reason: "",
-  });
-
-  // Fetch data for Appointment Creation
-  const { data: patientsData } = usePatients({ limit: 1000 });
-  const patients = (patientsData as any)?.data 
-    ? (patientsData as any).data 
-    : (Array.isArray(patientsData) ? patientsData : []);
-
-  const { data: availableSlots = [] } = useQuery({
-    queryKey: ["available-slots", appointmentForm.doctorId, appointmentForm.date],
-    queryFn: async () => {
-      const response = await clientApi.get<any>(
-        `/appointment/available-slots?doctorId=${appointmentForm.doctorId}&date=${appointmentForm.date}`
-      );
-      
-      if (response.success && response.data && Array.isArray(response.data.availableSlots)) {
-        return response.data.availableSlots;
-      }
-      return [];
-    },
-    enabled: !!appointmentForm.doctorId && !!appointmentForm.date,
-  });
-
-  const createAppointmentMutation = useMutation({
-    mutationFn: async (payload: any) => {
-      const response = await clientApi.post("/appointment/create-appointment", payload);
-      if (!response.success) throw new Error(response.error || "Failed to create appointment");
-      return response.data;
-    },
-    onSuccess: () => {
-      toast.success("Appointment created successfully");
-      queryClient.invalidateQueries({ queryKey: ["current-token"] });
-      queryClient.invalidateQueries({ queryKey: ["token-appointments"] });
-      setIsModalOpen(false);
-      setAppointmentForm({ patientId: "", doctorId: "", date: "", slot: "", reason: "" });
-      setModalDoctorSearch("");
-    },
-    onError: (error: any) => toast.error(error.message),
-  });
 
   // Queries
   const { data: currentTokenData } = useCurrentToken(
@@ -226,7 +152,6 @@ const filteredModalDoctors = useMemo(() => {
           </h1>
           <p className="text-slate-500">Manage real-time doctor visit queues</p>
         </div>
-        <Button onClick={() => setIsModalOpen(true)}>Create Appointment</Button>
       </div>
 
       <Card className="bg-white shadow-sm border-slate-200">
@@ -379,138 +304,6 @@ const filteredModalDoctors = useMemo(() => {
           </CardContent>
         </Card>
       </div>
-
-      {/* Create Appointment Modal */}
-      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="sm:max-w-[500px]">
-          <DialogHeader>
-            <DialogTitle>Create New Appointment</DialogTitle>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="space-y-2">
-              <Label>Patient</Label>
-              <Select
-                value={appointmentForm.patientId}
-                onValueChange={(val) => setAppointmentForm({ ...appointmentForm, patientId: val })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select Patient" />
-                </SelectTrigger>
-                <SelectContent>
-                  {patients.map((p: any) => (
-                    <SelectItem key={p.id} value={p.id}>
-                      {p.name} - {p.phoneNumber}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>Doctor</Label>
-              <Select
-                value={appointmentForm.doctorId}
-                onValueChange={(val) => setAppointmentForm({ ...appointmentForm, doctorId: val })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select Doctor" />
-                </SelectTrigger>
-                <SelectContent className="max-h-[300px]">
-                  <div className="p-2 border-b sticky top-0 bg-white z-10">
-                    <Input
-                      placeholder="Search doctor..."
-                      value={modalDoctorSearch}
-                      onChange={(e) => setModalDoctorSearch(e.target.value)}
-                      onKeyDown={(e) => e.stopPropagation()}
-                      className="h-8 text-sm"
-                    />
-                  </div>
-                  {filteredModalDoctors.map((d: any) => (
-                    <SelectItem 
-                      key={d.id || d._id} 
-                      value={d.id || d._id}
-                    >
-                      {d.user?.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>Date</Label>
-              <Input
-                type="date"
-                value={appointmentForm.date}
-                min={today}
-                onChange={(e) => setAppointmentForm({ ...appointmentForm, date: e.target.value })}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Slot</Label>
-              <div className="relative">
-                <Input
-  type="time"
-  value={appointmentForm.slot}
-  onChange={(e) =>
-    setAppointmentForm({
-      ...appointmentForm,
-      slot: e.target.value,
-    })
-  }
-  disabled={
-    !appointmentForm.doctorId ||
-    !appointmentForm.date
-  }
-/>
-                <datalist id="available-slots-list">
-                  {availableSlots.map((s: string) => (
-                    <option key={s} value={s} />
-                  ))}
-                </datalist>
-              </div>
-              {availableSlots.length > 0 && (
-                <p className="text-[10px] text-slate-500 mt-1">
-                  Available suggestions: {availableSlots.slice(0, 8).join(", ")}
-                </p>
-              )}
-            </div>
-            <div className="space-y-2">
-              <Label>Reason (Optional)</Label>
-              <Textarea
-                value={appointmentForm.reason}
-                onChange={(e) => setAppointmentForm({ ...appointmentForm, reason: e.target.value })}
-                placeholder="Reason for visit"
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsModalOpen(false)}>Cancel</Button>
-          <Button
-  onClick={() => {
-    const [hours, minutes] = appointmentForm.slot.split(":");
-
-    let hour = parseInt(hours, 10);
-    const ampm = hour >= 12 ? "PM" : "AM";
-
-    hour = hour % 12;
-    if (hour === 0) hour = 12;
-
-    const formattedSlot =
-      `${String(hour).padStart(2, "0")}:${minutes} ${ampm}`;
-
-    createAppointmentMutation.mutate({
-      doctor: appointmentForm.doctorId,
-      patient: appointmentForm.patientId,
-      date: appointmentForm.date,
-      slot: formattedSlot,
-      reason: appointmentForm.reason,
-    });
-  }}
->
-              {createAppointmentMutation.isPending ? "Creating..." : "Create Appointment"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

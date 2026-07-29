@@ -260,7 +260,7 @@ class ClientApiClient {
             attempt--; // don't count this as a real retry attempt
             continue;
           }
-          return this.failureResponse(401, "Unauthorized — session expired");
+          return this.failureResponse(401, "Inavlid Credentials");
         }
 
         return this.parseResponse<T>(response, responseType);

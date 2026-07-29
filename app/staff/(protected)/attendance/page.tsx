@@ -140,29 +140,45 @@ const clockOutMutation =
 
 
 
- const handleClockToggle = async () => {
-    if (!isClockedIn) {
-        const response =
-      await clockInMutation.mutateAsync({
-  latitude: 25.4582952,
-  longitude: 78.5852176,
-});
-      if (response.clockInTime) {
-  setClockInTime(
-    new Date(response.clockInTime)
-  );
-}
-    } else {
-      if (confirm("Are you sure you want to clock out?")) {
-        await clockOutMutation.mutateAsync({
-  latitude: 25.4582952,
-  longitude: 78.5852176,
-});
-        setClockInTime(null);
-        setTimer("00:00:00");
+
+const handleClockToggle = async () => {
+  navigator.geolocation.getCurrentPosition(
+    async (position) => {
+      const payload = {
+        latitude: position.coords.latitude,
+        longitude: position.coords.longitude,
+        accuracy: position.coords.accuracy,
+      };
+
+      console.log("Sending payload:", payload);
+
+      if (!isClockedIn) {
+        const response = await clockInMutation.mutateAsync(payload);
+
+        if (response.clockInTime) {
+          setClockInTime(new Date(response.clockInTime));
+        }
+      } else {
+        if (confirm("Are you sure you want to clock out?")) {
+          await clockOutMutation.mutateAsync(payload);
+
+          setClockInTime(null);
+          setTimer("00:00:00");
+        }
       }
+    },
+    (error) => {
+      console.error(error);
+      alert("Unable to fetch your location.");
+    },
+    {
+      enableHighAccuracy: true,
+      timeout: 10000,
+      maximumAge: 0,
     }
-  };
+  );
+};
+
 
 
 
