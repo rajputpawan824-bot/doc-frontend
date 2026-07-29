@@ -42,7 +42,7 @@ import {
   usePatientById,
   useUpdatePatient,
   type ClinicProfile,
-  
+  type PatientCreateData,
 } from "@/services/admin/patient";
 import { useRouter } from "next/navigation";
 import { 
@@ -247,16 +247,20 @@ const { data: activePatient } =
   });
 
 
-  const handleEditPatient = async (
+const handleEditPatient = async (
   data: ReusableFormData
 ) => {
-
-
-  const payload = {
+  const payload: PatientCreateData = {
     ...data,
+
     medicalReports: Array.isArray(data.medicalReports)
       ? data.medicalReports.filter(
-          (document): document is { documentName: string; file: File } =>
+          (
+            document
+          ): document is {
+            documentName: string;
+            file: File;
+          } =>
             Boolean(
               document &&
                 typeof document === "object" &&
@@ -264,28 +268,37 @@ const { data: activePatient } =
                 "file" in document &&
                 typeof document.documentName === "string" &&
                 document.documentName.trim() &&
-                document.file instanceof File,
-            ),
+                document.file instanceof File
+            )
         )
       : [],
 
-emergencyContact: {
-  name: data.emergencyContactName,
-  phone: data.emergencyContactPhone,
-  relation: data.emergencyContactRelation,
-  otherRelation:
-    data.emergencyContactRelation === "OTHER"
-      ? data.emergencyContactOtherRelation
-      : null,
-},
+    deletedDocumentIds: Array.isArray(
+      data.medicalReportsDeletedIds
+    )
+      ? (data.medicalReportsDeletedIds as string[])
+      : [],
+
+    emergencyContact: {
+      name: data.emergencyContactName as string | undefined,
+      phone: data.emergencyContactPhone as string | undefined,
+      relation:
+        data.emergencyContactRelation as string | undefined,
+      otherRelation:
+        data.emergencyContactRelation === "OTHER"
+          ? (data.emergencyContactOtherRelation as
+              | string
+              | undefined)
+          : undefined,
+    },
   };
 
-if (!patientDetails?.id) return;
+  if (!patientDetails?.id) return;
 
-await updatePatientMutation.mutateAsync({
-  id: patientDetails.id,
-  data: payload,
-});
+  await updatePatientMutation.mutateAsync({
+    id: patientDetails.id,
+    data: payload,
+  });
 };
 
 const addPatientProfile =
