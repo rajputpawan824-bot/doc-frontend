@@ -101,6 +101,9 @@ const [policyType, setPolicyType] = useState<
   "MONTHLY" | "YEARLY" | undefined
 >();
 
+const [employeeJoiningDate, setEmployeeJoiningDate] =
+  useState("");
+
 const [allowedLeaves, setAllowedLeaves] =
   useState("");
   const [selectedLeave, setSelectedLeave] = useState<LeaveResponse | null>(
@@ -127,6 +130,10 @@ const [toDate, setToDate] = useState("");
 
 const { data: employees = [] } =
   useEmployeesForLeave(selectedCategory);
+
+  console.log("Employees:", employees);
+
+console.log("Joining Date:", employeeJoiningDate);
 
   const { data: leaveBalance } =
   useLeaveBalance(selectedEmployeeId);
@@ -942,20 +949,30 @@ fields={[
     ],
   },
 
-  {
-    name: "userId",
-    label: "Select Employee",
-    type: "select",
-    required: true,
-    width: "half",
-    onChange: (value) => {
-      setSelectedEmployeeId(value as string);
-    },
-    options: employees.map((emp) => ({
-      label: emp.name,
-      value: emp.id,
-    })),
+{
+  name: "userId",
+  label: "Select Employee",
+  type: "select",
+  required: true,
+  width: "half",
+
+  onChange: (value) => {
+    const employee = employees.find(
+      (e) => e.id === value
+    );
+  console.log("Selected Employee:", employee);
+    setSelectedEmployeeId(value as string);
+
+    setEmployeeJoiningDate(
+      employee?.joiningDate?.split("T")[0] || ""
+    );
   },
+
+  options: employees.map((emp) => ({
+    label: emp.name,
+    value: emp.id,
+  })),
+},
 
   // Row 2
   {
@@ -988,6 +1005,7 @@ fields={[
   type: "date",
   required: true,
   width: "half",
+  min: employeeJoiningDate,
   onChange: (value) => {
     setFromDate(value as string);
   },
@@ -999,6 +1017,7 @@ fields={[
   type: "date",
   required: true,
   width: "half",
+  min: fromDate || employeeJoiningDate,
   onChange: (value) => {
     setToDate(value as string);
   },

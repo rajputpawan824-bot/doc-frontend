@@ -22,8 +22,8 @@ export interface FieldConfig {
   disabled?: boolean;
   hidden?: boolean | ((formData: ReusableFormData) => boolean);
   rows?: number; // For textarea
-  min?: number; // For number input
-  max?: number; // For number input
+min?: number | string;
+max?: number | string;
   accept?: string; // For file input
   multiple?: boolean; // For file input
   onChange?: (value: unknown) => void;

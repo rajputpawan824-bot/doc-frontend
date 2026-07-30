@@ -52,6 +52,13 @@ const salaryDetailsExpectedFields = [
   "baseSalary",
   "bonus",
   "penalty",
+  "attendanceDeduction",
+  "attendanceAbsentDays",
+  "attendanceHalfDays",
+  "leaveDeduction",
+  "unpaidDays",
+  "totalDeductions",
+  "totalEarnings",
   "netSalary",
   "adjustments",
 ] as const;

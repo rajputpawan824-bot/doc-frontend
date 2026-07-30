@@ -43,6 +43,13 @@ export interface SalaryDetailsResponse {
   baseSalary: number;
   bonus: number;
   penalty: number;
+  attendanceDeduction: number;
+  attendanceAbsentDays: number;
+  attendanceHalfDays: number;
+  leaveDeduction: number;
+  unpaidDays: number;
+  totalDeductions: number;
+  totalEarnings: number;
   netSalary: number;
   adjustments: SalaryHistoryResponse[];
 }
