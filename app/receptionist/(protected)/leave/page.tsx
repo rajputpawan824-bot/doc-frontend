@@ -39,7 +39,10 @@ export default function ReceptionistLeavePage() {
       console.error("[DEBUG] Mutation ERROR:", error);
     },
   });
-
+const [fromDate, setFromDate] = useState("");
+const [toDate, setToDate] = useState("");
+const [isPaid, setIsPaid] = useState(true);
+const [isHalfDay, setIsHalfDay] = useState(false);
 
     const [
     selectedMonth,
@@ -50,7 +53,11 @@ export default function ReceptionistLeavePage() {
     selectedYear,
     setSelectedYear
   ] = useState<number>();
-  
+
+
+  const today = new Date().toISOString().split("T")[0];
+
+
  const {
   data: leaveBalance,
 } = useLeaveBalance(
@@ -66,7 +73,16 @@ const {
   selectedYear
 );
 
-
+const leaveDays =
+  fromDate && toDate
+    ? isHalfDay
+      ? 0.5
+      : Math.floor(
+          (new Date(toDate).getTime() -
+            new Date(fromDate).getTime()) /
+            (1000 * 60 * 60 * 24)
+        ) + 1
+    : 0;
 
  const columns: ColumnDef<LeaveResponse>[] = [
     {
@@ -170,34 +186,48 @@ const {
       placeholder: "Enter 10-digit number",
       width: "half",
     },
-    {
-      name: "fromDate",
-      label: "Start Date",
-      type: "date",
-      required: true,
-      width: "half",
-    },
-    {
-      name: "toDate",
-      label: "End Date",
-      type: "date",
-      required: true,
-      width: "half",
-    },
+{
+  name: "fromDate",
+  label: "Start Date",
+  type: "date",
+  required: true,
+  width: "half",
+  min: today,
+  onChange: (value) => {
+    setFromDate(value as string);
+  },
+},
+{
+  name: "toDate",
+  label: "End Date",
+  type: "date",
+  required: true,
+  width: "half",
+  min: fromDate || today,
+  onChange: (value) => {
+    setToDate(value as string);
+  },
+},
 {
   name: "requestedIsPaid",
   label: "Request Paid Leave",
   type: "checkbox",
   width: "half",
   defaultValue: true,
+  onChange: (value) => {
+    setIsPaid(Boolean(value));
+  },
 },
-    {
-      name: "isHalfDay",
-      label: "Half Day Leave",
-      type: "checkbox",
-      width: "half",
-      defaultValue: false,
-    },
+{
+  name: "isHalfDay",
+  label: "Half Day Leave",
+  type: "checkbox",
+  width: "half",
+  defaultValue: false,
+  onChange: (value) => {
+    setIsHalfDay(Boolean(value));
+  },
+},
     {
       name: "halfDayType",
       label: "Shift Option",
@@ -428,15 +458,51 @@ const {
          </div>
        </div>
  
-       <ReusableModal
-         isOpen={isModalOpen}
-         onClose={() => setIsModalOpen(false)}
-         onSave={handleApplyLeave}
-         title="Apply for Leave"
-         fields={leaveFormFields}
-         saveButtonText="Submit Application"
-         size="lg"
-       />
+<ReusableModal
+  isOpen={isModalOpen}
+  onClose={() => {
+    setIsModalOpen(false);
+    setFromDate("");
+    setToDate("");
+    setIsPaid(true);
+    setIsHalfDay(false);
+  }}
+  onSave={handleApplyLeave}
+  title="Apply for Leave"
+  fields={leaveFormFields}
+  saveButtonText="Submit Application"
+  size="lg"
+>
+  {leaveBalance && (
+    <div className="rounded-lg border bg-blue-50 p-4 space-y-2">
+      <div className="flex items-center justify-between">
+        <span className="font-medium">Remaining Paid Leaves</span>
+        <span className="text-lg font-bold text-blue-700">
+          {Math.max(
+            0,
+            leaveBalance.remainingLeaves - (isPaid ? leaveDays : 0)
+          )}{" "}
+          days
+        </span>
+      </div>
+
+      <div className="flex items-center justify-between text-sm text-muted-foreground">
+        <span>Current Balance</span>
+        <span>{leaveBalance.remainingLeaves} days</span>
+      </div>
+
+      <div className="flex items-center justify-between text-sm text-muted-foreground">
+        <span>Requested Leave</span>
+        <span>{leaveDays} day{leaveDays !== 1 ? "s" : ""}</span>
+      </div>
+
+      <div className="flex items-center justify-between text-sm text-muted-foreground">
+        <span>Leave Type</span>
+        <span>{isPaid ? "Paid" : "Unpaid"}</span>
+      </div>
+    </div>
+  )}
+</ReusableModal>
      </div>
    );
 }

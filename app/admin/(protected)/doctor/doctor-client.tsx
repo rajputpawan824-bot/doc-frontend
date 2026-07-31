@@ -1677,10 +1677,19 @@ await queryClient.refetchQueries({
             <Button
               size="sm"
               variant="outline"
-              onClick={() => {
-                setSelectedDoctorId(doctor.id);
-                setIsEditModalOpen(true);
-              }}
+onClick={async () => {
+  setSelectedDoctorId(doctor.id);
+
+  await queryClient.invalidateQueries({
+    queryKey: ["doctor", doctor.id],
+  });
+
+  await queryClient.refetchQueries({
+    queryKey: ["doctor", doctor.id],
+  });
+
+  setIsEditModalOpen(true);
+}}
               title="Edit doctor"
             >
               <UserCog className="h-4 w-4" />

@@ -441,6 +441,8 @@ const [selfExists, setSelfExists] =
     },
     enabled: !!appointmentForm.doctorId && !!appointmentForm.date,
   });
+
+  
 console.log("availableSlotsResponse", availableSlotsResponse);
   const createAppointmentMutation = useMutation({
     mutationFn: async () => {

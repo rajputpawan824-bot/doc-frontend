@@ -227,7 +227,7 @@ const filteredModalDoctors = useMemo(() => {
           </h1>
           <p className="text-slate-500">Manage real-time doctor visit queues</p>
         </div>
-        <Button onClick={() => setIsModalOpen(true)}>Create Appointment</Button>
+       
       </div>
 
       <Card className="bg-white shadow-sm border-slate-200">

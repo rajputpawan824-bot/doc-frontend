@@ -48,28 +48,30 @@ import { toast } from "sonner";
 import { useDoctors } from "@/services/admin/doctor";
 import { usePatientPortalSelection } from "@/lib/hooks/usePatientPortalSelection";
 
-type DoctorOption = {
-  _id: string;
-  user?: {
-    name?: string;
-  };
-};
 
-type AvailableSlotsResponse = {
-  availableSlots?: string[];
-  data?: {
-    availableSlots?: string[];
+
+interface AvailableSlotsResponse {
+  doctorAvailable: boolean;
+  workingHours?: {
+    start?: string;
+    end?: string;
   };
-};
+  slotDuration?: number;
+  bookedSlots?: string[];
+  availableSlots: string[];
+}
+
 
 type CreateAppointmentPayload = {
   doctor: string;
   patient: string;
-  admin?: string;
+
   date: string;
   slot: string;
   reason: string;
 };
+
+
 
 export default function PatientDashboardPage() {
   const searchParams =
@@ -100,6 +102,12 @@ useEffect(() => {
 }, [searchParams, setSelection]);
   
 
+
+const today = new Intl.DateTimeFormat("en-CA", {
+  timeZone: "Asia/Kolkata",
+}).format(new Date());
+
+
   const [isBookAppointmentOpen, setIsBookAppointmentOpen] =
   useState(false);
 
@@ -128,24 +136,25 @@ const doctors = (
     )
 );
 
-  const { data: availableSlots = [] } = useQuery({
-    queryKey: ["available-slots", appointmentForm.doctorId, appointmentForm.date],
-    queryFn: async () => {
+  const { data: availableSlotsResponse, isFetching: isSlotsLoading } = useQuery({
+    queryKey: ['available-slots', appointmentForm.doctorId, appointmentForm.date],
+    queryFn: async (): Promise<AvailableSlotsResponse> => {
       const response = await clientApi.get<AvailableSlotsResponse>(
-        `/appointment/available-slots?doctorId=${appointmentForm.doctorId}&date=${appointmentForm.date}`
+        `/appointment/available-slots?doctorId=${appointmentForm.doctorId}&date=${appointmentForm.date}`,
       );
-      
-      if (response.success && response.data && Array.isArray(response.data.availableSlots)) {
-        return response.data.availableSlots;
+
+      if (!response.success) {
+        throw new Error(response.error || 'Failed to load available slots');
       }
-      if (response.success && response.data?.data && Array.isArray(response.data.data.availableSlots)) {
-        return response.data.data.availableSlots;
+
+      if (!response.data) {
+        throw new Error('Failed to load available slots');
       }
-      return [];
+
+      return (response.data as any).data;
     },
     enabled: !!appointmentForm.doctorId && !!appointmentForm.date,
   });
-
 
   const createAppointmentMutation =
   useMutation({
@@ -180,6 +189,10 @@ const doctors = (
       queryClient.invalidateQueries({
         queryKey: ["patient-token-status", patientId],
       });
+
+      queryClient.invalidateQueries({
+  queryKey: ["available-slots"],
+});
 
       setIsBookAppointmentOpen(
         false
@@ -394,13 +407,22 @@ if (isLoading) {
         </Link>
       </div>
 
-      <Dialog
+<Dialog
   open={isBookAppointmentOpen}
-  onOpenChange={
-    setIsBookAppointmentOpen
-  }
+  onOpenChange={(open) => {
+    setIsBookAppointmentOpen(open);
+
+    if (!open) {
+      setAppointmentForm({
+        doctorId: "",
+        date: "",
+        slot: "",
+        reason: "",
+      });
+    }
+  }}
 >
-  <DialogContent>
+ <DialogContent className="max-w-2xl">
     <DialogHeader>
       <DialogTitle>
         Book Appointment
@@ -416,12 +438,14 @@ if (isLoading) {
           value={
             appointmentForm.doctorId
           }
-          onValueChange={(val) =>
-            setAppointmentForm({
-              ...appointmentForm,
-              doctorId: val,
-            })
-          }
+onValueChange={(val) =>
+  setAppointmentForm((current) => ({
+    ...current,
+    doctorId: val,
+    date: "",
+    slot: "",
+  }))
+}
         >
           <SelectTrigger>
             <SelectValue placeholder="Select Doctor" />
@@ -443,59 +467,57 @@ if (isLoading) {
       <div>
         <Label>Date</Label>
 
-        <Input
-          type="date"
-          value={
-            appointmentForm.date
-          }
-          onChange={(e) =>
-            setAppointmentForm({
-              ...appointmentForm,
-              date:
-                e.target.value,
-            })
-          }
-        />
+            <Input
+              type="date"
+              min={today}
+              value={appointmentForm.date}
+              disabled={!appointmentForm.doctorId}
+              onChange={(event) => setAppointmentForm((current) => ({
+                ...current,
+                date: event.target.value,
+                slot: '',
+              }))}
+            />
       </div>
 
-      <div>
-        <Label>Slot</Label>
-
-        <Input
-          type="time"
-          list="patient-available-slots-list"
-          value={
-            appointmentForm.slot
-          }
-          onChange={(e) =>
-            setAppointmentForm({
-              ...appointmentForm,
-              slot:
-                e.target.value,
-            })
-          }
-        />
-        <datalist id="patient-available-slots-list">
-          {availableSlots.map((slot) => (
-            <option key={slot} value={slot} />
-          ))}
-        </datalist>
-      </div>
+         <div className="space-y-2">
+            <label className="text-sm font-medium">Available Slots</label>
+            {!appointmentForm.doctorId || !appointmentForm.date ? (
+              <p className="text-sm text-slate-500">Choose a doctor and date to load available slots.</p>
+            ) : isSlotsLoading ? (
+              <p className="text-sm text-slate-500">Loading available slots...</p>
+            ) : availableSlotsResponse?.doctorAvailable === false ? (
+              <p className="text-sm text-red-600">Doctor unavailable on selected day.</p>
+            ) : (availableSlotsResponse?.availableSlots ?? []).length ? (
+              <div className="flex flex-wrap gap-2">
+                {(availableSlotsResponse?.availableSlots ?? []).map((slot) => (
+                  <Button
+                    key={slot}
+                    type="button"
+                    variant={appointmentForm.slot === slot ? 'default' : 'outline'}
+                    onClick={() => setAppointmentForm((current) => ({ ...current, slot }))}
+                  >
+                    {slot}
+                  </Button>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-slate-500">No slots available for this date.</p>
+            )}
+          </div>
 
       <div>
         <Label>Reason</Label>
 
-        <Textarea
-          value={
-            appointmentForm.reason
-          }
-          onChange={(e) =>
-            setAppointmentForm({
-              ...appointmentForm,
-              reason:
-                e.target.value,
-            })
-          }
+   <Textarea
+  placeholder="Reason for visit"
+  value={appointmentForm.reason}
+onChange={(e) =>
+  setAppointmentForm((current) => ({
+    ...current,
+    reason: e.target.value,
+  }))
+}
         />
       </div>
 
@@ -504,55 +526,46 @@ if (isLoading) {
     <DialogFooter>
       <Button
         variant="outline"
-        onClick={() =>
-          setIsBookAppointmentOpen(
-            false
-          )
-        }
+onClick={() => {
+  setIsBookAppointmentOpen(false);
+
+  setAppointmentForm({
+    doctorId: "",
+    date: "",
+    slot: "",
+    reason: "",
+  });
+}}
       >
         Cancel
       </Button>
 
-      <Button
-        onClick={() => {
-          const [
-            hours,
-            minutes,
-          ] =
-            appointmentForm.slot.split(
-              ":"
-            );
+<Button
+  disabled={
+    !appointmentForm.doctorId ||
+    !appointmentForm.date ||
+    !appointmentForm.slot ||
+    availableSlotsResponse?.doctorAvailable === false ||
+    createAppointmentMutation.isPending
+  }
+  onClick={() => {
 
-          let hour =
-            parseInt(
-              hours,
-              10
-            );
 
-          const ampm =
-            hour >= 12
-              ? "PM"
-              : "AM";
 
-          hour =
-            hour % 12;
+          
 
-          if (hour === 0)
-            hour = 12;
-
-          const formattedSlot =
-            `${String(hour).padStart(2,"0")}:${minutes} ${ampm}`;
-
+  if (createAppointmentMutation.isPending) return;
 createAppointmentMutation.mutate({
   doctor: appointmentForm.doctorId,
   patient: patientId,
   date: appointmentForm.date,
-  slot: formattedSlot,
+  slot: appointmentForm.slot,
   reason: appointmentForm.reason,
-});
-        }}
+});    }}
       >
-        Book Appointment
+{createAppointmentMutation.isPending
+  ? "Booking..."
+  : "Book Appointment"}
       </Button>
     </DialogFooter>
   </DialogContent>
