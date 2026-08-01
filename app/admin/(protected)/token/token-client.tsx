@@ -44,6 +44,7 @@ import {
   useDecrementToken,
   useResetToken,
 } from "@/services/admin/token";
+import { useDoctors } from "@/services/admin/doctor";
 
 interface TokenManagementClientProps {
   initialDoctors: DoctorResponse[];
@@ -54,6 +55,15 @@ export default function TokenManagementClient({
 }: TokenManagementClientProps) {
   const [selectedDoctorId, setSelectedDoctorId] = useState<string>("");
   const [doctorSearch, setDoctorSearch] = useState("");
+  const {
+  data: doctorsResponse,
+  isFetching,
+  refetch: refetchDoctors,
+} = useDoctors({
+  status: "active",
+  page: 1,
+  limit: 1000,
+});
   const today = useMemo(
   () =>
     new Intl.DateTimeFormat("en-CA", {
@@ -63,17 +73,21 @@ export default function TokenManagementClient({
 );
   const [selectedDate, setSelectedDate] = useState(today);
 
+const doctors = doctorsResponse?.data || initialDoctors || [];
+
 const filteredDoctorsList = useMemo(() => {
-  const activeDoctors = (initialDoctors || []).filter(
-    (doctor: any) => doctor.user?.isActive === true
+  const activeDoctors = doctors.filter(
+    (doctor: any) => doctor.user?.isActive
   );
 
   if (!doctorSearch) return activeDoctors;
 
   return activeDoctors.filter((doctor: any) =>
-    doctor.user?.name?.toLowerCase().includes(doctorSearch.toLowerCase())
+    doctor.user?.name
+      ?.toLowerCase()
+      .includes(doctorSearch.toLowerCase())
   );
-}, [initialDoctors, doctorSearch]);
+}, [doctors, doctorSearch]);
 
   // Queries
   const { data: currentTokenData } = useCurrentToken(
