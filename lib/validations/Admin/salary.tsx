@@ -27,7 +27,7 @@ export interface SalaryUpdateData {
 }
 
 export interface SalaryHistoryResponse {
-  id: string;
+  _id: string;
   userId: string;
   userRole: UserRole;
   type: SalaryType;

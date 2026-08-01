@@ -1037,7 +1037,7 @@ const addAdjustmentMutation = useAddSalaryAdjustment({
               </div>
             ) : salaryHistory && salaryHistory.data.length > 0 ? (
               salaryHistory.data.map((record: SalaryHistoryResponse) => (
-                <Card key={record.id} className="border">
+               <Card key={record._id} className="border">
                   <CardContent className="pt-4">
                     <div className="flex items-center justify-between mb-2">
    <Badge
