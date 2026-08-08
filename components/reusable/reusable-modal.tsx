@@ -678,25 +678,31 @@ case "document-manager": {
   />
 )}
 
-<input
-  type="file"
-  className={commonClasses}
-  onChange={(e) => {
-    const file =
-      e.target.files?.[0] || null;
+<div className="relative w-56 shrink-0">
+  <input
+    id={`document-file-${index}`}
+    type="file"
+    className="hidden"
+    onChange={(e) => {
+      const file = e.target.files?.[0] || null;
 
-    const updatedRows = [
-      ...documentRows,
-    ];
+      const updatedRows = [...documentRows];
+      updatedRows[index].file = file;
 
-    updatedRows[index].file =
-      file;
+      setDocumentRows(updatedRows);
+      updateNewDocuments(updatedRows);
+    }}
+  />
 
-    setDocumentRows(updatedRows);
-
-    updateNewDocuments(updatedRows);
-  }}
-/>
+  <label
+    htmlFor={`document-file-${index}`}
+    className={`${commonClasses} flex h-full items-center cursor-pointer overflow-hidden`}
+  >
+    <span className="block w-full truncate">
+      {row.file ? row.file.name : "Choose File"}
+    </span>
+  </label>
+</div>
           {index === documentRows.length - 1 ? (
             <button
               type="button"
@@ -992,7 +998,7 @@ case "patient-document-manager":
         disabled={field.disabled}
       />
 
-      <button
+      {/* <button
         type="button"
         onClick={() =>
           setShowPassword((prev) => ({
@@ -1007,7 +1013,7 @@ case "patient-document-manager":
         ) : (
           <Eye className="h-4 w-4" />
         )}
-      </button>
+      </button> */}
     </div>
   ) : (
 
@@ -1019,6 +1025,16 @@ case "patient-document-manager":
       required={required}
       className={commonClasses}
         onBlur={() => handleBlur(field.name)}
+        onClick={(e) => {
+  const input = e.currentTarget;
+
+  if (
+    (field.type === "date" || field.type === "time") &&
+    typeof input.showPicker === "function"
+  ) {
+    input.showPicker();
+  }
+}}
       value={fieldValueAsString(formData[field.name])}
 onChange={(e) => {
   let value = e.target.value;

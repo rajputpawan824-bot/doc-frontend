@@ -94,6 +94,7 @@ interface PaginatedReceptionistTableProps {
   currentPage: number;
   totalPages: number;
   limit: number;
+  onRowClick?: (receptionist: Receptionist) => void;
   onPageChange: (page: number) => void;
   onLimitChange: (limit: number) => void;
 }
@@ -105,6 +106,7 @@ function PaginatedReceptionistTable({
   currentPage,
   totalPages,
   limit,
+    onRowClick,
   onPageChange,
   onLimitChange,
 }: PaginatedReceptionistTableProps) {
@@ -134,7 +136,11 @@ function PaginatedReceptionistTable({
           <TableBody>
             {table.getRowModel().rows.length ? (
               table.getRowModel().rows.map((row) => (
-                <TableRow key={row.id}>
+               <TableRow
+  key={row.id}
+  onClick={() => onRowClick?.(row.original)}
+  className="cursor-pointer hover:bg-muted/50 transition-colors"
+>
                   {row.getVisibleCells().map((cell) => (
                     <TableCell key={cell.id}>
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
@@ -1497,6 +1503,7 @@ onError: (error) => {
             <div className="flex items-center gap-2">
               <Switch
                 checked={canEdit}
+                  onClick={(e) => e.stopPropagation()}
                 onCheckedChange={() =>
                   handleTogglePatientEditMode(receptionist.id, canEdit)
                 }
@@ -1537,11 +1544,17 @@ onError: (error) => {
       cell: ({ row }) => {
         const receptionist = row.original;
         return (
-          <div className="flex gap-2">
+       <div
+  className="flex gap-2"
+  onClick={(e) => e.stopPropagation()}
+>
             <Button
               size="sm"
               variant="outline"
-              onClick={() => handleViewDetails(receptionist.id)} // Pass ID instead of object
+            onClick={(e) => {
+  e.stopPropagation();
+  handleViewDetails(receptionist.id);
+}} // Pass ID instead of object
               title="View details"
               disabled={isDetailLoading}
             >
@@ -1554,7 +1567,7 @@ onError: (error) => {
             <Button
               size="sm"
               variant="outline"
-              onClick={() => {
+              onClick={(e) => {  e.stopPropagation();
                 // For edit, still use the existing data since we need to populate the form
                 setSelectedReceptionistId(receptionist.id);
                 setIsEditModalOpen(true);
@@ -1566,7 +1579,8 @@ onError: (error) => {
             <Button
               size="sm"
               variant="outline"
-              onClick={() => {
+              onClick={(e) => {
+                e.stopPropagation();
                 setSelectedReceptionistId(receptionist.id);
                 setIsPasswordModalOpen(true);
               }}
@@ -1577,7 +1591,10 @@ onError: (error) => {
             <Button
               size="sm"
               variant="destructive"
-              onClick={() => handleDeactivate(receptionist.id)}
+            onClick={(e) => {
+  e.stopPropagation();
+  handleDeactivate(receptionist.id);
+}}
               title="Deactivate receptionist"
             >
               <UserMinus className="h-4 w-4" />
@@ -1659,11 +1676,17 @@ onError: (error) => {
       cell: ({ row }) => {
         const receptionist = row.original;
         return (
-          <div className="flex gap-2">
+        <div
+  className="flex gap-2"
+  onClick={(e) => e.stopPropagation()}
+>
             <Button
               size="sm"
               variant="outline"
-              onClick={() => handleViewDetails(receptionist.id)} // Pass ID instead of object
+            onClick={(e) => {
+  e.stopPropagation();
+  handleViewDetails(receptionist.id);
+}}// Pass ID instead of object
               title="View details"
               disabled={isDetailLoading}
             >
@@ -1786,6 +1809,9 @@ onError: (error) => {
                   limit={limit}
                   onPageChange={handlePageChange}
                   onLimitChange={handleLimitChange}
+                    onRowClick={(receptionist) =>
+    handleViewDetails(receptionist.id)
+  }
                   emptyMessage={
                     <div className="text-center py-12">
                       <Users className="mx-auto h-12 w-12 text-gray-400" />

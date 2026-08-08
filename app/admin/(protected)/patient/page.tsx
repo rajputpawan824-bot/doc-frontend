@@ -147,6 +147,7 @@ interface PaginatedPatientTableProps {
   limit: number;
   onPageChange: (page: number) => void;
   onLimitChange: (limit: number) => void;
+    onRowClick?: (patient: Patient) => void;
 }
 
 function PaginatedPatientTable({
@@ -156,6 +157,7 @@ function PaginatedPatientTable({
   currentPage,
   totalPages,
   limit,
+    onRowClick,
   onPageChange,
   onLimitChange,
 }: PaginatedPatientTableProps) {
@@ -185,7 +187,11 @@ function PaginatedPatientTable({
           <TableBody>
             {table.getRowModel().rows.length ? (
               table.getRowModel().rows.map((row) => (
-                <TableRow key={row.id}>
+              <TableRow
+  key={row.id}
+  onClick={() => onRowClick?.(row.original)}
+  className="cursor-pointer hover:bg-muted/50 transition-colors"
+>
                   {row.getVisibleCells().map((cell) => (
                     <TableCell key={cell.id}>
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
@@ -442,7 +448,7 @@ const [selfExists, setSelfExists] =
     enabled: !!appointmentForm.doctorId && !!appointmentForm.date,
   });
 
-  
+
 console.log("availableSlotsResponse", availableSlotsResponse);
   const createAppointmentMutation = useMutation({
     mutationFn: async () => {
@@ -834,6 +840,31 @@ const handleBookAppointment = (patient: Patient) => {
 const handleAddPatient = async (data: ReusableFormData) => {
   console.log("[Patient create] complete form data", data);
 
+const hasName = !!String(data.emergencyContactName ?? "").trim();
+const hasPhone = !!String(data.emergencyContactPhone ?? "").trim();
+  const hasRelation = !!data.emergencyContactRelation;
+
+  const filledCount =
+    Number(hasName) +
+    Number(hasPhone) +
+    Number(hasRelation);
+
+  if (filledCount > 0 && filledCount < 3) {
+    toast.error(
+      "Please fill Contact Name, Contact Phone and Relation together, or leave all three empty."
+    );
+    return;
+  }
+
+  if (
+    data.emergencyContactRelation === "OTHER" &&
+    !String(data.emergencyContactOtherRelation ?? "").trim()
+  ) {
+    toast.error("Please specify the other relation.");
+    return;
+  }
+
+
   const payload = {
     ...data,
 medicalReports:
@@ -879,6 +910,29 @@ const handleEditPatient = async (data: ReusableFormData) => {
   const patient = editPatient ?? selectedPatient;
 
   if (!patient) return;
+const hasName = !!String(data.emergencyContactName ?? "").trim();
+const hasPhone = !!String(data.emergencyContactPhone ?? "").trim();
+  const hasRelation = !!data.emergencyContactRelation;
+
+  const filledCount =
+    Number(hasName) +
+    Number(hasPhone) +
+    Number(hasRelation);
+
+  if (filledCount > 0 && filledCount < 3) {
+    toast.error(
+      "Please fill Contact Name, Contact Phone and Relation together, or leave all three empty."
+    );
+    return;
+  }
+
+  if (
+    data.emergencyContactRelation === "OTHER" &&
+    !String(data.emergencyContactOtherRelation ?? "").trim()
+  ) {
+    toast.error("Please specify the other relation.");
+    return;
+  }
 
   const payload = {
     ...data,
@@ -997,7 +1051,10 @@ emergencyContact: {
             <Button
               size="sm"
               variant="outline"
-              onClick={() => handleOpenDetails(patient)}
+               onClick={(e) => {
+    e.stopPropagation();
+    handleOpenDetails(patient);
+  }}
               title="View details"
             >
               <Eye className="h-4 w-4" />
@@ -1006,7 +1063,10 @@ emergencyContact: {
   <Button
     size="sm"
     variant="outline"
-    onClick={() => handleOpenEditPatient(patient)}
+  onClick={(e) => {
+    e.stopPropagation();
+    handleOpenEditPatient(patient);
+  }}
     title="Edit patient"
   >
     <UserCog className="h-4 w-4" />
@@ -1016,7 +1076,10 @@ emergencyContact: {
               <Button
                 size="sm"
                 variant="outline"
-                onClick={() => handleBookAppointment(patient)}
+                onClick={(e) => {
+    e.stopPropagation();
+    handleBookAppointment(patient);
+  }}
                 title="Book appointment"
               >
                 Book Appointment
@@ -1102,7 +1165,7 @@ emergencyContact: {
         <TabsList className="grid grid-cols-1 w-full max-w-md">
           <TabsTrigger value="active" className="flex items-center gap-2">
             <CheckCircle className="h-4 w-4" />
-            Active Patients ({activeCount})
+            All Patients ({activeCount})
           </TabsTrigger>
  
         </TabsList>
@@ -1115,7 +1178,7 @@ emergencyContact: {
                 {activeTab === 'active' ? 'Active' : 'Deactivated'} Patient Records ({filteredPatients.length})
               </CardTitle>
               <CardDescription>
-                View and manage {activeTab === 'active' ? 'active' : 'deactivated'} patient information
+                View and manage patient information
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -1132,6 +1195,7 @@ emergencyContact: {
                   limit={limit}
                   onPageChange={handlePageChange}
                   onLimitChange={handleLimitChange}
+  onRowClick={(patient) => handleOpenDetails(patient)}
                   emptyMessage={
                     <div className="text-center py-12">
                       <Users className="mx-auto h-12 w-12 text-gray-400" />
@@ -1257,6 +1321,13 @@ emergencyContact: {
               type="date"
               min={today}
               value={appointmentForm.date}
+                onClick={(event) => {
+    const input = event.currentTarget;
+
+    if (typeof input.showPicker === "function") {
+      input.showPicker();
+    }
+  }}
               disabled={!appointmentForm.doctorId}
               onChange={(event) => setAppointmentForm((current) => ({
                 ...current,

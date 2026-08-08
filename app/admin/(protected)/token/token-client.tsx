@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useMemo } from "react";
+import ReusableModal from "@/components/reusable/reusable-modal";
 import {
   Ticket,
   Plus,
@@ -27,6 +28,14 @@ import {
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+
+import {
+  Tabs,
+  TabsList,
+  TabsTrigger,
+  TabsContent,
+} from "@/components/ui/tabs";
+
 import {
   Table,
   TableBody,
@@ -41,9 +50,12 @@ import {
   useCurrentToken,
   useTokenAppointments,
   useIncrementToken,
+    usePatientAvailability,
   useDecrementToken,
   useResetToken,
 } from "@/services/admin/token";
+
+import { useUpdateAppointmentStatus } from "@/services/admin/appointment";
 import { useDoctors } from "@/services/admin/doctor";
 
 interface TokenManagementClientProps {
@@ -71,7 +83,18 @@ export default function TokenManagementClient({
     }).format(new Date()),
   []
 );
+
+const [activeTab, setActiveTab] = useState<
+  "today" | "skipped"
+>("today");
+
   const [selectedDate, setSelectedDate] = useState(today);
+
+  const [pendingAppointment, setPendingAppointment] =
+  useState<any>(null);
+
+const [showAvailabilityDialog, setShowAvailabilityDialog] =
+  useState(false);
 
 const doctors = doctorsResponse?.data || initialDoctors || [];
 
@@ -101,9 +124,33 @@ const filteredDoctorsList = useMemo(() => {
   );
 
   // Mutations
-  const incrementMutation = useIncrementToken({
-    onSuccess: () => toast.success("Token incremented successfully"),
-    onError: (error) => toast.error(error.message),
+const incrementMutation = useIncrementToken({
+onSuccess: (data) => {
+  console.log("Increment Success", data);
+    if (data?.needsConfirmation) {
+      setPendingAppointment(data.appointment);
+      setShowAvailabilityDialog(true);
+      return;
+    }
+
+    toast.success("Token incremented successfully");
+  },
+
+  onError: (error) => toast.error(error.message),
+});
+
+const patientAvailabilityMutation =
+  usePatientAvailability({
+    onSuccess: () => {
+      setShowAvailabilityDialog(false);
+      setPendingAppointment(null);
+
+      toast.success("Appointment updated");
+    },
+
+    onError: (error) => {
+      toast.error(error.message);
+    },
   });
 
   const decrementMutation = useDecrementToken({
@@ -115,6 +162,40 @@ const filteredDoctorsList = useMemo(() => {
     onSuccess: () => toast.success("Token queue reset successfully"),
     onError: (error) => toast.error(error.message),
   });
+const updateAppointmentStatusMutation =
+  useUpdateAppointmentStatus({
+    onSuccess: () => {
+      toast.success("Appointment updated");
+    },
+
+    onError: (error) => {
+      toast.error(error.message);
+    },
+  });
+
+  const handlePatientAvailability = (
+  available: boolean
+) => {
+  if (!pendingAppointment) return;
+
+  patientAvailabilityMutation.mutate(
+    {
+      appointmentId:
+        pendingAppointment._id,
+      available,
+    },
+    {
+      onSuccess: () => {
+        if (!available) {
+          incrementMutation.mutate({
+            doctorId: selectedDoctorId,
+            date: selectedDate,
+          });
+        }
+      },
+    }
+  );
+};
 
   const handleAction = (action: "increment" | "decrement" | "reset") => {
     if (!selectedDoctorId) {
@@ -136,7 +217,10 @@ const filteredDoctorsList = useMemo(() => {
   const getStatusBadge = (status: string) => {
     const statusMap: Record<string, string> = {
       WAITING: "bg-yellow-100 text-yellow-800 border-yellow-200",
+        SKIPPED:
+    "bg-orange-100 text-orange-800 border-orange-200",
       IN_PROGRESS: "bg-blue-100 text-blue-800 border-blue-200",
+
       COMPLETED: "bg-green-100 text-green-800 border-green-200",
       CANCELLED: "bg-red-100 text-red-800 border-red-200",
     };
@@ -153,9 +237,14 @@ const filteredDoctorsList = useMemo(() => {
     ? (appointments as any).data 
     : (Array.isArray(appointments) ? appointments : []);
 
-  const currentToken = (currentTokenData as any)?.data?.currentToken 
-    ? (currentTokenData as any).data.currentToken 
-    : (currentTokenData?.currentToken || 0);
+    const skippedAppointments = appointmentsList.filter(
+  (appointment: any) => appointment.status === "SKIPPED"
+);
+
+const currentToken =
+  (currentTokenData as any)?.data?.currentToken ??
+  currentTokenData?.currentToken ??
+  0;
 
   return (
     <div className="container mx-auto p-6 space-y-6">
@@ -262,62 +351,280 @@ const filteredDoctorsList = useMemo(() => {
             </div>
           </CardContent>
         </Card>
+{/* Appointments */}
+<Card className="lg:col-span-2 border-slate-200 shadow-sm">
+  <CardHeader className="pb-4">
+    <CardTitle className="text-lg flex items-center gap-2">
+      <Users className="h-5 w-5 text-slate-600" />
+      Appointments
+    </CardTitle>
+  </CardHeader>
 
-        {/* History Table */}
-        <Card className="lg:col-span-2 border-slate-200 shadow-sm">
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
-              <Users className="h-5 w-5 text-slate-600" />
-              Today&apos;s Appointments
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="rounded-md border border-slate-100 overflow-hidden">
-              <Table>
-                <TableHeader className="bg-slate-50">
-                  <TableRow>
-                    <TableHead>Patient</TableHead>
-                    <TableHead className="text-center">Token Number</TableHead>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Time</TableHead>
-                    <TableHead>Doctor</TableHead>
-                    <TableHead>Status</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {!selectedDoctorId || appointmentsList.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={6} className="h-32 text-center text-slate-400">
-                        {selectedDoctorId ? "No appointments for today" : "Select a doctor to view queue"}
+  <CardContent>
+    <Tabs
+      value={activeTab}
+      onValueChange={(value) =>
+        setActiveTab(value as "today" | "skipped")
+      }
+    >
+      <TabsList className="mb-4">
+        <TabsTrigger value="today">
+          Today's Appointments
+          <Badge
+            variant="secondary"
+            className="ml-2"
+          >
+            {appointmentsList.length}
+          </Badge>
+        </TabsTrigger>
+
+        <TabsTrigger value="skipped">
+          Skipped Appointments
+          <Badge
+            variant="secondary"
+            className="ml-2 bg-orange-100 text-orange-700"
+          >
+            {skippedAppointments.length}
+          </Badge>
+        </TabsTrigger>
+      </TabsList>
+
+      {/* ================= TODAY ================= */}
+
+      <TabsContent value="today">
+        <div className="rounded-md border border-slate-100 overflow-hidden">
+          <Table>
+            <TableHeader className="bg-slate-50">
+              <TableRow>
+                <TableHead>Patient</TableHead>
+                <TableHead className="text-center">
+                  Token Number
+                </TableHead>
+                <TableHead>Date</TableHead>
+                <TableHead>Time</TableHead>
+                <TableHead>Doctor</TableHead>
+                <TableHead>Status</TableHead>
+              </TableRow>
+            </TableHeader>
+
+            <TableBody>
+              {!selectedDoctorId ||
+              appointmentsList.length === 0 ? (
+                <TableRow>
+                  <TableCell
+                    colSpan={6}
+                    className="h-32 text-center text-slate-400"
+                  >
+                    {selectedDoctorId
+                      ? "No appointments for today"
+                      : "Select a doctor to view queue"}
+                  </TableCell>
+                </TableRow>
+              ) : (
+                appointmentsList.map(
+                  (row: any, index: number) => (
+                    <TableRow
+                      key={row.id || row._id || index}
+                    >
+                      <TableCell className="font-medium">
+                        {row.patient?.name}
+                      </TableCell>
+
+                      <TableCell className="text-center font-mono">
+                        <Badge
+                          variant="secondary"
+                          className="font-bold"
+                        >
+                          {row.tokenNumber}
+                        </Badge>
+                      </TableCell>
+
+                      <TableCell>
+                        {new Date(
+                          row.date
+                        ).toLocaleDateString()}
+                      </TableCell>
+
+                      <TableCell>
+                        <div className="flex items-center gap-1.5 text-slate-600">
+                          <Clock className="h-3 w-3" />
+                          {row.slot}
+                        </div>
+                      </TableCell>
+
+                      <TableCell>
+                        {row.doctor?.user?.name}
+                      </TableCell>
+
+                      <TableCell>
+                        {getStatusBadge(row.status)}
                       </TableCell>
                     </TableRow>
-                  ) : (
-                    appointmentsList.map((row: any, index: number) => (
-                      <TableRow key={row.id || row._id || index}>
-                        <TableCell className="font-medium">{row.patient?.name}</TableCell>
-                        <TableCell className="text-center font-mono">
-                          <Badge variant="secondary" className="font-bold">
-                            {row.tokenNumber}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>{new Date(row.date).toLocaleDateString()}</TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-1.5 text-slate-600">
-                            <Clock className="h-3 w-3" />
-                            {row.slot}
-                          </div>
-                        </TableCell>
-                        <TableCell>{row.doctor?.user?.name}</TableCell>
-                        <TableCell>{getStatusBadge(row.status)}</TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </div>
-          </CardContent>
-        </Card>
+                  )
+                )
+              )}
+            </TableBody>
+          </Table>
+        </div>
+      </TabsContent>
+
+      {/* ================= SKIPPED ================= */}
+
+      <TabsContent value="skipped">
+        <div className="rounded-md border border-slate-100 overflow-hidden">
+          <Table>
+            <TableHeader className="bg-slate-50">
+              <TableRow>
+                <TableHead>Patient</TableHead>
+                <TableHead className="text-center">
+                  Token Number
+                </TableHead>
+                <TableHead>Date</TableHead>
+                <TableHead>Time</TableHead>
+                <TableHead>Doctor</TableHead>
+                <TableHead>Status</TableHead>
+              </TableRow>
+            </TableHeader>
+
+            <TableBody>
+              {skippedAppointments.length === 0 ? (
+                <TableRow>
+                  <TableCell
+                    colSpan={6}
+                    className="h-32 text-center text-slate-400"
+                  >
+                    No skipped appointments
+                  </TableCell>
+                </TableRow>
+              ) : (
+                skippedAppointments.map(
+                  (row: any, index: number) => (
+                    <TableRow
+                      key={row.id || row._id || index}
+                    >
+                      <TableCell className="font-medium">
+                        {row.patient?.name}
+                      </TableCell>
+
+                      <TableCell className="text-center font-mono">
+                        <Badge variant="secondary">
+                          {row.tokenNumber}
+                        </Badge>
+                      </TableCell>
+
+                      <TableCell>
+                        {new Date(
+                          row.date
+                        ).toLocaleDateString()}
+                      </TableCell>
+
+                      <TableCell>
+                        <div className="flex items-center gap-1.5">
+                          <Clock className="h-3 w-3" />
+                          {row.slot}
+                        </div>
+                      </TableCell>
+
+                      <TableCell>
+                        {row.doctor?.user?.name}
+                      </TableCell>
+
+                      <TableCell>
+                        <Select
+                          defaultValue={row.status}
+                          onValueChange={(value) => {
+                            if (
+                              value === "COMPLETED"
+                            ) {
+                              updateAppointmentStatusMutation.mutate(
+                                {
+                                  appointmentId:
+                                    row._id,
+                                  status:
+                                    "COMPLETED",
+                                }
+                              );
+                            }
+                          }}
+                        >
+                          <SelectTrigger className="w-[150px]">
+                            <SelectValue />
+                          </SelectTrigger>
+
+                          <SelectContent>
+                            <SelectItem value="SKIPPED">
+                              SKIPPED
+                            </SelectItem>
+
+                            <SelectItem value="COMPLETED">
+                              COMPLETED
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </TableCell>
+                    </TableRow>
+                  )
+                )
+              )}
+            </TableBody>
+          </Table>
+        </div>
+      </TabsContent>
+    </Tabs>
+  </CardContent>
+</Card>
+
       </div>
+
+      <ReusableModal
+  isOpen={showAvailabilityDialog}
+  onClose={() => {
+    setShowAvailabilityDialog(false);
+    setPendingAppointment(null);
+  }}
+  mode="alert"
+  title="Patient Availability"
+  showSaveButton={false}
+  message={
+    <div className="space-y-3 text-center">
+      <p className="text-lg font-semibold">
+        Is patient available?
+      </p>
+
+      <div className="rounded-md border p-3 bg-slate-50">
+        <p className="font-medium">
+          {pendingAppointment?.patient?.name}
+        </p>
+
+        <p className="text-sm text-slate-500">
+          Token #{pendingAppointment?.tokenNumber}
+        </p>
+      </div>
+
+      <div className="flex justify-center gap-3 mt-4">
+        <Button
+          variant="destructive"
+          onClick={() =>
+            handlePatientAvailability(false)
+          }
+          disabled={patientAvailabilityMutation.isPending}
+        >
+          No
+        </Button>
+
+        <Button
+          onClick={() =>
+            handlePatientAvailability(true)
+          }
+          disabled={patientAvailabilityMutation.isPending}
+        >
+          Yes
+        </Button>
+      </div>
+    </div>
+  }
+/>
+
     </div>
   );
 }

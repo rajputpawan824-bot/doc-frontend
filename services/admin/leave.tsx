@@ -178,6 +178,8 @@ export const useApproveLeave = (options?: {
       const payload: LeaveApprovalPayload = {
         status: "APPROVED",
         approvedIsPaid,
+        
+        
       };
 
       const response = await clientApi.put<{ data: LeaveResponse }>(

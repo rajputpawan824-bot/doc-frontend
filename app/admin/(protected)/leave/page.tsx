@@ -109,6 +109,9 @@ const [allowedLeaves, setAllowedLeaves] =
   const [selectedLeave, setSelectedLeave] = useState<LeaveResponse | null>(
     null,
   );
+
+  const [rejectTargetLeave, setRejectTargetLeave] =
+  useState<LeaveResponse | null>(null);
   const [isPaid, setIsPaid] = useState(false);
   const [isHalfDay, setIsHalfDay] = useState(false);
   const [rejectionReason, setRejectionReason] = useState("");
@@ -234,9 +237,9 @@ const {
   const rejectLeave = useRejectLeave({
     onSuccess: () => {
       toast.success("Leave rejected successfully");
-      setSelectedLeave(null);
-      setRejectionReason("");
-      setShowRejectDialog(false);
+  setRejectTargetLeave(null);
+setRejectionReason("");
+setShowRejectDialog(false);
       refetch();
       refetchOnLeave();
       refetchOnLeaveToday();
@@ -343,6 +346,7 @@ const matchesTab =
     leaves: LeaveResponse[],
     actions: "pending" | "view-only",
     showStatus = true,
+      showActions = true,
   ) => (
     <Table>
       <TableHeader>
@@ -354,9 +358,11 @@ const matchesTab =
           <TableHead>To Date</TableHead>
           <TableHead>Total Days</TableHead>
           <TableHead>Paid/Unpaid</TableHead>
-          {showStatus && <TableHead>Status</TableHead>}
+          {showStatus && <TableHead>Emergency Contact</TableHead>}
           <TableHead>Reason</TableHead>
-          <TableHead className="text-right">Actions</TableHead>
+       {showActions && (
+  <TableHead className="text-right">Actions</TableHead>
+)}
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -373,10 +379,12 @@ const matchesTab =
             <TableCell>{format(new Date(leave.toDate), "dd MMM yyyy")}</TableCell>
             <TableCell>{getTotalDays(leave)}</TableCell>
             <TableCell>{getPaidStatus(leave)}</TableCell>
-            {showStatus && <TableCell>{getStatusBadge(leave.status)}</TableCell>}
+            {showStatus && <TableCell>  {leave.emergencyContact || "-"}
+</TableCell>}
             <TableCell className="max-w-xs whitespace-normal">
               {leave.reason || "N/A"}
             </TableCell>
+            {showActions && (
             <TableCell>
               <div className="flex justify-end gap-2">
                 {/* <Button
@@ -408,11 +416,17 @@ const matchesTab =
                     <Button
                       size="sm"
                       className="bg-green-600 hover:bg-green-700"
-                      onClick={() => {
-                        setApproveTargetLeave(leave);
-                        setApprovalIsPaid(null);
-                        setShowApproveDialog(true);
-                      }}
+    onClick={() => {
+    setApproveTargetLeave(leave);
+
+    // default selection = employee's request
+    setApprovalIsPaid(leave.requestedIsPaid);
+
+    // fetch leave balance for this employee
+    setSelectedEmployeeId(leave.user?._id);
+
+    setShowApproveDialog(true);
+}}
                       disabled={approveLeave.isPending}
                     >
                       {approveLeave.isPending ? (
@@ -425,10 +439,10 @@ const matchesTab =
                     <Button
                       size="sm"
                       variant="destructive"
-                      onClick={() => {
-                        setSelectedLeave(leave);
-                        setShowRejectDialog(true);
-                      }}
+           onClick={() => {
+  setRejectTargetLeave(leave);
+  setShowRejectDialog(true);
+}}
                     >
                       <XCircle className="h-4 w-4 mr-1" />
                       Reject
@@ -437,6 +451,7 @@ const matchesTab =
                 )}
               </div>
             </TableCell>
+            )}
           </TableRow>
         ))}
       </TableBody>
@@ -815,7 +830,7 @@ setActiveTab(
           </p>
         </div>
       ) : (
-        renderLeaveTable(filteredLeaves, "view-only")
+        renderLeaveTable(filteredLeaves, "view-only", true, false)
       )}
     </CardContent>
   </Card>
@@ -1141,7 +1156,7 @@ fields={[
                 </div>
                 <div>
                   <div className="text-sm font-medium text-muted-foreground">
-                    Status
+                    Emergency Contact
                   </div>
                   {getStatusBadge(selectedLeave.status)}
                 </div>
@@ -1249,58 +1264,86 @@ fields={[
           setApprovalIsPaid(null);
         }
       }}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Approve Leave Application</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <div className="font-medium">Select leave type</div>
-              <div className="mt-3 grid grid-cols-2 gap-3">
-                <Button
-                  variant={approvalIsPaid === true ? "secondary" : "outline"}
-                  onClick={() => setApprovalIsPaid(true)}
-                >
-                  Paid Leave
-                </Button>
-                <Button
-                  variant={approvalIsPaid === false ? "secondary" : "outline"}
-                  onClick={() => setApprovalIsPaid(false)}
-                >
-                  Unpaid Leave
-                </Button>
-              </div>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setShowApproveDialog(false);
-                setApproveTargetLeave(null);
-                setApprovalIsPaid(null);
-              }}
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={() => {
-                if (approveTargetLeave && approvalIsPaid !== null) {
-                  approveLeave.mutate({
-                    leaveId: approveTargetLeave._id,
-                    approvedIsPaid: approvalIsPaid,
-                  });
-                }
-              }}
-              disabled={approveLeave.isPending || approvalIsPaid === null}
-            >
-              {approveLeave.isPending ? (
-                <Loader2 className="h-4 w-4 animate-spin mr-2" />
-              ) : null}
-              Confirm Approval
-            </Button>
-          </DialogFooter>
-        </DialogContent>
+<DialogContent>
+  <DialogHeader>
+    <DialogTitle>Approve Leave Application</DialogTitle>
+  </DialogHeader>
+
+  <div className="space-y-5">
+    {/* Requested Leave */}
+    <div>
+      <p className="text-sm text-muted-foreground">
+        Requested Leave
+      </p>
+      <p className="mt-1 font-medium">
+        {approveTargetLeave?.requestedIsPaid
+          ? "Paid Leave"
+          : "Unpaid Leave"}
+      </p>
+    </div>
+
+    {/* Remaining Paid Leaves */}
+    <div>
+      <p className="text-sm text-muted-foreground">
+        Remaining Paid Leaves
+      </p>
+      <p className="mt-1 font-medium">
+        {leaveBalance?.remainingLeaves ?? 0} Days
+      </p>
+    </div>
+
+    {/* Approve As */}
+    <div>
+      <div className="font-medium mb-3">Approve As</div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <Button
+          variant={approvalIsPaid === true ? "secondary" : "outline"}
+          onClick={() => setApprovalIsPaid(true)}
+        >
+          Paid Leave
+        </Button>
+
+        <Button
+          variant={approvalIsPaid === false ? "secondary" : "outline"}
+          onClick={() => setApprovalIsPaid(false)}
+        >
+          Unpaid Leave
+        </Button>
+      </div>
+    </div>
+  </div>
+
+  <DialogFooter>
+    <Button
+      variant="outline"
+      onClick={() => {
+        setShowApproveDialog(false);
+        setApproveTargetLeave(null);
+        setApprovalIsPaid(null);
+      }}
+    >
+      Cancel
+    </Button>
+
+    <Button
+      onClick={() => {
+        if (approveTargetLeave && approvalIsPaid !== null) {
+          approveLeave.mutate({
+            leaveId: approveTargetLeave._id,
+            approvedIsPaid: approvalIsPaid,
+          });
+        }
+      }}
+      disabled={approveLeave.isPending || approvalIsPaid === null}
+    >
+      {approveLeave.isPending ? (
+        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+      ) : null}
+      Confirm Approval
+    </Button>
+  </DialogFooter>
+</DialogContent>
       </Dialog>
 
       <Dialog open={showRejectDialog} onOpenChange={setShowRejectDialog}>
@@ -1328,6 +1371,7 @@ fields={[
               onClick={() => {
                 setShowRejectDialog(false);
                 setRejectionReason("");
+                setRejectTargetLeave(null);
               }}
             >
               Cancel
@@ -1335,12 +1379,12 @@ fields={[
             <Button
               variant="destructive"
               onClick={() => {
-                if (selectedLeave) {
-                  rejectLeave.mutate({
-                    leaveId: selectedLeave._id,
-                    rejectionReason,
-                  });
-                }
+if (rejectTargetLeave) {
+  rejectLeave.mutate({
+    leaveId: rejectTargetLeave._id,
+    rejectionReason,
+  });
+}
               }}
               disabled={rejectLeave.isPending}
             >

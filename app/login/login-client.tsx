@@ -401,7 +401,7 @@ const handleSubmit = (
         className="pl-10 pr-12 py-6"
         placeholder="Enter your password"
       />
-
+{/* 
       <button
         type="button"
         onClick={() =>
@@ -414,7 +414,7 @@ const handleSubmit = (
         ) : (
           <Eye className="w-5 h-5" />
         )}
-      </button>
+      </button> */}
     </div>
   </div>
 )}

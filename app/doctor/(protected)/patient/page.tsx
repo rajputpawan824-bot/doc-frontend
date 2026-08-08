@@ -143,6 +143,7 @@ interface DataTableProps<TData, TValue> {
   data: TData[];
   searchColumn?: string;
   searchPlaceholder?: string;
+  onRowClick?: (row: TData) => void;
   emptyMessage?: ReactNode;
 }
 
@@ -152,6 +153,7 @@ function DataTable<TData, TValue>({
   searchColumn = "name",
   searchPlaceholder = "Search...",
   emptyMessage = "No results found.",
+    onRowClick,
 }: DataTableProps<TData, TValue>) {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
@@ -256,10 +258,12 @@ function DataTable<TData, TValue>({
           <TableBody>
             {table.getRowModel().rows?.length ? (
               table.getRowModel().rows.map((row) => (
-                <TableRow
-                  key={row.id}
-                  data-state={row.getIsSelected() && "selected"}
-                >
+        <TableRow
+  key={row.id}
+  data-state={row.getIsSelected() && "selected"}
+  onClick={() => onRowClick?.(row.original)}
+  className="cursor-pointer hover:bg-muted/50 transition-colors"
+>
                   {row.getVisibleCells().map((cell) => (
                     <TableCell key={cell.id}>
                       {flexRender(
@@ -689,7 +693,7 @@ export default function PatientsPage() {
             <div>
               <p className="font-medium">{patient.name}</p>
               <p className="text-sm text-gray-500">
-                Code: {patient.patientCode || patient.id}
+               {patient.patientCode || patient.id}
               </p>
             </div>
           </div>
@@ -717,23 +721,25 @@ export default function PatientsPage() {
         );
       },
     },
-    {
-      accessorKey: "age",
-      header: "Age / Gender",
-      cell: ({ row }) => {
-        const patient = row.original;
-        return (
-          <div className="space-y-1">
-            <span className="font-medium">
-              {patient.age !== undefined ? `${patient.age} years` : "-"}
-            </span>
-            <Badge variant="outline" className="capitalize">
-              {patient.gender}
-            </Badge>
-          </div>
-        );
-      },
-    },
+{
+  accessorKey: "age",
+  header: "Age / Gender",
+  cell: ({ row }) => {
+    const patient = row.original;
+
+    return (
+      <div className="flex flex-col gap-1">
+        <span className="font-medium">
+          {patient.age !== undefined ? `${patient.age} years` : "-"}
+        </span>
+
+        <Badge variant="outline" className="w-fit capitalize">
+          {patient.gender}
+        </Badge>
+      </div>
+    );
+  },
+},
     {
       accessorKey: "emergencyContact",
       header: "Emergency Contact",
@@ -820,9 +826,13 @@ export default function PatientsPage() {
         return (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="h-8 w-8 p-0">
-                <MoreVertical className="h-4 w-4" />
-              </Button>
+    <Button
+      variant="ghost"
+      className="h-8 w-8 p-0"
+      onClick={(e) => e.stopPropagation()}
+    >
+      <MoreVertical className="h-4 w-4" />
+    </Button>
             </DropdownMenuTrigger>
 
             <DropdownMenuContent align="end" className="w-56">
@@ -830,7 +840,8 @@ export default function PatientsPage() {
               <DropdownMenuSeparator />
 
               <DropdownMenuItem
-                onClick={() => {
+                onClick={(e) => {
+                      e.stopPropagation();
                   setSelectedPatient(patient);
                   setViewPatientOpen(true);
                 }}
@@ -840,7 +851,8 @@ export default function PatientsPage() {
               </DropdownMenuItem>
 
               <DropdownMenuItem
-                onClick={() => {
+                onClick={(e) => {
+                      e.stopPropagation();
                   setSelectedPatient(patient);
                   setHistoryOpen(true);
                 }}
@@ -848,8 +860,12 @@ export default function PatientsPage() {
                 <FileText className="mr-2 h-4 w-4" />
                 Prescription History
               </DropdownMenuItem>
-
-              <DropdownMenuItem onClick={() => openPrescriptionDialog(patient)}>
+<DropdownMenuItem
+  onClick={(e) => {
+    e.stopPropagation();
+    openPrescriptionDialog(patient);
+  }}
+>
                 <Stethoscope className="mr-2 h-4 w-4" />
                 Create Prescription
               </DropdownMenuItem>
@@ -965,6 +981,10 @@ export default function PatientsPage() {
                   <DataTable<DoctorPatient, unknown>
                     columns={columns}
                     data={filteredPatients}
+                      onRowClick={(patient) => {
+    setSelectedPatient(patient);
+    setViewPatientOpen(true);
+  }}
                     searchColumn="name"
                     searchPlaceholder="Search patients by name, phone, or ID..."
                     emptyMessage={

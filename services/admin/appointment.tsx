@@ -158,3 +158,50 @@ export function useCancelAppointment() {
   });
 }
 
+export function useUpdateAppointmentStatus(options?: {
+  onSuccess?: (data: any) => void;
+  onError?: (error: Error) => void;
+}) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      appointmentId,
+      status,
+    }: {
+      appointmentId: string;
+      status: string;
+    }) => {
+      const response = await clientApi.put(
+        `/appointment/${appointmentId}/status`,
+        {
+          status,
+        }
+      );
+
+      if (!response.success) {
+        throw new Error(
+          response.error || "Failed to update appointment"
+        );
+      }
+
+      return response.data;
+    },
+
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({
+        queryKey: ["token-appointments"],
+      });
+
+      queryClient.invalidateQueries({
+        queryKey: ["current-token"],
+      });
+
+      options?.onSuccess?.(data);
+    },
+
+    onError: (error: Error) => {
+      options?.onError?.(error);
+    },
+  });
+}

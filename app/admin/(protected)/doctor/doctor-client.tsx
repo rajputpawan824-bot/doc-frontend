@@ -102,6 +102,7 @@ interface PaginatedDoctorTableProps {
   currentPage: number;
   totalPages: number;
   limit: number;
+  onRowClick?: (row: any) => void;
   onPageChange: (page: number) => void;
   onLimitChange: (limit: number) => void;
 }
@@ -115,6 +116,7 @@ function PaginatedDoctorTable({
   limit,
   onPageChange,
   onLimitChange,
+    onRowClick,
 }: PaginatedDoctorTableProps) {
   const table = useReactTable({
     data,
@@ -142,7 +144,11 @@ function PaginatedDoctorTable({
           <TableBody>
             {table.getRowModel().rows.length ? (
               table.getRowModel().rows.map((row) => (
-                <TableRow key={row.id}>
+              <TableRow
+  key={row.id}
+  onClick={() => onRowClick?.(row.original)}
+  className="cursor-pointer hover:bg-muted/50 transition-colors"
+>
                   {row.getVisibleCells().map((cell) => (
                     <TableCell key={cell.id}>
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
@@ -1664,7 +1670,10 @@ await queryClient.refetchQueries({
             <Button
               size="sm"
               variant="outline"
-              onClick={() => handleViewDetails(doctor.id)}
+               onClick={(e) => {
+    e.stopPropagation();
+    handleViewDetails(doctor.id);
+  }}
               title="View details"
               disabled={isDetailLoading}
             >
@@ -1677,7 +1686,8 @@ await queryClient.refetchQueries({
             <Button
               size="sm"
               variant="outline"
-onClick={async () => {
+onClick={async (e) => {
+    e.stopPropagation();
   setSelectedDoctorId(doctor.id);
 
   await queryClient.invalidateQueries({
@@ -1694,20 +1704,22 @@ onClick={async () => {
             >
               <UserCog className="h-4 w-4" />
             </Button>
-            <Button
-              size="sm"
-              variant="destructive"
-            onClick={() =>
+<Button
+  size="sm"
+  variant="destructive"
+  onClick={(e) => {
+    e.stopPropagation();
+
     blockDoctorMutation.mutate({
       id: doctor.id,
       isActive: false,
-    })
-  }
-              title="Delete doctor"
-              disabled={blockDoctorMutation.isPending}
-            >
-              <UserMinus className="h-4 w-4" />
-            </Button>
+    });
+  }}
+  title="Delete doctor"
+  disabled={blockDoctorMutation.isPending}
+>
+  <UserMinus className="h-4 w-4" />
+</Button>
           </div>
         );
       },
@@ -1830,7 +1842,10 @@ onClick={async () => {
             <Button
               size="sm"
               variant="outline"
-              onClick={() => handleViewDetails(doctor.id)}
+               onClick={(e) => {
+    e.stopPropagation();
+    handleViewDetails(doctor.id);
+  }}
               title="View details"
             >
               <Eye className="h-4 w-4" />
@@ -1838,7 +1853,8 @@ onClick={async () => {
             <Button
               size="sm"
               variant="outline"
-            onClick={() => {
+            onClick={(e) => {
+                e.stopPropagation();
     blockDoctorMutation.mutate({
       id: doctor.id,
       isActive: true,
@@ -1990,6 +2006,7 @@ onClick={async () => {
                   currentPage={currentPage}
                   totalPages={totalPages}
                   limit={limit}
+                  onRowClick={(doctor) => handleViewDetails(doctor.id)}
                   onPageChange={handlePageChange}
                   onLimitChange={handleLimitChange}
                   emptyMessage={
@@ -2033,6 +2050,7 @@ onClick={async () => {
                   currentPage={currentPage}
                   totalPages={totalPages}
                   limit={limit}
+                  onRowClick={(doctor) => handleViewDetails(doctor.id)}
                   onPageChange={handlePageChange}
                   onLimitChange={handleLimitChange}
                   emptyMessage={
@@ -2076,6 +2094,7 @@ onClick={async () => {
                   currentPage={currentPage}
                   totalPages={totalPages}
                   limit={limit}
+                  onRowClick={(doctor) => handleViewDetails(doctor.id)}
                   onPageChange={handlePageChange}
                   onLimitChange={handleLimitChange}
                   emptyMessage={

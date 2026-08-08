@@ -169,6 +169,7 @@ interface PaginatedStaffTableProps {
   currentPage: number;
   totalPages: number;
   limit: number;
+    onRowClick?: (staff: StaffMember) => void;
   onPageChange: (page: number) => void;
   onLimitChange: (limit: number) => void;
 }
@@ -180,6 +181,7 @@ function PaginatedStaffTable({
   currentPage,
   totalPages,
   limit,
+    onRowClick,
   onPageChange,
   onLimitChange,
 }: PaginatedStaffTableProps) {
@@ -209,7 +211,11 @@ function PaginatedStaffTable({
           <TableBody>
             {table.getRowModel().rows.length ? (
               table.getRowModel().rows.map((row) => (
-                <TableRow key={row.id}>
+         <TableRow
+  key={row.id}
+  onClick={() => onRowClick?.(row.original)}
+  className="cursor-pointer hover:bg-muted/50 transition-colors"
+>
                   {row.getVisibleCells().map((cell) => (
                     <TableCell key={cell.id}>
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
@@ -892,22 +898,35 @@ const enableStaffMutation = useEnableStaff({
         return (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="sm">
+             <Button
+      variant="ghost"
+      size="sm"
+      onClick={(e) => e.stopPropagation()}
+    >
                 ⋯
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => handleViewDetails(staff.id)}>
+              <DropdownMenuItem   onClick={(e) => {
+    e.stopPropagation();
+    handleViewDetails(staff.id);
+  }}>
                 <Eye className="h-4 w-4 mr-2" />
                 View Details
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleEditStaff(staff)}>
+              <DropdownMenuItem  onClick={(e) => {
+    e.stopPropagation();
+    handleEditStaff(staff);
+  }}>
                 <Edit2 className="h-4 w-4 mr-2" />
                 Edit
               </DropdownMenuItem>
               {isActive ? (
                 <DropdownMenuItem
-                  onClick={() => handleDisableStaff(staff)}
+                 onClick={(e) => {
+    e.stopPropagation();
+    handleDisableStaff(staff);
+  }}
                   className="text-red-600"
                 >
                   <UserMinus className="h-4 w-4 mr-2" />
@@ -915,7 +934,10 @@ const enableStaffMutation = useEnableStaff({
                 </DropdownMenuItem>
               ) : (
                 <DropdownMenuItem
-                  onClick={() => handleEnableStaff(staff)}
+           onClick={(e) => {
+    e.stopPropagation();
+    handleEnableStaff(staff);
+  }}
                   className="text-green-600"
                 >
                   <UserPlus className="h-4 w-4 mr-2" />
@@ -1666,6 +1688,7 @@ workingHourEnd:
               currentPage={currentPage}
               totalPages={totalPages}
               limit={limit}
+                onRowClick={(staff) => handleViewDetails(staff.id)}
               onPageChange={handlePageChange}
               onLimitChange={handleLimitChange}
               emptyMessage={

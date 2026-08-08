@@ -74,6 +74,15 @@ export function useTokenAppointments(
 }
 
 // ==================== INCREMENT TOKEN ====================
+interface IncrementTokenResponse {
+  success: boolean;
+  message: string;
+  data: {
+    currentToken: number;
+    needsConfirmation?: boolean;
+    appointment?: any;
+  };
+}
 
 export function useIncrementToken(options?: {
   onSuccess?: (data: any) => void;
@@ -83,7 +92,8 @@ export function useIncrementToken(options?: {
 
   return useMutation({
     mutationFn: async (payload: TokenPayload) => {
-      const response = await clientApi.put(
+const response =
+  await clientApi.put<IncrementTokenResponse>(
         "/appointment/token/increment",
         payload
       );
@@ -93,8 +103,9 @@ export function useIncrementToken(options?: {
           response.error || "Failed to increment token"
         );
       }
-
-      return response.data;
+console.log("Increment API Response", response);
+console.log("Increment Data", response.data);
+   return response.data.data;
     },
 
     onSuccess: (data, variables) => {
@@ -222,3 +233,55 @@ export function useResetToken(options?: {
     },
   });
 }
+
+
+
+export interface PatientAvailabilityPayload {
+  appointmentId: string;
+  available: boolean;
+}
+
+export function usePatientAvailability(options?: {
+  onSuccess?: (data: any) => void;
+  onError?: (error: Error) => void;
+}) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (
+      payload: PatientAvailabilityPayload
+    ) => {
+      const response = await clientApi.put(
+        "/appointment/token/patient-availability",
+        payload
+      );
+
+      if (!response.success) {
+        throw new Error(
+          response.error ||
+            "Failed to update patient availability"
+        );
+      }
+console.log("Increment API Response", response);
+      return response.data;
+    },
+
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({
+        queryKey: ["current-token"],
+      });
+
+      queryClient.invalidateQueries({
+        queryKey: ["token-appointments"],
+      });
+
+      options?.onSuccess?.(data);
+    },
+
+    onError: (error: Error) => {
+      options?.onError?.(error);
+    },
+  });
+}
+
+

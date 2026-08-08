@@ -9,14 +9,16 @@ import {
   Edit,
   Save,
   X,
+  CircleMinus,
   UserCircle,
   Monitor,
-  Key ,
+  Key,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import DeleteModal from "@/components/ui/delete-modal";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { useReceptionistById ,  useUpdateReceptionist, useUpdateReceptionistPassword,} from "@/services/admin/reception";
@@ -41,6 +43,30 @@ const [selectedDocuments, setSelectedDocuments] = useState<
 >([]);
 
 const [deletedDocuments, setDeletedDocuments] = useState<string[]>([]);
+const [deleteDocumentDialogOpen, setDeleteDocumentDialogOpen] =
+  useState(false);
+
+const [documentToDelete, setDocumentToDelete] =
+  useState<string | null>(null);
+
+const handleDeleteDocument = (filePath?: string) => {
+  if (!filePath) return;
+
+  setDocumentToDelete(filePath);
+  setDeleteDocumentDialogOpen(true);
+};
+
+const confirmDeleteDocument = () => {
+  if (!documentToDelete) return;
+
+  setDeletedDocuments((prev) => [
+    ...prev,
+    documentToDelete,
+  ]);
+
+  setDocumentToDelete(null);
+  setDeleteDocumentDialogOpen(false);
+};
 const [selectedProfileImage, setSelectedProfileImage] =
   useState<File | null>(null);
 
@@ -585,21 +611,16 @@ Working Hours
                     )}
             </a>
 
-            <Button
-              type="button"
-              variant="destructive"
-              size="sm"
-              onClick={() => {
-                if (!doc.filePath) return;
-
-                setDeletedDocuments((prev) => [
-                  ...prev,
-                  doc.filePath,
-                ]);
-              }}
-            >
-              Delete
-            </Button>
+<Button
+  type="button"
+  variant="ghost"
+  size="icon"
+  className="h-8 w-8 text-red-600 hover:bg-red-50 hover:text-red-700"
+  onClick={() => handleDeleteDocument(doc.filePath)}
+  title="Delete document"
+>
+  <X className="h-4 w-4" />
+</Button>
           </div>
         ))}
 
@@ -678,17 +699,20 @@ Working Hours
             }}
           />
 
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() =>
-              setSelectedDocuments((prev) =>
-                prev.filter((_, i) => i !== index)
-              )
-            }
-          >
-            Remove
-          </Button>
+<Button
+  type="button"
+  variant="ghost"
+  size="icon"
+  className="h-10 w-10 text-red-600 hover:bg-red-50 hover:text-red-700"
+  onClick={() =>
+    setSelectedDocuments((prev) =>
+      prev.filter((_, i) => i !== index)
+    )
+  }
+  title="Remove document"
+>
+  <CircleMinus className="h-5 w-5" />
+</Button>
         </div>
       ))}
 
@@ -761,6 +785,21 @@ Working Hours
       : "Update Password"
   }
   validationOnChange
+/>
+<DeleteModal
+  isOpen={deleteDocumentDialogOpen}
+  onClose={() => {
+    setDeleteDocumentDialogOpen(false);
+    setDocumentToDelete(null);
+  }}
+  onConfirm={confirmDeleteDocument}
+  title="Delete Document"
+  description="Are you sure you want to delete this document?"
+  confirmLabel="Delete"
+  destructive={true}
+  data={{
+    Document: documentToDelete || "Selected document",
+  }}
 />
     </Card>
   </CardContent>

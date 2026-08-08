@@ -75,16 +75,29 @@ return response.data.data;
 
 // ==================== MY STATS ====================
 
-export const useMyAttendanceStats = () => {
-  return useQuery({
-    queryKey: ATTENDANCE_KEYS.stats,
+export const useMyAttendanceStats = (
+  month?: number,
+  year?: number
+) => {
+   return useQuery({
+    queryKey: [
+      ...ATTENDANCE_KEYS.stats,
+      month,
+      year,
+    ],
 
     queryFn: async () => {
-     const response: ApiResponse<{
-  data: AttendanceStatsResponse;
-}> = await clientApi.get(
-  "/attendance/my-stats"
-);
+      const response: ApiResponse<{
+        data: AttendanceStatsResponse;
+      }> = await clientApi.get(
+        "/attendance/my-stats",
+        {
+          params: {
+            month,
+            year,
+          },
+        }
+      );
 
       if (!response.success) {
         throw new Error(
@@ -108,23 +121,41 @@ export const useMyAttendanceStats = () => {
 
 // ==================== ATTENDANCE HISTORY ====================
 
-export const useMyAttendanceHistory = (
+export const useMyAttendanceHistory = ({
   page = 1,
-  limit = 10
-) => {
+  limit = 10,
+  date,
+    month,
+  year,
+}: {
+  page?: number;
+  limit?: number;
+  date?: string;
+  month?: number;
+year?: number;
+}) => {
   return useQuery({
-    queryKey: [
-      ...ATTENDANCE_KEYS.history,
-      page,
+queryKey: [
+  ...ATTENDANCE_KEYS.history,
+     page,
       limit,
-    ],
+      date,
+      month,
+      year,
+],
 
     queryFn: async () => {
-     const response: ApiResponse<AttendanceHistoryResponse> =
+const response: ApiResponse<AttendanceHistoryResponse> =
   await clientApi.get(
     "/attendance/my-history",
     {
-      params: { page, limit }
+      params: {
+         page,
+              limit,
+              date,
+              month,
+              year,
+      },
     }
   );
 

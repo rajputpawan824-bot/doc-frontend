@@ -29,7 +29,7 @@ export interface LeaveFormData {
   emergencyContact?: string;
   halfDayType?: HalfDayType;
   isHalfDay: boolean;
-  requestedIsPaid?: boolean;
+    requestedIsPaid: boolean;
 }
 
 // API Request/Response Interfaces
@@ -42,7 +42,7 @@ export interface LeaveRequest {
   emergencyContact?: string;
   halfDayType?: HalfDayType;
   isHalfDay: boolean;
-  requestedIsPaid?: boolean;
+    requestedIsPaid: boolean;
 
 approvedIsPaid?: boolean;
 }
@@ -71,7 +71,7 @@ export interface LeaveResponse {
   rejectionReason?: string;
   attachments?: string[];
   isHalfDay: boolean;
-  requestedIsPaid?: boolean;
+    requestedIsPaid: boolean;
 
 approvedIsPaid?: boolean;
   createdAt: string;
@@ -93,7 +93,7 @@ export interface LeaveApprovalPayload {
   status: "APPROVED" | "REJECTED";
   approvedBy?: string;
   rejectionReason?: string;
-  requestedIsPaid?: boolean;
+    requestedIsPaid?: boolean;
 
 approvedIsPaid?: boolean;
 }

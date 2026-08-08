@@ -12,17 +12,20 @@ import {
   DollarSign,
   IndianRupee,
   Stethoscope,
-  Eye,
-  Edit,
-  Save,
-  X,
-  Loader2,
+Eye,
+Edit,
+Save,
+X,
+CircleMinus,
+Loader2,
   FileText,
   BriefcaseMedical,
   Key,
 } from "lucide-react";
 
 import { useDoctorById, useUpdateDoctor,  useUpdateDoctorPassword, } from "@/services/admin/doctor";
+
+import DeleteModal from "@/components/ui/delete-modal";
 
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -205,6 +208,36 @@ const hasMissingFile = selectedDocuments.some(
 deletedDocumentIds: deletedDocuments,
     },
   });
+};
+
+const [deleteDocumentDialogOpen, setDeleteDocumentDialogOpen] =
+  useState(false);
+
+const [documentToDelete, setDocumentToDelete] =
+  useState<string | null>(null);
+
+const handleDeleteDocument = (filePath?: string) => {
+  if (!filePath) return;
+
+  setDocumentToDelete(filePath);
+  setDeleteDocumentDialogOpen(true);
+};
+
+const confirmDeleteDocument = () => {
+  if (!documentToDelete) return;
+
+  setDeletedDocuments((prev) => [
+    ...prev,
+    documentToDelete,
+  ]);
+
+  setDocumentToDelete(null);
+  setDeleteDocumentDialogOpen(false);
+};
+
+const cancelDeleteDocument = () => {
+  setDocumentToDelete(null);
+  setDeleteDocumentDialogOpen(false);
 };
 
   const handleCancel = () => {
@@ -662,21 +695,16 @@ Number(e.target.value)
       )}
           </a>
 
-          <Button
-            type="button"
-            variant="destructive"
-            size="sm"
-            onClick={() => {
-              if (!doc.filePath) return;
-
-              setDeletedDocuments((prev) => [
-                ...prev,
-                doc.filePath,
-              ]);
-            }}
-          >
-            Delete
-          </Button>
+<Button
+  type="button"
+  variant="ghost"
+  size="icon"
+  className="h-8 w-8 text-red-600 hover:bg-red-50 hover:text-red-700"
+  onClick={() => handleDeleteDocument(doc.filePath)}
+  title="Delete document"
+>
+  <X className="h-4 w-4" />
+</Button>
         </div>
       ))}
 
@@ -760,16 +788,19 @@ Number(e.target.value)
               setSelectedDocuments(updated);
             }}
           />
-          <Button
+<Button
   type="button"
-  variant="outline"
+  variant="ghost"
+  size="icon"
+  className="h-10 w-10 text-red-600 hover:bg-red-50 hover:text-red-700"
   onClick={() =>
     setSelectedDocuments((prev) =>
       prev.filter((_, i) => i !== index)
     )
   }
+  title="Remove document"
 >
-  Remove
+  <CircleMinus className="h-5 w-5" />
 </Button>
         </div>
       ))}
@@ -856,6 +887,22 @@ Number(e.target.value)
       : "Update Password"
   }
   validationOnChange
+/>
+
+<DeleteModal
+  isOpen={deleteDocumentDialogOpen}
+  onClose={() => {
+    setDeleteDocumentDialogOpen(false);
+    setDocumentToDelete(null);
+  }}
+  onConfirm={confirmDeleteDocument}
+  title="Delete Document"
+  description="Are you sure you want to delete this document?"
+  confirmLabel="Delete"
+  destructive={true}
+  data={{
+    Document: documentToDelete || "Selected document",
+  }}
 />
     </Card>
   );

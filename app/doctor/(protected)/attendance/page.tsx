@@ -16,6 +16,13 @@ import {
   Clock3,
   Timer,
 } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -32,6 +39,17 @@ import {
  
 } from "@/services/admin/attendance";
 import { useDoctorById} from "@/services/admin/doctor";
+
+
+const getTodayISTDate = () => {
+  const today = new Date();
+
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, "0");
+  const day = String(today.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+};
 
 
 interface AttendanceRecord {
@@ -59,6 +77,35 @@ export default function DoctorAttendancePage() {
   useEffect(() => {
   console.log("clockInTime:", clockInTime);
 }, [clockInTime]);
+const currentDate = new Date();
+
+const [selectedMonth, setSelectedMonth] = useState(
+  currentDate.getMonth() + 1
+);
+
+const [selectedYear, setSelectedYear] = useState(
+  currentDate.getFullYear()
+);
+
+const months = [
+  { value: 1, label: "January" },
+  { value: 2, label: "February" },
+  { value: 3, label: "March" },
+  { value: 4, label: "April" },
+  { value: 5, label: "May" },
+  { value: 6, label: "June" },
+  { value: 7, label: "July" },
+  { value: 8, label: "August" },
+  { value: 9, label: "September" },
+  { value: 10, label: "October" },
+  { value: 11, label: "November" },
+  { value: 12, label: "December" },
+];
+
+const years = Array.from(
+  { length: 5 },
+  (_, index) => currentDate.getFullYear() - index
+);
 
 
 const [userId, setUserId] =
@@ -91,10 +138,18 @@ const { data: doctor } =
   useTodayAttendance();
 
 const { data: attendanceStats } =
-  useMyAttendanceStats();
+  useMyAttendanceStats(
+    selectedMonth,
+    selectedYear
+  );
 
 const { data: attendanceHistory } =
-  useMyAttendanceHistory();
+  useMyAttendanceHistory({
+    page: 1,
+    limit: 10,
+    month: selectedMonth,
+    year: selectedYear,
+  });
   
 const clockInMutation =
   useClockIn();
@@ -470,9 +525,63 @@ const history: AttendanceRecord[] =
             </Card>
           </div>
 
-          <Card className="shadow-sm">
-            <CardHeader>
-              <CardTitle className="text-lg">Recent History</CardTitle>
+      <Card className="shadow-sm">
+  <CardHeader className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+    <div>
+      <CardTitle className="text-lg">
+        Recent History
+      </CardTitle>
+      <CardDescription>
+        Your attendance logs
+      </CardDescription>
+    </div>
+
+<div className="flex gap-2 w-full md:w-auto">
+  <Select
+    value={String(selectedMonth)}
+    onValueChange={(value) =>
+      setSelectedMonth(Number(value))
+    }
+  >
+    <SelectTrigger className="w-[140px]">
+      <SelectValue placeholder="Month" />
+    </SelectTrigger>
+
+    <SelectContent>
+      {months.map((month) => (
+        <SelectItem
+          key={month.value}
+          value={String(month.value)}
+        >
+          {month.label}
+        </SelectItem>
+      ))}
+    </SelectContent>
+  </Select>
+
+  <Select
+    value={String(selectedYear)}
+    onValueChange={(value) =>
+      setSelectedYear(Number(value))
+    }
+  >
+    <SelectTrigger className="w-[110px]">
+      <SelectValue placeholder="Year" />
+    </SelectTrigger>
+
+    <SelectContent>
+      {years.map((year) => (
+        <SelectItem
+          key={year}
+          value={String(year)}
+        >
+          {year}
+        </SelectItem>
+      ))}
+    </SelectContent>
+  </Select>
+</div>
+ 
               <CardDescription>Your last few attendance logs</CardDescription>
             </CardHeader>
             <CardContent>

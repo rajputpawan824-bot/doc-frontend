@@ -1062,8 +1062,7 @@ const addAdjustmentMutation = useAddSalaryAdjustment({
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-lg font-semibold">
                         {record.type === "BONUS" || record.type === "INCREMENT"
-                          ? "+"
-                          : "-"}
+                      }
                         {formatCurrency(record.amount)}
                       </span>
                       <span className="text-xs text-muted-foreground">

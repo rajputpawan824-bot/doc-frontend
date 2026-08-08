@@ -12,6 +12,27 @@ import {
   Hash,
   Loader2,
 } from "lucide-react";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/components/ui/tabs";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -24,17 +45,36 @@ import {
   useResetToken,
   useTokenAppointments,
 } from "@/services/admin/token";
+import { useUpdateAppointmentStatus } from "@/services/admin/appointment";
 
 export default function DoctorTokenPage() {
 const [selectedDate, setSelectedDate] = useState(
   format(new Date(), "yyyy-MM-dd")
 );
 
+const [activeTab, setActiveTab] = useState<
+  "today" | "skipped"
+>("today");
+
+const [userId, setUserId] = useState<string>();
+
+useEffect(() => {
+  const token = localStorage.getItem("access_token");
+
+  if (token) {
+    try {
+      const payload = JSON.parse(atob(token.split(".")[1]));
+      setUserId(payload.id);
+    } catch (error) {
+      console.error("Failed to decode token", error);
+    }
+  }
+}, []);
   const {
     data: doctor,
     isLoading: isDoctorLoading,
     isError: isDoctorError,
-  } = useDoctorById("me");
+  } = useDoctorById(userId);
 
   const doctorId = doctor?.id;
 
@@ -75,6 +115,16 @@ const [selectedDate, setSelectedDate] = useState(
     onError: (error) => toast.error(error.message || "Failed to reset token"),
   });
 
+  const updateAppointmentStatusMutation =
+  useUpdateAppointmentStatus({
+    onSuccess: () => {
+      toast.success("Appointment completed");
+    },
+    onError: (error) => {
+      toast.error(error.message || "Failed to update appointment");
+    },
+  });
+
   useEffect(() => {
     if (isTokenError) {
       toast.error(tokenError?.message || "Failed to load current token");
@@ -97,6 +147,7 @@ const [selectedDate, setSelectedDate] = useState(
       const statusMap: Record<string, string> = {
         WAITING: "bg-yellow-100 text-yellow-800 border-yellow-200",
         IN_PROGRESS: "bg-blue-100 text-blue-800 border-blue-200",
+          SKIPPED: "bg-orange-100 text-orange-800 border-orange-200",
         COMPLETED: "bg-green-100 text-green-800 border-green-200",
         CANCELLED: "bg-red-100 text-red-800 border-red-200",
       };
@@ -118,6 +169,13 @@ const tokenAppointments = Array.isArray(
 )
   ? (appointments as any).data
   : [];
+
+  const appointmentsList = tokenAppointments;
+
+const skippedAppointments = appointmentsList.filter(
+  (appointment: any) => appointment.status === "SKIPPED"
+);
+
   const isMutating =
     incrementMutation.isPending ||
     decrementMutation.isPending ||
@@ -272,7 +330,7 @@ const tokenAppointments = Array.isArray(
         </div>
       </div>
 
-      <Card>
+     <Card>
   <CardHeader>
     <CardTitle>
       Appointments
@@ -280,78 +338,220 @@ const tokenAppointments = Array.isArray(
   </CardHeader>
 
   <CardContent>
-    <table className="w-full border-collapse">
-      <thead>
-        <tr className="border-b">
-          <th className="text-left p-2">
-            Patient
-          </th>
+    <Tabs
+      value={activeTab}
+      onValueChange={(value) =>
+        setActiveTab(value as "today" | "skipped")
+      }
+    >
+      <TabsList className="mb-4">
+        <TabsTrigger value="today">
+          Today's Appointments
 
-          <th className="text-left p-2">
-            Token
-          </th>
+          <Badge
+            variant="secondary"
+            className="ml-2"
+          >
+            {appointmentsList.length}
+          </Badge>
+        </TabsTrigger>
 
-          <th className="text-left p-2">
-            Date
-          </th>
+        <TabsTrigger value="skipped">
+          Skipped Appointments
 
-          <th className="text-left p-2">
-            Time
-          </th>
+          <Badge
+            variant="secondary"
+            className="ml-2 bg-orange-100 text-orange-700"
+          >
+            {skippedAppointments.length}
+          </Badge>
+        </TabsTrigger>
+      </TabsList>
 
-          <th className="text-left p-2">
-            Status
-          </th>
-        </tr>
-      </thead>
+      {/* ================= TODAY'S APPOINTMENTS ================= */}
 
-      <tbody>
-        {tokenAppointments.length === 0 ? (
-          <tr>
-            <td
-              colSpan={5}
-              className="text-center py-6"
-            >
-              No appointments found
-            </td>
-          </tr>
-        ) : (
-          tokenAppointments.map(
-            (appointment: any) => (
-              <tr
-                key={appointment._id}
-                className="border-b"
-              >
-                <td className="p-2">
-                  {appointment.patient?.name}
-                </td>
+      <TabsContent value="today">
+        <div className="rounded-md border border-slate-100 overflow-hidden">
+          <Table>
+            <TableHeader className="bg-slate-50">
+              <TableRow>
+                <TableHead>Patient</TableHead>
 
-                <td className="p-2">
-                  {appointment.tokenNumber}
-                </td>
+                <TableHead className="text-center">
+                  Token Number
+                </TableHead>
 
-                <td className="p-2">
-                  {format(
-                    new Date(
-                      appointment.date
-                    ),
-                    "dd/MM/yyyy"
-                  )}
-                </td>
+                <TableHead>Date</TableHead>
 
-                <td className="p-2">
-                  {appointment.slot}
-                </td>
+                <TableHead>Time</TableHead>
 
-                <td className="p-2">
-                  {getStatusBadge(appointment.status)}
-                </td>
-              </tr>
-            )
-          )
-        )}
-      </tbody>
-    </table>
+                <TableHead>Status</TableHead>
+              </TableRow>
+            </TableHeader>
+
+            <TableBody>
+              {appointmentsList.length === 0 ? (
+                <TableRow>
+                  <TableCell
+                    colSpan={5}
+                    className="h-32 text-center text-slate-400"
+                  >
+                    No appointments found
+                  </TableCell>
+                </TableRow>
+              ) : (
+                appointmentsList.map(
+                  (appointment: any, index: number) => (
+                    <TableRow
+                      key={
+                        appointment._id ||
+                        appointment.id ||
+                        index
+                      }
+                    >
+                      <TableCell className="font-medium">
+                        {appointment.patient?.name || "-"}
+                      </TableCell>
+
+                      <TableCell className="text-center font-mono">
+                        <Badge
+                          variant="secondary"
+                          className="font-bold"
+                        >
+                          {appointment.tokenNumber}
+                        </Badge>
+                      </TableCell>
+
+                      <TableCell>
+                        {format(
+                          new Date(appointment.date),
+                          "dd/MM/yyyy"
+                        )}
+                      </TableCell>
+
+                      <TableCell>
+                        <div className="flex items-center gap-1.5 text-slate-600">
+                          <Clock className="h-3 w-3" />
+                          {appointment.slot}
+                        </div>
+                      </TableCell>
+
+                      <TableCell>
+                        {getStatusBadge(
+                          appointment.status
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  )
+                )
+              )}
+            </TableBody>
+          </Table>
+        </div>
+      </TabsContent>
+
+      {/* ================= SKIPPED APPOINTMENTS ================= */}
+
+      <TabsContent value="skipped">
+        <div className="rounded-md border border-slate-100 overflow-hidden">
+          <Table>
+            <TableHeader className="bg-slate-50">
+              <TableRow>
+                <TableHead>Patient</TableHead>
+
+                <TableHead className="text-center">
+                  Token Number
+                </TableHead>
+
+                <TableHead>Date</TableHead>
+
+                <TableHead>Time</TableHead>
+
+                <TableHead>Status</TableHead>
+              </TableRow>
+            </TableHeader>
+
+            <TableBody>
+              {skippedAppointments.length === 0 ? (
+                <TableRow>
+                  <TableCell
+                    colSpan={5}
+                    className="h-32 text-center text-slate-400"
+                  >
+                    No skipped appointments
+                  </TableCell>
+                </TableRow>
+              ) : (
+                skippedAppointments.map(
+                  (appointment: any, index: number) => (
+                    <TableRow
+                      key={
+                        appointment._id ||
+                        appointment.id ||
+                        index
+                      }
+                    >
+                      <TableCell className="font-medium">
+                        {appointment.patient?.name || "-"}
+                      </TableCell>
+
+                      <TableCell className="text-center font-mono">
+                        <Badge variant="secondary">
+                          {appointment.tokenNumber}
+                        </Badge>
+                      </TableCell>
+
+                      <TableCell>
+                        {format(
+                          new Date(appointment.date),
+                          "dd/MM/yyyy"
+                        )}
+                      </TableCell>
+
+                      <TableCell>
+                        <div className="flex items-center gap-1.5 text-slate-600">
+                          <Clock className="h-3 w-3" />
+                          {appointment.slot}
+                        </div>
+                      </TableCell>
+
+                      <TableCell>
+                        <Select
+                          defaultValue={appointment.status}
+                          onValueChange={(value) => {
+                            if (value === "COMPLETED") {
+                              updateAppointmentStatusMutation.mutate({
+                                appointmentId:
+                                  appointment._id,
+                                status: "COMPLETED",
+                              });
+                            }
+                          }}
+                        >
+                          <SelectTrigger className="w-[150px]">
+                            <SelectValue />
+                          </SelectTrigger>
+
+                          <SelectContent>
+                            <SelectItem value="SKIPPED">
+                              SKIPPED
+                            </SelectItem>
+
+                            <SelectItem value="COMPLETED">
+                              COMPLETED
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </TableCell>
+                    </TableRow>
+                  )
+                )
+              )}
+            </TableBody>
+          </Table>
+        </div>
+      </TabsContent>
+    </Tabs>
   </CardContent>
 </Card>
     </div>
