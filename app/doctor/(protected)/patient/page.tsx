@@ -63,7 +63,7 @@ import {
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
-import { Switch } from "@/components/ui/switch";
+
 import type { Patient } from "@/app/admin/(protected)/patient/page";
 import { usePatientById, usePatients } from "@/services/admin/patient";
 import {
@@ -143,6 +143,8 @@ interface DataTableProps<TData, TValue> {
   data: TData[];
   searchColumn?: string;
   searchPlaceholder?: string;
+  searchValue?: string;
+  onSearchChange?: (value: string) => void;
   onRowClick?: (row: TData) => void;
   emptyMessage?: ReactNode;
 }
@@ -152,8 +154,10 @@ function DataTable<TData, TValue>({
   data,
   searchColumn = "name",
   searchPlaceholder = "Search...",
+  searchValue = "",
+  onSearchChange,
   emptyMessage = "No results found.",
-    onRowClick,
+  onRowClick,
 }: DataTableProps<TData, TValue>) {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
@@ -192,22 +196,20 @@ function DataTable<TData, TValue>({
     <div className="space-y-4">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex w-full flex-1 items-center gap-4">
-          {searchColumnObj && (
-            <div className="relative w-full max-w-sm flex-1">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-              <Input
-                placeholder={searchPlaceholder}
-                value={
-                  (searchColumnObj.getFilterValue() as string) || globalFilter
-                }
-                onChange={(event) => {
-                  searchColumnObj.setFilterValue(event.target.value);
-                  setGlobalFilter(event.target.value);
-                }}
-                className="pl-10"
-              />
-            </div>
-          )}
+      <div className="relative w-full max-w-sm flex-1">
+  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+
+<Input
+  placeholder={searchPlaceholder}
+  value={searchValue}
+  onChange={(event) => {
+    const value = event.target.value;
+    setGlobalFilter(value);
+    onSearchChange?.(value);
+  }}
+  className="pl-10"
+/>
+</div>
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -530,12 +532,12 @@ export default function PatientsPage() {
   const [activeTab, setActiveTab] = useState("all");
   const [page] = useState(1);
   const [limit] = useState(10);
-  const [search] = useState("");
+const [search, setSearch] = useState("");
 
   const [prescription, setPrescription] = useState("");
   const [medicalNotes, setMedicalNotes] = useState("");
   const [followUpDate, setFollowUpDate] = useState("");
-  const [followUpRequired, setFollowUpRequired] = useState(false);
+  // const [followUpRequired, setFollowUpRequired] = useState(false);
   const [prescriptionFiles, setPrescriptionFiles] = useState<File[]>([]);
   const [selectedAppointmentId, setSelectedAppointmentId] = useState("");
 
@@ -576,7 +578,24 @@ export default function PatientsPage() {
     [prescriptionHistory],
   );
 
-  const appointmentOptions = patientAppointments as AppointmentOption[];
+const appointmentOptions = useMemo(() => {
+  const appointments = patientAppointments as AppointmentOption[];
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  return appointments.filter((appointment) => {
+    const appointmentDate = new Date(getAppointmentDate(appointment));
+
+    if (Number.isNaN(appointmentDate.getTime())) {
+      return false;
+    }
+
+    appointmentDate.setHours(0, 0, 0, 0);
+
+    return appointmentDate >= today;
+  });
+}, [patientAppointments]);
   const selectedAppointment = appointmentOptions.find(
     (appointment) => getAppointmentId(appointment) === selectedAppointmentId,
   );
@@ -588,7 +607,7 @@ export default function PatientsPage() {
     setPrescription("");
     setMedicalNotes("");
     setFollowUpDate("");
-    setFollowUpRequired(false);
+    // setFollowUpRequired(false);
     setPrescriptionFiles([]);
     setSelectedAppointmentId("");
     setPrescriptionDialogOpen(true);
@@ -642,16 +661,14 @@ export default function PatientsPage() {
       return;
     }
 
-    const payload = new FormData();
-    payload.append("prescription", prescription.trim());
-    payload.append("medicalNotes", medicalNotes.trim());
-    payload.append("followUpDate", followUpDate || "");
-    payload.append("isFollowUpRequired", String(followUpRequired));
+const payload = new FormData();
 
-    prescriptionFiles.forEach((file) => {
-      payload.append("files", file);
-    });
+payload.append("prescription", prescription.trim());
+payload.append("medicalNotes", medicalNotes.trim());
 
+if (followUpDate) {
+  payload.append("followUpDate", followUpDate);
+}
     createPrescriptionMutation.mutate(
       {
         appointmentId: selectedAppointmentId,
@@ -665,7 +682,7 @@ export default function PatientsPage() {
           setPrescription("");
           setMedicalNotes("");
           setFollowUpDate("");
-          setFollowUpRequired(false);
+         // setFollowUpRequired(false);
           setPrescriptionFiles([]);
           setSelectedAppointmentId("");
           void queryClient.invalidateQueries({
@@ -978,15 +995,17 @@ export default function PatientsPage() {
                     <p className="mt-4 text-gray-600">Loading patients...</p>
                   </div>
                 ) : (
-                  <DataTable<DoctorPatient, unknown>
-                    columns={columns}
-                    data={filteredPatients}
-                      onRowClick={(patient) => {
+        <DataTable<DoctorPatient, unknown>
+  columns={columns}
+  data={filteredPatients}
+  onRowClick={(patient) => {
     setSelectedPatient(patient);
     setViewPatientOpen(true);
   }}
-                    searchColumn="name"
-                    searchPlaceholder="Search patients by name, phone, or ID..."
+  searchValue={search}
+  onSearchChange={setSearch}
+  searchColumn="name"
+  searchPlaceholder="Search patients by name, phone, Aadhaar, or ID..."
                     emptyMessage={
                       <div className="py-8 text-center">
                         <Users className="mx-auto mb-4 h-12 w-12 text-gray-300" />
@@ -1344,23 +1363,14 @@ export default function PatientsPage() {
                 </div>
               </div>
 
-              <div className="grid gap-4 rounded-lg border bg-white p-4 md:grid-cols-2">
-                <div className="space-y-2">
-                  <Label>Follow Up Date</Label>
-                  <Input
-                    type="date"
-                    value={followUpDate}
-                    onChange={(event) => setFollowUpDate(event.target.value)}
-                  />
-                </div>
-                <div className="flex items-center justify-between rounded-md border px-4 py-3">
-                  <Label>Follow Up Required</Label>
-                  <Switch
-                    checked={followUpRequired}
-                    onCheckedChange={setFollowUpRequired}
-                  />
-                </div>
-              </div>
+      <div className="space-y-2 rounded-lg border bg-white p-4">
+  <Label>Follow Up Date</Label>
+  <Input
+    type="date"
+    value={followUpDate}
+    onChange={(event) => setFollowUpDate(event.target.value)}
+  />
+</div>
 
               <div className="space-y-2 rounded-lg border bg-white p-4">
                 <Label>Medical Reports</Label>

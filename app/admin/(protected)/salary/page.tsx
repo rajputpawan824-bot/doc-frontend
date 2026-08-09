@@ -77,6 +77,7 @@ import {
   useAddSalaryAdjustment,
   useUpdateSalary,
   useDownloadPayslip,
+    useViewPayslip,
 } from "@/services/admin/salary";
 
 import type {
@@ -356,6 +357,7 @@ const addAdjustmentMutation = useAddSalaryAdjustment({
 
   // Download payslip mutation
   const downloadPayslipMutation = useDownloadPayslip();
+  const viewPayslipMutation = useViewPayslip();
 
   // ==================== HELPER FUNCTIONS ====================
   function formatDate(date: Date | string) {
@@ -450,6 +452,15 @@ const addAdjustmentMutation = useAddSalaryAdjustment({
       year: selectedMonthYear.year,
     });
   };
+
+  const handleViewPayslip = (employee: EmployeeSalary) => {
+  viewPayslipMutation.mutate({
+    userId: employee.userId,
+    userRole: employee.role,
+    month: selectedMonthYear.month,
+    year: selectedMonthYear.year,
+  });
+};
 
   const handleRefresh = () => {
     refetchList();
@@ -706,16 +717,29 @@ const addAdjustmentMutation = useAddSalaryAdjustment({
                 <History className="h-4 w-4" />
               </Button>
             </div>
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => handleDownloadPayslip(employee)}
-              className="text-xs"
-              disabled={downloadPayslipMutation.isPending}
-            >
-              <Download className="h-3 w-3 mr-1" />
-              Payslip
-            </Button>
+    <div className="flex gap-2">
+  <Button
+    size="sm"
+    variant="ghost"
+    onClick={() => handleViewPayslip(employee)}
+    className="text-xs"
+    disabled={viewPayslipMutation.isPending}
+  >
+    <FileText className="h-3 w-3 mr-1" />
+    View
+  </Button>
+
+  <Button
+    size="sm"
+    variant="ghost"
+    onClick={() => handleDownloadPayslip(employee)}
+    className="text-xs"
+    disabled={downloadPayslipMutation.isPending}
+  >
+    <Download className="h-3 w-3 mr-1" />
+    Download
+  </Button>
+</div>
           </div>
         );
       },

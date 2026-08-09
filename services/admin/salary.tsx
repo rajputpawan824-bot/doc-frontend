@@ -455,3 +455,32 @@ export const useDownloadPayslip = () => {
     retryDelay: 1000,
   });
 };
+
+
+export const useViewPayslip = () => {
+  return useMutation<void, Error, PayslipParams>({
+    mutationFn: async (params: PayslipParams) => {
+      const { userId, month, year } = params;
+
+      const response = await clientApi.get<Blob>(
+        `/salary/view-payslip?${buildSalaryQueryString(params)}`,
+        { responseType: "blob" },
+      );
+
+      if (!response.success || !response.data) {
+        throw new Error("Failed to view payslip");
+      }
+
+      const blob = response.data;
+      const url = window.URL.createObjectURL(blob);
+
+      window.open(url, "_blank");
+
+      setTimeout(() => {
+        window.URL.revokeObjectURL(url);
+      }, 1000);
+    },
+    retry: 1,
+    retryDelay: 1000,
+  });
+};

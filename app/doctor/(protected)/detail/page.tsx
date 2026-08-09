@@ -773,21 +773,32 @@ Number(e.target.value)
             />
           )}
 
-          <Input
-            type="file"
-            onChange={(e) => {
-              const file =
-                e.target.files?.[0];
+  <div className="relative w-full">
+  <input
+    id={`doctor-document-file-${index}`}
+    type="file"
+    className="hidden"
+    onChange={(e) => {
+      const file = e.target.files?.[0] || null;
 
-              if (!file) return;
+      if (!file) return;
 
-              const updated = [...selectedDocuments];
+      const updated = [...selectedDocuments];
+      updated[index].file = file;
 
-              updated[index].file = file;
+      setSelectedDocuments(updated);
+    }}
+  />
 
-              setSelectedDocuments(updated);
-            }}
-          />
+  <label
+    htmlFor={`doctor-document-file-${index}`}
+    className="flex h-10 w-full cursor-pointer items-center rounded-md border border-slate-300 bg-white px-3 text-sm hover:border-blue-400"
+  >
+    <span className="block w-full truncate">
+      {doc.file ? doc.file.name : "Choose File"}
+    </span>
+  </label>
+</div>
 <Button
   type="button"
   variant="ghost"

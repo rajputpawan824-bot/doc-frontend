@@ -42,9 +42,11 @@ import {
   useCurrentToken,
   useDecrementToken,
   useIncrementToken,
+  usePatientAvailability,
   useResetToken,
   useTokenAppointments,
 } from "@/services/admin/token";
+import ReusableModal from "@/components/reusable/reusable-modal";
 import { useUpdateAppointmentStatus } from "@/services/admin/appointment";
 
 export default function DoctorTokenPage() {
@@ -57,6 +59,11 @@ const [activeTab, setActiveTab] = useState<
 >("today");
 
 const [userId, setUserId] = useState<string>();
+const [pendingAppointment, setPendingAppointment] =
+  useState<any>(null);
+
+const [showAvailabilityDialog, setShowAvailabilityDialog] =
+  useState(false);
 
 useEffect(() => {
   const token = localStorage.getItem("access_token");
@@ -100,9 +107,38 @@ useEffect(() => {
 
   console.log("appointments", appointments);
 
-  const incrementMutation = useIncrementToken({
-    onSuccess: () => toast.success("Token incremented successfully"),
-    onError: (error) => toast.error(error.message || "Failed to increment token"),
+const incrementMutation = useIncrementToken({
+  onSuccess: (data) => {
+    console.log("Increment Success", data);
+
+    if (data?.needsConfirmation) {
+      setPendingAppointment(data.appointment);
+      setShowAvailabilityDialog(true);
+      return;
+    }
+
+    toast.success("Token incremented successfully");
+  },
+
+  onError: (error) => {
+    toast.error(
+      error.message || "Failed to increment token"
+    );
+  },
+});
+
+const patientAvailabilityMutation =
+  usePatientAvailability({
+    onSuccess: () => {
+      setShowAvailabilityDialog(false);
+      setPendingAppointment(null);
+
+      toast.success("Appointment updated");
+    },
+
+    onError: (error) => {
+      toast.error(error.message || "Failed to update appointment");
+    },
   });
 
   const decrementMutation = useDecrementToken({
@@ -181,6 +217,29 @@ const skippedAppointments = appointmentsList.filter(
     decrementMutation.isPending ||
     resetMutation.isPending;
   const isActionDisabled = !doctorId || isTokenLoading || isMutating;
+
+  const handlePatientAvailability = (
+  available: boolean
+) => {
+  if (!pendingAppointment || !doctorId) return;
+
+  patientAvailabilityMutation.mutate(
+    {
+      appointmentId: pendingAppointment._id,
+      available,
+    },
+    {
+      onSuccess: () => {
+        if (!available) {
+          incrementMutation.mutate({
+            doctorId,
+            date: selectedDate,
+          });
+        }
+      },
+    }
+  );
+};
 
   const handleIncrement = () => {
     if (!doctorId) {
@@ -554,6 +613,56 @@ const skippedAppointments = appointmentsList.filter(
     </Tabs>
   </CardContent>
 </Card>
+
+<ReusableModal
+  isOpen={showAvailabilityDialog}
+  onClose={() => {
+    setShowAvailabilityDialog(false);
+    setPendingAppointment(null);
+  }}
+  mode="alert"
+  title="Patient Availability"
+  showSaveButton={false}
+  message={
+    <div className="space-y-3 text-center">
+      <p className="text-lg font-semibold">
+        Is patient available?
+      </p>
+
+      <div className="rounded-md border p-3 bg-slate-50">
+        <p className="font-medium">
+          {pendingAppointment?.patient?.name}
+        </p>
+
+        <p className="text-sm text-slate-500">
+          Token #{pendingAppointment?.tokenNumber}
+        </p>
+      </div>
+
+      <div className="flex justify-center gap-3 mt-4">
+        <Button
+          variant="destructive"
+          onClick={() =>
+            handlePatientAvailability(false)
+          }
+          disabled={patientAvailabilityMutation.isPending}
+        >
+          No
+        </Button>
+
+        <Button
+          onClick={() =>
+            handlePatientAvailability(true)
+          }
+          disabled={patientAvailabilityMutation.isPending}
+        >
+          Yes
+        </Button>
+      </div>
+    </div>
+  }
+/>
+
     </div>
   );
 }

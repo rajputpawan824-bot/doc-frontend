@@ -998,7 +998,7 @@ case "patient-document-manager":
         disabled={field.disabled}
       />
 
-      {/* <button
+      <button
         type="button"
         onClick={() =>
           setShowPassword((prev) => ({
@@ -1013,7 +1013,7 @@ case "patient-document-manager":
         ) : (
           <Eye className="h-4 w-4" />
         )}
-      </button> */}
+      </button>
     </div>
   ) : (
 

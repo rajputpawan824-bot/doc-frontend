@@ -423,7 +423,10 @@ const [selfExists, setSelfExists] =
   } = useNextPatientCode();
 
   const queryClient = useQueryClient();
-  const { data: doctorsResponse } = useDoctors({ limit: 1000 });
+ const {
+  data: doctorsResponse,
+  refetch: refetchDoctors,
+} = useDoctors({ limit: 1000 });
   const doctors = (doctorsResponse?.data ?? []).filter(
     (doctor) => doctor.user?.isActive !== false,
   );
@@ -812,9 +815,22 @@ const handleAddFamilyMember = () => {
   void refetchNextPatientCode();
 };
 
-const handleCreateAppointment = (profile: FamilyProfile) => {
+const refreshAppointmentData = async () => {
+  // Get latest doctors including availabilityDays / workingHours
+  await refetchDoctors();
+
+  // Clear old available-slot cache
+  await queryClient.invalidateQueries({
+    queryKey: ['available-slots'],
+  });
+};
+
+const handleCreateAppointment = async (profile: FamilyProfile) => {
+  await refreshAppointmentData();
+
   setIsProfileModalOpen(false);
   setAppointmentPatientName(profile.name);
+
   setAppointmentForm({
     patientId: profile._id,
     doctorId: '',
@@ -822,11 +838,15 @@ const handleCreateAppointment = (profile: FamilyProfile) => {
     slot: '',
     reason: '',
   });
+
   setIsAppointmentModalOpen(true);
 };
 
-const handleBookAppointment = (patient: Patient) => {
+const handleBookAppointment = async (patient: Patient) => {
+  await refreshAppointmentData();
+
   setAppointmentPatientName(patient.name);
+
   setAppointmentForm({
     patientId: patient.id,
     doctorId: '',
@@ -834,9 +854,9 @@ const handleBookAppointment = (patient: Patient) => {
     slot: '',
     reason: '',
   });
+
   setIsAppointmentModalOpen(true);
 };
-
 const handleAddPatient = async (data: ReusableFormData) => {
   console.log("[Patient create] complete form data", data);
 

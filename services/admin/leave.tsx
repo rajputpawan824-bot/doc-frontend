@@ -135,20 +135,28 @@ export const useCreateLeave = (options?: {
 
       return response.data.data;
     },
-onSuccess: (data) => {
-  queryClient.invalidateQueries({
+onSuccess: async (data) => {
+  await queryClient.invalidateQueries({
+    queryKey: ["my-leaves"],
+  });
+
+  await queryClient.invalidateQueries({
+    queryKey: ["leave-balance"],
+  });
+
+  await queryClient.invalidateQueries({
     queryKey: ["leaves"],
   });
 
-  queryClient.invalidateQueries({
+  await queryClient.invalidateQueries({
     queryKey: ["doctors", "on-leave"],
   });
 
-  queryClient.invalidateQueries({
+  await queryClient.invalidateQueries({
     queryKey: ["doctors"],
   });
 
-  queryClient.invalidateQueries({
+  await queryClient.invalidateQueries({
     queryKey: ["doctors", "dashboard-stats"],
   });
 

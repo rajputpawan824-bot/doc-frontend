@@ -5,7 +5,8 @@ import {
   Banknote, 
   TrendingUp, 
   TrendingDown, 
-  Download, 
+Download,
+FileText,
   History,
   Calendar,
   AlertCircle
@@ -27,6 +28,7 @@ import {
   useDownloadPayslip,
   useSalaryDetails,
   useSalaryHistory,
+    useViewPayslip,
 } from "@/services/admin/salary";
 
 export default function DoctorSalaryPage() {
@@ -52,6 +54,8 @@ export default function DoctorSalaryPage() {
   } = useSalaryHistory(salaryParams);
   const downloadPayslipMutation = useDownloadPayslip();
 
+  const viewPayslipMutation = useViewPayslip();
+
   const summary = {
     baseSalary: salaryDetails?.baseSalary ?? 0,
     bonus: salaryDetails?.bonus ?? 0,
@@ -63,6 +67,10 @@ export default function DoctorSalaryPage() {
   const handleDownloadPayslip = () => {
     downloadPayslipMutation.mutate(salaryParams);
   };
+
+  const handleViewPayslip = () => {
+  viewPayslipMutation.mutate(salaryParams);
+};
 
   const columns: ColumnDef<SalaryHistoryResponse>[] = [
     {
@@ -176,14 +184,26 @@ export default function DoctorSalaryPage() {
               ))}
             </SelectContent>
           </Select>
-          <Button
-            className="gap-2 bg-blue-600 hover:bg-blue-700"
-            onClick={handleDownloadPayslip}
-            disabled={downloadPayslipMutation.isPending}
-          >
-            <Download className="h-4 w-4" />
-            Download Payslip
-          </Button>
+     <div className="flex gap-2">
+  <Button
+    className="gap-2"
+    variant="outline"
+    onClick={handleViewPayslip}
+    disabled={viewPayslipMutation.isPending}
+  >
+    <FileText className="h-4 w-4" />
+    View Payslip
+  </Button>
+
+  <Button
+    className="gap-2 bg-blue-600 hover:bg-blue-700"
+    onClick={handleDownloadPayslip}
+    disabled={downloadPayslipMutation.isPending}
+  >
+    <Download className="h-4 w-4" />
+    Download Payslip
+  </Button>
+</div>
         </div>
       </div>
 
