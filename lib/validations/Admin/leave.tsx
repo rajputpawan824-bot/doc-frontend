@@ -88,7 +88,7 @@ export interface LeaveListResponse {
     totalPages: number;
   };
 }
-
+//hey
 export interface LeaveApprovalPayload {
   status: "APPROVED" | "REJECTED";
   approvedBy?: string;
