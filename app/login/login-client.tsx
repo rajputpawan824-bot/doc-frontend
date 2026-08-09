@@ -341,9 +341,10 @@ const handleSubmit = (
                     id="phone"
                     type="tel"
                     value={formData.phone}
-                    onChange={(e) =>
-                      handleInputChange("phone", e.target.value)
-                    }
+                 onChange={(e) => {
+  const value = e.target.value.replace(/\D/g, "").slice(0, 10);
+  handleInputChange("phone", value);
+}}
                     className="pl-10 pr-4 py-6 border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-blue-500"
                     placeholder="Enter your phone number"
                   />

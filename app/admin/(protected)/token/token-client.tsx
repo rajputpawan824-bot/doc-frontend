@@ -293,12 +293,15 @@ const currentToken =
               <Label className="mb-1.5 block text-slate-700">
                 Select Date
               </Label>
-              <Input
-                type="date"
-                value={selectedDate}
-                onChange={(e) => setSelectedDate(e.target.value)}
-                className="bg-slate-50 border-slate-200"
-              />
+   <Input
+  type="date"
+  value={selectedDate}
+  onChange={(e) => setSelectedDate(e.target.value)}
+  onClick={(e) => {
+    e.currentTarget.showPicker?.();
+  }}
+  className="bg-slate-50 border-slate-200 cursor-pointer"
+/>
             </div>
           </div>
         </CardContent>

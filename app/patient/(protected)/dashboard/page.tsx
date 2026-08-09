@@ -468,16 +468,21 @@ onValueChange={(val) =>
         <Label>Date</Label>
 
             <Input
-              type="date"
-              min={today}
-              value={appointmentForm.date}
-              disabled={!appointmentForm.doctorId}
-              onChange={(event) => setAppointmentForm((current) => ({
-                ...current,
-                date: event.target.value,
-                slot: '',
-              }))}
-            />
+  type="date"
+  min={today}
+  value={appointmentForm.date}
+  disabled={!appointmentForm.doctorId}
+  onClick={(event) => {
+    event.currentTarget.showPicker?.();
+  }}
+  onChange={(event) =>
+    setAppointmentForm((current) => ({
+      ...current,
+      date: event.target.value,
+      slot: "",
+    }))
+  }
+/>
       </div>
 
          <div className="space-y-2">

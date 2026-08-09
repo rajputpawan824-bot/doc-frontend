@@ -1040,13 +1040,14 @@ onChange={(e) => {
   let value = e.target.value;
 
   // Restrict phone fields
-  if (
-    field.name === "phone" ||
-    field.name === "phoneNumber" ||
-    field.name === "emergencyContactPhone"
-  ) {
-    value = value.replace(/\D/g, "").slice(0, 10);
-  }
+if (
+  field.name === "phone" ||
+  field.name === "phoneNumber" ||
+  field.name === "emergencyContactPhone" ||
+  field.name === "emergencyContact"
+) {
+  value = value.replace(/\D/g, "").slice(0, 10);
+}
 
   // Restrict Aadhaar fields
   if (

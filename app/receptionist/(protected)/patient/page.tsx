@@ -1349,17 +1349,23 @@ emergencyContact: {
           </div>
           <div className="space-y-2">
             <label className="text-sm font-medium">Date</label>
-            <Input
-              type="date"
-              min={today}
-              value={appointmentForm.date}
-              disabled={!appointmentForm.doctorId}
-              onChange={(event) => setAppointmentForm((current) => ({
-                ...current,
-                date: event.target.value,
-                slot: '',
-              }))}
-            />
+      <Input
+  type="date"
+  min={today}
+  value={appointmentForm.date}
+  disabled={!appointmentForm.doctorId}
+  onClick={(event) => {
+    event.currentTarget.showPicker?.();
+  }}
+  onChange={(event) =>
+    setAppointmentForm((current) => ({
+      ...current,
+      date: event.target.value,
+      slot: '',
+    }))
+  }
+  className="cursor-pointer"
+/>
           </div>
           <div className="space-y-2">
             <label className="text-sm font-medium">Available Slots</label>

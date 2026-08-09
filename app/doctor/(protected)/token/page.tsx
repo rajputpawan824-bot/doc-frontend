@@ -286,14 +286,15 @@ const skippedAppointments = appointmentsList.filter(
           <h1 className="text-2xl font-bold text-slate-900">Visit Token Management</h1>
           <p className="text-slate-500">Manage the queue and issuance of patient visit tokens</p>
           <div className="mt-4">
-  <input
-    type="date"
-    value={selectedDate}
-    onChange={(e) =>
-      setSelectedDate(e.target.value)
-    }
-    className="border rounded px-3 py-2"
-  />
+<input
+  type="date"
+  value={selectedDate}
+  onChange={(e) => setSelectedDate(e.target.value)}
+  onClick={(e) => {
+    e.currentTarget.showPicker?.();
+  }}
+  className="border rounded px-3 py-2 cursor-pointer"
+/>
 </div>
         </div>
       </div>
