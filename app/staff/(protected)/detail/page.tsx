@@ -16,7 +16,10 @@ import {
   Building2,
   Award,
   Hash,
+  CircleMinus,
 } from "lucide-react";
+
+import DeleteModal from "@/components/ui/delete-modal";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -70,6 +73,37 @@ const [selectedDocuments, setSelectedDocuments] = useState<
 >([]);
 
 const [deletedDocuments, setDeletedDocuments] = useState<string[]>([]);
+
+const [deleteDocumentDialogOpen, setDeleteDocumentDialogOpen] =
+  useState(false);
+
+const [documentToDelete, setDocumentToDelete] =
+  useState<string | null>(null);
+
+const handleDeleteDocument = (filePath?: string) => {
+  if (!filePath) return;
+
+  setDocumentToDelete(filePath);
+  setDeleteDocumentDialogOpen(true);
+};
+
+const confirmDeleteDocument = () => {
+  if (!documentToDelete) return;
+
+  setDeletedDocuments((prev) => [
+    ...prev,
+    documentToDelete,
+  ]);
+
+  setDocumentToDelete(null);
+  setDeleteDocumentDialogOpen(false);
+};
+
+const cancelDeleteDocument = () => {
+  setDocumentToDelete(null);
+  setDeleteDocumentDialogOpen(false);
+};
+
 const [selectedProfileImage, setSelectedProfileImage] =
   useState<File | null>(null);
 
@@ -101,13 +135,14 @@ const {
 
 
 const updateStaffMutation = useUpdateStaff({
-  onSuccess: () => {
-    toast.success("Profile updated");
-    setIsEditing(false);
-    setSelectedDocuments([]);
-setDeletedDocuments([]);
-    refetch();
-  },
+onSuccess: () => {
+  toast.success("Profile updated");
+  setIsEditing(false);
+  setSelectedDocuments([]);
+  setDeletedDocuments([]);
+  setSelectedProfileImage(null);
+  refetch();
+},
 });
 const updateStaffPasswordMutation =
   useUpdateStaffPassword({
@@ -280,9 +315,17 @@ if (!staff) {
             </Button>
           ) : (
             <div className="flex gap-2 w-full sm:w-auto">
-              <Button onClick={handleSave} className="flex-1 sm:w-auto gap-2 bg-green-600">
-                <Save className="h-4 w-4" /> Save
-              </Button>
+      <Button
+  onClick={handleSave}
+  className="flex-1 sm:w-auto gap-2 bg-green-600"
+  disabled={updateStaffMutation.isPending}
+>
+  <Save className="h-4 w-4" />
+
+  {updateStaffMutation.isPending
+    ? "Saving..."
+    : "Save"}
+</Button>
              <Button   onClick={() => {
     setIsEditing(false);
     resetForm();
@@ -607,18 +650,15 @@ if (!staff) {
 
             <Button
               type="button"
-              variant="destructive"
-              size="sm"
-              onClick={() => {
-                if (!doc.filePath) return;
-
-                setDeletedDocuments((prev) => [
-                  ...prev,
-                  doc.filePath,
-                ]);
-              }}
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 text-red-600 hover:bg-red-50 hover:text-red-700"
+              onClick={() =>
+                handleDeleteDocument(doc.filePath)
+              }
+              title="Delete document"
             >
-              Delete
+              <X className="h-4 w-4" />
             </Button>
           </div>
         ))}
@@ -632,8 +672,10 @@ if (!staff) {
             value={doc.documentType}
             onChange={(e) => {
               const updated = [...selectedDocuments];
+
               updated[index].documentType =
                 e.target.value;
+
               setSelectedDocuments(updated);
             }}
             className="border rounded px-3 py-2"
@@ -674,53 +716,62 @@ if (!staff) {
           {doc.documentType === "OTHER" && (
             <Input
               placeholder="Document Name"
-              value={doc.customDocumentName}
+              value={doc.customDocumentName || ""}
               onChange={(e) => {
                 const updated = [...selectedDocuments];
+
                 updated[index].customDocumentName =
                   e.target.value;
+
                 setSelectedDocuments(updated);
               }}
             />
           )}
 
-<div className="relative w-full">
-  <input
-    id={`doctor-document-file-${index}`}
-    type="file"
-    className="hidden"
-    onChange={(e) => {
-      const file = e.target.files?.[0] || null;
+          <div className="relative w-full">
+            <input
+              id={`staff-document-file-${index}`}
+              type="file"
+              className="hidden"
+              onChange={(e) => {
+                const file =
+                  e.target.files?.[0] || null;
 
-      if (!file) return;
+                if (!file) return;
 
-      const updated = [...selectedDocuments];
-      updated[index].file = file;
+                const updated = [...selectedDocuments];
 
-      setSelectedDocuments(updated);
-    }}
-  />
+                updated[index].file = file;
 
-  <label
-    htmlFor={`doctor-document-file-${index}`}
-    className="flex h-10 w-full cursor-pointer items-center rounded-md border border-slate-300 bg-white px-3 text-sm hover:border-blue-400"
-  >
-    <span className="block w-full truncate">
-      {doc.file ? doc.file.name : "Choose File"}
-    </span>
-  </label>
-</div>
+                setSelectedDocuments(updated);
+              }}
+            />
+
+            <label
+              htmlFor={`staff-document-file-${index}`}
+              className="flex h-10 w-full cursor-pointer items-center rounded-md border border-slate-300 bg-white px-3 text-sm hover:border-blue-400"
+            >
+              <span className="block w-full truncate">
+                {doc.file
+                  ? doc.file.name
+                  : "Choose File"}
+              </span>
+            </label>
+          </div>
 
           <Button
             type="button"
-            variant="outline"
+            variant="ghost"
+            size="icon"
+            className="h-10 w-10 text-red-600 hover:bg-red-50 hover:text-red-700"
             onClick={() =>
               setSelectedDocuments((prev) =>
                 prev.filter((_, i) => i !== index)
               )
             }
+            title="Remove document"
           >
-            Remove
+            <CircleMinus className="h-5 w-5" />
           </Button>
         </div>
       ))}
@@ -797,6 +848,23 @@ if (!staff) {
   validationOnChange
 />
       </Card>
+
+      <DeleteModal
+  isOpen={deleteDocumentDialogOpen}
+  onClose={() => {
+    setDeleteDocumentDialogOpen(false);
+    setDocumentToDelete(null);
+  }}
+  onConfirm={confirmDeleteDocument}
+  title="Delete Document"
+  description="Are you sure you want to delete this document?"
+  confirmLabel="Delete"
+  destructive={true}
+  data={{
+    Document:
+      documentToDelete || "Selected document",
+  }}
+/>
     </div>
   );
 }

@@ -88,7 +88,9 @@ export default function PatientTokenPage() {
                 <div className="p-2 bg-green-50 rounded-lg">
                   <Activity className="h-5 w-5 text-green-500" />
                 </div>
-                <span className="text-sm font-medium text-slate-600">Avg. wait time per patient</span>
+<span className="text-sm font-medium text-slate-600">
+  Avg. consultation time
+</span>
               </div>
               <span className="text-xl font-bold text-slate-900">{avgWaitPerPatient}</span>
             </div>

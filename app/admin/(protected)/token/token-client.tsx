@@ -214,23 +214,36 @@ const updateAppointmentStatusMutation =
     }
   };
 
-  const getStatusBadge = (status: string) => {
-    const statusMap: Record<string, string> = {
-      WAITING: "bg-yellow-100 text-yellow-800 border-yellow-200",
-        SKIPPED:
-    "bg-orange-100 text-orange-800 border-orange-200",
-      IN_PROGRESS: "bg-blue-100 text-blue-800 border-blue-200",
-
-      COMPLETED: "bg-green-100 text-green-800 border-green-200",
-      CANCELLED: "bg-red-100 text-red-800 border-red-200",
-    };
-
-    return (
-      <Badge variant="outline" className={statusMap[status] || ""}>
-        {status}
-      </Badge>
-    );
+const getStatusColorClass = (status: string) => {
+  const statusMap: Record<string, string> = {
+    WAITING: "bg-yellow-100 text-yellow-800 border-yellow-200",
+     IN_PROGRESS: "bg-blue-600 text-white border-blue-600",
+    SKIPPED: "bg-orange-100 text-orange-800 border-orange-200",
+    COMPLETED: "bg-green-100 text-green-800 border-green-200",
+    CANCELLED: "bg-red-100 text-red-800 border-red-200",
   };
+
+  return (
+    statusMap[status] ||
+    "bg-slate-100 text-slate-800 border-slate-200"
+  );
+};
+
+const getStatusLabel = (status: string) => {
+  if (status === "IN_PROGRESS") return "IN PROGRESS";
+  return status;
+};
+
+const getStatusBadge = (status: string) => {
+  return (
+    <Badge
+      variant="outline"
+      className={getStatusColorClass(status)}
+    >
+      {getStatusLabel(status)}
+    </Badge>
+  );
+};
 
   // Handle both direct array response and wrapped data property response
   const appointmentsList = (appointments as any)?.data 
@@ -459,9 +472,100 @@ const currentToken =
                         {row.doctor?.user?.name}
                       </TableCell>
 
-                      <TableCell>
-                        {getStatusBadge(row.status)}
-                      </TableCell>
+                <TableCell>
+  <Select
+    value={row.status}
+    onValueChange={(value) => {
+      updateAppointmentStatusMutation.mutate({
+        appointmentId: row._id,
+        status: value,
+      });
+    }}
+    disabled={
+      updateAppointmentStatusMutation.isPending ||
+      row.status === "COMPLETED" ||
+      row.status === "CANCELLED"
+    }
+  >
+<SelectTrigger
+  className={`w-[150px] ${getStatusColorClass(row.status)}`}
+>
+  <SelectValue />
+</SelectTrigger>
+
+<SelectContent>
+  {row.status === "WAITING" && (
+    <>
+      <SelectItem value="WAITING">
+        <div className="bg-yellow-100 text-yellow-800 border border-yellow-200 rounded-md px-2 py-1">
+          WAITING
+        </div>
+      </SelectItem>
+
+      <SelectItem value="IN_PROGRESS">
+       <div className="bg-blue-600 text-white border border-blue-600 rounded-md px-2 py-1">
+          IN PROGRESS
+        </div>
+      </SelectItem>
+
+      <SelectItem value="CANCELLED">
+        <div className="bg-red-100 text-red-800 border border-red-200 rounded-md px-2 py-1">
+          CANCELLED
+        </div>
+      </SelectItem>
+    </>
+  )}
+
+  {row.status === "IN_PROGRESS" && (
+    <>
+      <SelectItem value="IN_PROGRESS">
+        <div className="bg-blue-600 text-white border border-blue-600 rounded-md px-2 py-1">
+          IN PROGRESS
+        </div>
+      </SelectItem>
+
+      <SelectItem value="COMPLETED">
+        <div className="bg-green-100 text-green-800 border border-green-200 rounded-md px-2 py-1">
+          COMPLETED
+        </div>
+      </SelectItem>
+    </>
+  )}
+
+{row.status === "SKIPPED" && (
+  <>
+    <SelectItem value="SKIPPED">
+      <div className="bg-orange-100 text-orange-800 border border-orange-200 rounded-md px-2 py-1">
+        SKIPPED
+      </div>
+    </SelectItem>
+
+    <SelectItem value="IN_PROGRESS">
+      <div className="bg-blue-600 text-white border border-blue-600 rounded-md px-2 py-1">
+        IN PROGRESS
+      </div>
+    </SelectItem>
+  </>
+)}
+
+  {row.status === "COMPLETED" && (
+    <SelectItem value="COMPLETED">
+      <div className="bg-green-100 text-green-800 border border-green-200 rounded-md px-2 py-1">
+        COMPLETED
+      </div>
+    </SelectItem>
+  )}
+
+  {row.status === "CANCELLED" && (
+    <SelectItem value="CANCELLED">
+      <div className="bg-red-100 text-red-800 border border-red-200 rounded-md px-2 py-1">
+        CANCELLED
+      </div>
+    </SelectItem>
+  )}
+</SelectContent>
+  </Select>
+</TableCell>
                     </TableRow>
                   )
                 )
@@ -533,37 +637,37 @@ const currentToken =
                       </TableCell>
 
                       <TableCell>
-                        <Select
-                          defaultValue={row.status}
-                          onValueChange={(value) => {
-                            if (
-                              value === "COMPLETED"
-                            ) {
-                              updateAppointmentStatusMutation.mutate(
-                                {
-                                  appointmentId:
-                                    row._id,
-                                  status:
-                                    "COMPLETED",
-                                }
-                              );
-                            }
-                          }}
-                        >
-                          <SelectTrigger className="w-[150px]">
-                            <SelectValue />
-                          </SelectTrigger>
+<Select
+  defaultValue={row.status}
+  onValueChange={(value) => {
+    if (value === "IN_PROGRESS") {
+      updateAppointmentStatusMutation.mutate({
+        appointmentId: row._id,
+        status: "IN_PROGRESS",
+      });
+    }
+  }}
+>
+  <SelectTrigger
+    className={`w-[150px] ${getStatusColorClass(row.status)}`}
+  >
+    <SelectValue />
+  </SelectTrigger>
 
-                          <SelectContent>
-                            <SelectItem value="SKIPPED">
-                              SKIPPED
-                            </SelectItem>
+  <SelectContent>
+    <SelectItem value="SKIPPED">
+      <div className="bg-orange-100 text-orange-800 border border-orange-200 rounded-md px-2 py-1">
+        SKIPPED
+      </div>
+    </SelectItem>
 
-                            <SelectItem value="COMPLETED">
-                              COMPLETED
-                            </SelectItem>
-                          </SelectContent>
-                        </Select>
+    <SelectItem value="IN_PROGRESS">
+      <div className="bg-blue-600 text-white border border-blue-600 rounded-md px-2 py-1">
+        IN PROGRESS
+      </div>
+    </SelectItem>
+  </SelectContent>
+</Select>
                       </TableCell>
                     </TableRow>
                   )

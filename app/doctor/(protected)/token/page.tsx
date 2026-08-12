@@ -179,21 +179,33 @@ const patientAvailabilityMutation =
     }
   }, [isDoctorError]);
 
-    const getStatusBadge = (status: string) => {
-      const statusMap: Record<string, string> = {
-        WAITING: "bg-yellow-100 text-yellow-800 border-yellow-200",
-        IN_PROGRESS: "bg-blue-100 text-blue-800 border-blue-200",
-          SKIPPED: "bg-orange-100 text-orange-800 border-orange-200",
-        COMPLETED: "bg-green-100 text-green-800 border-green-200",
-        CANCELLED: "bg-red-100 text-red-800 border-red-200",
-      };
-  
-      return (
-        <Badge variant="outline" className={statusMap[status] || ""}>
-          {status}
-        </Badge>
-      );
-    };
+const getStatusColorClass = (status: string) => {
+  const statusMap: Record<string, string> = {
+    WAITING: "bg-yellow-100 text-yellow-800 border-yellow-200",
+    IN_PROGRESS: "bg-blue-600 text-white border-blue-600",
+    SKIPPED: "bg-orange-100 text-orange-800 border-orange-200",
+    COMPLETED: "bg-green-100 text-green-800 border-green-200",
+    CANCELLED: "bg-red-100 text-red-800 border-red-200",
+  };
+
+  return statusMap[status] || "bg-slate-100 text-slate-800 border-slate-200";
+};
+
+const getStatusLabel = (status: string) => {
+  if (status === "IN_PROGRESS") return "IN PROGRESS";
+  return status;
+};
+
+const getStatusBadge = (status: string) => {
+  return (
+    <Badge
+      variant="outline"
+      className={getStatusColorClass(status)}
+    >
+      {getStatusLabel(status)}
+    </Badge>
+  );
+};
   
 
   const currentToken =
@@ -431,7 +443,7 @@ const skippedAppointments = appointmentsList.filter(
       {/* ================= TODAY'S APPOINTMENTS ================= */}
 
       <TabsContent value="today">
-        <div className="rounded-md border border-slate-100 overflow-hidden">
+     <div className="h-[500px] rounded-md border border-slate-100 overflow-y-auto overflow-x-hidden">
           <Table>
             <TableHeader className="bg-slate-50">
               <TableRow>
@@ -496,11 +508,102 @@ const skippedAppointments = appointmentsList.filter(
                         </div>
                       </TableCell>
 
-                      <TableCell>
-                        {getStatusBadge(
-                          appointment.status
-                        )}
-                      </TableCell>
+                  <TableCell>
+  <Select
+    value={appointment.status}
+    onValueChange={(value) => {
+      updateAppointmentStatusMutation.mutate({
+        appointmentId: appointment._id,
+        status: value,
+      });
+    }}
+    disabled={
+      updateAppointmentStatusMutation.isPending ||
+      appointment.status === "COMPLETED" ||
+      appointment.status === "CANCELLED"
+    }
+  >
+    <SelectTrigger
+      className={`w-[150px] ${getStatusColorClass(
+        appointment.status
+      )}`}
+    >
+      <SelectValue />
+    </SelectTrigger>
+
+    <SelectContent>
+      {appointment.status === "WAITING" && (
+        <>
+          <SelectItem value="WAITING">
+            <div className="bg-yellow-100 text-yellow-800 border border-yellow-200 rounded-md px-2 py-1">
+              WAITING
+            </div>
+          </SelectItem>
+
+          <SelectItem value="IN_PROGRESS">
+           <div className="bg-blue-600 text-white border border-blue-600 rounded-md px-2 py-1">
+              IN PROGRESS
+            </div>
+          </SelectItem>
+
+          <SelectItem value="CANCELLED">
+            <div className="bg-red-100 text-red-800 border border-red-200 rounded-md px-2 py-1">
+              CANCELLED
+            </div>
+          </SelectItem>
+        </>
+      )}
+
+      {appointment.status === "IN_PROGRESS" && (
+        <>
+          <SelectItem value="IN_PROGRESS">
+           <div className="bg-blue-600 text-white border border-blue-600 rounded-md px-2 py-1">
+              IN PROGRESS
+            </div>
+          </SelectItem>
+
+          <SelectItem value="COMPLETED">
+            <div className="bg-green-100 text-green-800 border border-green-200 rounded-md px-2 py-1">
+              COMPLETED
+            </div>
+          </SelectItem>
+        </>
+      )}
+
+      {appointment.status === "SKIPPED" && (
+        <>
+          <SelectItem value="SKIPPED">
+            <div className="bg-orange-100 text-orange-800 border border-orange-200 rounded-md px-2 py-1">
+              SKIPPED
+            </div>
+          </SelectItem>
+
+    <SelectItem value="IN_PROGRESS">
+      <div className="bg-blue-600 text-white border border-blue-600 rounded-md px-2 py-1">
+        IN PROGRESS
+      </div>
+    </SelectItem>
+        </>
+      )}
+
+      {appointment.status === "COMPLETED" && (
+        <SelectItem value="COMPLETED">
+          <div className="bg-green-100 text-green-800 border border-green-200 rounded-md px-2 py-1">
+            COMPLETED
+          </div>
+        </SelectItem>
+      )}
+
+      {appointment.status === "CANCELLED" && (
+        <SelectItem value="CANCELLED">
+          <div className="bg-red-100 text-red-800 border border-red-200 rounded-md px-2 py-1">
+            CANCELLED
+          </div>
+        </SelectItem>
+      )}
+    </SelectContent>
+  </Select>
+</TableCell>
                     </TableRow>
                   )
                 )
@@ -575,34 +678,49 @@ const skippedAppointments = appointmentsList.filter(
                         </div>
                       </TableCell>
 
-                      <TableCell>
-                        <Select
-                          defaultValue={appointment.status}
-                          onValueChange={(value) => {
-                            if (value === "COMPLETED") {
-                              updateAppointmentStatusMutation.mutate({
-                                appointmentId:
-                                  appointment._id,
-                                status: "COMPLETED",
-                              });
-                            }
-                          }}
-                        >
-                          <SelectTrigger className="w-[150px]">
-                            <SelectValue />
-                          </SelectTrigger>
+<TableCell>
+  <Select
+    defaultValue={appointment.status}
+    onValueChange={(value) => {
+      if (value === "IN_PROGRESS") {
+        updateAppointmentStatusMutation.mutate({
+          appointmentId: appointment._id,
+          status: "IN_PROGRESS",
+        });
+      }
+    }}
+  >
+    <SelectTrigger
+      className={`w-[150px] border ${getStatusColorClass(
+        appointment.status
+      )}`}
+    >
+      <SelectValue />
+    </SelectTrigger>
 
-                          <SelectContent>
-                            <SelectItem value="SKIPPED">
-                              SKIPPED
-                            </SelectItem>
+    <SelectContent>
+      <SelectItem value="SKIPPED">
+        <div
+          className={`w-full rounded-md border px-2 py-1 text-xs font-medium ${getStatusColorClass(
+            "SKIPPED"
+          )}`}
+        >
+          SKIPPED
+        </div>
+      </SelectItem>
 
-                            <SelectItem value="COMPLETED">
-                              COMPLETED
-                            </SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </TableCell>
+      <SelectItem value="IN_PROGRESS">
+        <div
+          className={`w-full rounded-md border px-2 py-1 text-xs font-medium ${getStatusColorClass(
+            "IN_PROGRESS"
+          )}`}
+        >
+          IN PROGRESS
+        </div>
+      </SelectItem>
+    </SelectContent>
+  </Select>
+</TableCell>
                     </TableRow>
                   )
                 )

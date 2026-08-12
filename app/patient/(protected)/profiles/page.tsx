@@ -1018,6 +1018,11 @@ if (isLoading) {
   onSave={handleEditPatient}
   title={`Edit Patient - ${patientDetails?.patientCode}`}
   sections={editFormSections}
+  saveButtonText={
+    updatePatientMutation.isPending
+      ? "Updating..."
+      : "Update Patient"
+  }
   initialData={
     patientDetails
       ? getInitialData(patientDetails)
@@ -1025,7 +1030,7 @@ if (isLoading) {
   }
   isEdit
   size="xl"
-  saveButtonText="Update Patient"
+  
 />
 
 

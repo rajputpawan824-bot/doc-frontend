@@ -787,6 +787,9 @@ export function useClinicProfiles(
     },
 
     enabled: !!adminId,
+        refetchOnMount: "always",
+    refetchOnWindowFocus: true,
+    staleTime: 0,
   });
 }
 

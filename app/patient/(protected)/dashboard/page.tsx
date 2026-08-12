@@ -136,25 +136,46 @@ const doctors = (
     )
 );
 
-  const { data: availableSlotsResponse, isFetching: isSlotsLoading } = useQuery({
-    queryKey: ['available-slots', appointmentForm.doctorId, appointmentForm.date],
-    queryFn: async (): Promise<AvailableSlotsResponse> => {
-      const response = await clientApi.get<AvailableSlotsResponse>(
-        `/appointment/available-slots?doctorId=${appointmentForm.doctorId}&date=${appointmentForm.date}`,
+const { data: availableSlotsResponse, isFetching: isSlotsLoading } = useQuery({
+  queryKey: [
+    'available-slots',
+    appointmentForm.doctorId,
+    appointmentForm.date,
+  ],
+
+  queryFn: async (): Promise<AvailableSlotsResponse> => {
+  const response = await clientApi.get<AvailableSlotsResponse>(
+  `/appointment/available-slots?doctorId=${appointmentForm.doctorId}&date=${appointmentForm.date}&adminId=${adminId}`,
+);
+
+    if (!response.success) {
+      throw new Error(
+        response.error || 'Failed to load available slots'
       );
+    }
 
-      if (!response.success) {
-        throw new Error(response.error || 'Failed to load available slots');
-      }
+    if (!response.data) {
+      throw new Error('Failed to load available slots');
+    }
 
-      if (!response.data) {
-        throw new Error('Failed to load available slots');
-      }
+    return (response.data as any).data;
+  },
 
-      return (response.data as any).data;
-    },
-    enabled: !!appointmentForm.doctorId && !!appointmentForm.date,
-  });
+  enabled:
+    !!appointmentForm.doctorId &&
+    !!appointmentForm.date,
+
+  refetchOnWindowFocus: true,
+  staleTime: 0,
+});
+
+const bookedSlots = availableSlotsResponse?.bookedSlots ?? [];
+
+const availableSlots = (
+  availableSlotsResponse?.availableSlots ?? []
+).filter(
+  (slot) => !bookedSlots.includes(slot)
+);
 
   const createAppointmentMutation =
   useMutation({
@@ -318,7 +339,7 @@ if (isLoading) {
         <Card className="border-none shadow-md bg-white">
           <CardHeader className="pb-2">
             <CardTitle className="text-lg flex items-center gap-2 text-slate-800">
-              <Calendar className="h-5 w-5 text-blue-600" /> Next Appointment
+              <Calendar className="h-5 w-5 text-blue-600" /> Upcoming Visit
             </CardTitle>
           </CardHeader>
           <CardContent className="pt-4 space-y-6">
@@ -341,11 +362,11 @@ if (isLoading) {
                 <p className="text-xs text-slate-400 font-bold uppercase">Doctor</p>
                 <p className="font-bold text-slate-700">{nextAppointment?.doctorName || "--"}</p>
               </div>
- <Badge
+ {/* <Badge
   className="bg-blue-600 text-white font-bold text-base px-5 py-2 rounded-md"
 >
   {tokenNumber || "N/A"}
-</Badge>
+</Badge> */}
             </div>
           </CardContent>
         </Card>
@@ -422,7 +443,7 @@ if (isLoading) {
     }
   }}
 >
- <DialogContent className="max-w-2xl">
+<DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
     <DialogHeader>
       <DialogTitle>
         Book Appointment
@@ -493,17 +514,26 @@ onValueChange={(val) =>
               <p className="text-sm text-slate-500">Loading available slots...</p>
             ) : availableSlotsResponse?.doctorAvailable === false ? (
               <p className="text-sm text-red-600">Doctor unavailable on selected day.</p>
-            ) : (availableSlotsResponse?.availableSlots ?? []).length ? (
-              <div className="flex flex-wrap gap-2">
-                {(availableSlotsResponse?.availableSlots ?? []).map((slot) => (
-                  <Button
-                    key={slot}
-                    type="button"
-                    variant={appointmentForm.slot === slot ? 'default' : 'outline'}
-                    onClick={() => setAppointmentForm((current) => ({ ...current, slot }))}
-                  >
-                    {slot}
-                  </Button>
+    ) : availableSlots.length ? (
+  <div className="flex flex-wrap gap-2">
+    {availableSlots.map((slot) => (
+      <Button
+        key={slot}
+        type="button"
+        variant={
+          appointmentForm.slot === slot
+            ? 'default'
+            : 'outline'
+        }
+        onClick={() =>
+          setAppointmentForm((current) => ({
+            ...current,
+            slot,
+          }))
+        }
+      >
+        {slot}
+      </Button>
                 ))}
               </div>
             ) : (

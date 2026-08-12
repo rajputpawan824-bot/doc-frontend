@@ -478,6 +478,42 @@ const [selfExists, setSelfExists] =
     },
     enabled: !!appointmentForm.doctorId && !!appointmentForm.date,
   });
+
+useEffect(() => {
+  const availableSlots = availableSlotsResponse?.availableSlots ?? [];
+
+  if (isSlotsLoading) {
+    return;
+  }
+
+  if (availableSlots.length === 0) {
+    setAppointmentForm((current) => ({
+      ...current,
+      slot: '',
+    }));
+    return;
+  }
+
+  setAppointmentForm((current) => {
+    // Keep user's manually selected slot if it is still available.
+    if (
+      current.slot &&
+      availableSlots.includes(current.slot)
+    ) {
+      return current;
+    }
+
+    // Otherwise automatically select the first available slot.
+    return {
+      ...current,
+      slot: availableSlots[0],
+    };
+  });
+}, [
+  availableSlotsResponse?.availableSlots,
+  isSlotsLoading,
+]);
+
 console.log("availableSlotsResponse", availableSlotsResponse);
   const createAppointmentMutation = useMutation({
     mutationFn: async () => {
@@ -506,6 +542,9 @@ console.log("availableSlotsResponse", availableSlotsResponse);
       void queryClient.invalidateQueries({ queryKey: ['patient-dashboard'] });
       void queryClient.invalidateQueries({ queryKey: ['doctor-appointments'] });
       void queryClient.invalidateQueries({ queryKey: ['available-slots'] });
+        void queryClient.invalidateQueries({
+    queryKey: ['token-appointments'],
+  });
     },
     onError: (error: Error) => toast.error(error.message),
   });
