@@ -312,44 +312,52 @@ const handleSubmit = (
 
           <CardContent className="space-y-6">
             <form onSubmit={handleSubmit} className="space-y-6">
-              {/* Email */}
-              <div className="space-y-2">
-                <Label htmlFor="email" className="text-sm font-medium">
-                  Email Address
-                </Label>
-                <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                  <Input
-                    id="email"
-                    type="email"
-                    value={formData.email}
-                    onChange={(e) => handleInputChange("email", e.target.value)}
-                    className="pl-10 pr-4 py-6 border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-blue-500"
-                    placeholder="Enter your email"
-                  />
-                </div>
-              </div>
+{/* Email */}
+<div className="space-y-2">
+  <Label htmlFor="email" className="text-sm font-medium">
+    {selectedRole === "patient"
+      ? "Email Address (optional)"
+      : "Email Address"}
+  </Label>
 
-              {/* Mobile Number */}
-              <div className="space-y-2">
-                <Label htmlFor="phone" className="text-sm font-medium">
-                  Mobile Number(Optional)
-                </Label>
-                <div className="relative">
-                  <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                  <Input
-                    id="phone"
-                    type="tel"
-                    value={formData.phone}
-                 onChange={(e) => {
-  const value = e.target.value.replace(/\D/g, "").slice(0, 10);
-  handleInputChange("phone", value);
-}}
-                    className="pl-10 pr-4 py-6 border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-blue-500"
-                    placeholder="Enter your phone number"
-                  />
-                </div>
-              </div>
+  <div className="relative">
+    <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+
+    <Input
+      id="email"
+      type="email"
+      value={formData.email}
+      onChange={(e) => handleInputChange("email", e.target.value)}
+      className="pl-10 pr-4 py-6 border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-blue-500"
+      placeholder="Enter your email"
+    />
+  </div>
+</div>
+
+{/* Mobile Number */}
+<div className="space-y-2">
+  <Label htmlFor="phone" className="text-sm font-medium">
+    {selectedRole === "patient"
+      ? "Mobile Number"
+      : "Mobile Number (Optional)"}
+  </Label>
+
+  <div className="relative">
+    <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+
+    <Input
+      id="phone"
+      type="tel"
+      value={formData.phone}
+      onChange={(e) => {
+        const value = e.target.value.replace(/\D/g, "").slice(0, 10);
+        handleInputChange("phone", value);
+      }}
+      className="pl-10 pr-4 py-6 border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-blue-500"
+      placeholder="Enter your phone number"
+    />
+  </div>
+</div>
 
               {selectedRole === "patient" &&
   otpSent && (

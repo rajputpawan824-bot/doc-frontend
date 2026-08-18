@@ -1,6 +1,9 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { clientApi } from "@/lib/api/client";
-
 
 export interface PrescriptionPayload {
   prescription: string;
@@ -9,13 +12,30 @@ export interface PrescriptionPayload {
   isFollowUpRequired?: boolean;
 }
 
-export type PrescriptionRequestPayload = PrescriptionPayload | FormData;
+export interface PrescriptionData {
+  prescription: string;
+  medicalNotes: string;
+  followUpDate?: string | null;
+  isFollowUpRequired?: boolean;
+}
 
+export type PrescriptionRequestPayload =
+  | PrescriptionPayload
+  | FormData;
+
+export interface PrescriptionResponse {
+  _id?: string;
+  appointmentId?: string;
+  prescription: string;
+  medicalNotes: string;
+  followUpDate?: string | null;
+  isFollowUpRequired?: boolean;
+}
 
 export function usePrescription(
   appointmentId?: string
 ) {
-  return useQuery({
+  return useQuery<PrescriptionResponse | null>({
     queryKey: ["prescription", appointmentId],
 
     queryFn: async () => {
@@ -29,25 +49,46 @@ export function usePrescription(
         );
       }
 
-      return response.data;
+      if (!response.data) {
+        return null;
+      }
+
+      return response.data as PrescriptionResponse;
     },
 
     enabled: !!appointmentId,
   });
 }
 
-
-export function useCreatePrescription() {
+export function useSavePrescription() {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async ({
       appointmentId,
       data,
+      isExisting,
     }: {
       appointmentId: string;
       data: PrescriptionRequestPayload;
+      isExisting: boolean;
     }) => {
+      if (isExisting) {
+        const response = await clientApi.put(
+          `/appointment/${appointmentId}/updateprescription`,
+          data
+        );
+
+        if (!response.success) {
+          throw new Error(
+            response.error ||
+              "Failed to update prescription"
+          );
+        }
+
+        return response.data;
+      }
+
       const response = await clientApi.post(
         `/appointment/${appointmentId}/addprescription`,
         data
@@ -55,7 +96,8 @@ export function useCreatePrescription() {
 
       if (!response.success) {
         throw new Error(
-          response.error || "Failed to create prescription"
+          response.error ||
+            "Failed to create prescription"
         );
       }
 
@@ -69,53 +111,13 @@ export function useCreatePrescription() {
           variables.appointmentId,
         ],
       });
+
       queryClient.invalidateQueries({
         queryKey: ["prescription-history"],
       });
     },
   });
 }
-
-
-export function useUpdatePrescription() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async ({
-      appointmentId,
-      data,
-    }: {
-      appointmentId: string;
-      data: PrescriptionRequestPayload;
-    }) => {
-      const response = await clientApi.put(
-        `/appointment/${appointmentId}/updateprescription`,
-        data
-      );
-
-      if (!response.success) {
-        throw new Error(
-          response.error || "Failed to update prescription"
-        );
-      }
-
-      return response.data;
-    },
-
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({
-        queryKey: [
-          "prescription",
-          variables.appointmentId,
-        ],
-      });
-      queryClient.invalidateQueries({
-        queryKey: ["prescription-history"],
-      });
-    },
-  });
-}
-
 
 export async function downloadPrescriptionPdf(
   appointmentId: string
@@ -128,7 +130,9 @@ export async function downloadPrescriptionPdf(
   );
 
   if (!response.success || !response.data) {
-    throw new Error("Failed to download prescription");
+    throw new Error(
+      "Failed to download prescription"
+    );
   }
 
   const blob = response.data;

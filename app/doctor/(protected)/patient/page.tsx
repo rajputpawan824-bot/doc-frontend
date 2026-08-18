@@ -72,9 +72,12 @@ import {
 } from "@/services/admin/appointment";
 import {
   type PrescriptionPayload,
-  useCreatePrescription,
+
   usePrescriptionHistory,
+   usePrescription,
+  useSavePrescription,
 } from "@/services/admin/prescription";
+
 
 type DoctorPatient = Patient & {
   appointmentId?: string;
@@ -534,12 +537,67 @@ export default function PatientsPage() {
   const [limit] = useState(10);
 const [search, setSearch] = useState("");
 
-  const [prescription, setPrescription] = useState("");
-  const [medicalNotes, setMedicalNotes] = useState("");
-  const [followUpDate, setFollowUpDate] = useState("");
-  // const [followUpRequired, setFollowUpRequired] = useState(false);
-  const [prescriptionFiles, setPrescriptionFiles] = useState<File[]>([]);
-  const [selectedAppointmentId, setSelectedAppointmentId] = useState("");
+const [prescription, setPrescription] = useState("");
+const [medicalNotes, setMedicalNotes] = useState("");
+const [followUpDate, setFollowUpDate] = useState("");
+
+const [prescriptionFiles, setPrescriptionFiles] = useState<File[]>([]);
+const [selectedAppointmentId, setSelectedAppointmentId] = useState("");
+
+
+
+const {
+  data: prescriptionData,
+  isLoading: prescriptionLoading,
+} = usePrescription(
+  selectedAppointmentId || undefined
+);
+
+const savePrescriptionMutation = useSavePrescription();
+
+useEffect(() => {
+  if (!selectedAppointmentId) {
+    setPrescription("");
+    setMedicalNotes("");
+    setFollowUpDate("");
+    return;
+  }
+
+  if (prescriptionLoading) {
+    return;
+  }
+
+  if (!prescriptionData) {
+    setPrescription("");
+    setMedicalNotes("");
+    setFollowUpDate("");
+    return;
+  }
+
+  // API may return either:
+  // { prescription, medicalNotes, followUpDate }
+  // OR
+  // { success, data: { prescription, medicalNotes, followUpDate } }
+
+  const existingPrescription =
+    (prescriptionData as any)?.data?.data ??
+    (prescriptionData as any)?.data ??
+    prescriptionData;
+
+  setPrescription(existingPrescription?.prescription ?? "");
+
+  setMedicalNotes(existingPrescription?.medicalNotes ?? "");
+
+  setFollowUpDate(
+    existingPrescription?.followUpDate
+      ? String(existingPrescription.followUpDate).split("T")[0]
+      : ""
+  );
+}, [
+  selectedAppointmentId,
+  prescriptionData,
+  prescriptionLoading,
+]);
 
   const queryClient = useQueryClient();
   const { data, isLoading, error } = usePatients({ page, limit, search });
@@ -564,7 +622,6 @@ const [search, setSearch] = useState("");
       : undefined,
   );
 
-  const createPrescriptionMutation = useCreatePrescription();
 
   useEffect(() => {
     if (error) toast.error("Failed to load patients");
@@ -645,56 +702,76 @@ const appointmentOptions = useMemo(() => {
     setter(`${value}\n${nextNumber}. `);
   };
 
-  const handleSavePrescription = () => {
-    if (!selectedPatient?.id) {
-      toast.error("Patient not found");
-      return;
-    }
+const handleSavePrescription = () => {
+  if (!selectedPatient?.id) {
+    toast.error("Patient not found");
+    return;
+  }
 
-    if (!selectedAppointmentId) {
-      toast.error("Please select an appointment");
-      return;
-    }
+  if (!selectedAppointmentId) {
+    toast.error("Please select an appointment");
+    return;
+  }
 
-    if (!prescription.trim() && !medicalNotes.trim()) {
-      toast.error("Add prescription or medical notes before saving");
-      return;
-    }
+  if (!prescription.trim() && !medicalNotes.trim()) {
+    toast.error("Add prescription or medical notes before saving");
+    return;
+  }
 
-const payload = new FormData();
+  const payload = new FormData();
 
-payload.append("prescription", prescription.trim());
-payload.append("medicalNotes", medicalNotes.trim());
+  payload.append(
+    "prescription",
+    prescription.trim()
+  );
 
-if (followUpDate) {
-  payload.append("followUpDate", followUpDate);
-}
-    createPrescriptionMutation.mutate(
-      {
-        appointmentId: selectedAppointmentId,
-       
-        data: payload as unknown as PrescriptionPayload,
-      },
-      {
-        onSuccess: () => {
-          toast.success("Prescription saved");
-          setPrescriptionDialogOpen(false);
-          setPrescription("");
-          setMedicalNotes("");
-          setFollowUpDate("");
-         // setFollowUpRequired(false);
-          setPrescriptionFiles([]);
-          setSelectedAppointmentId("");
-          void queryClient.invalidateQueries({
-            queryKey: ["prescription-history", selectedPatient.id],
-          });
-        },
-        onError: (mutationError: Error) => {
-          toast.error(mutationError.message || "Failed to save prescription");
-        },
-      },
+  payload.append(
+    "medicalNotes",
+    medicalNotes.trim()
+  );
+
+  if (followUpDate) {
+    payload.append(
+      "followUpDate",
+      followUpDate
     );
-  };
+  }
+
+  savePrescriptionMutation.mutate(
+    {
+      appointmentId: selectedAppointmentId,
+      data: payload,
+      isExisting: !!prescriptionData,
+    },
+    {
+      onSuccess: () => {
+        toast.success("Prescription saved");
+
+        setPrescriptionDialogOpen(false);
+
+        setPrescription("");
+        setMedicalNotes("");
+        setFollowUpDate("");
+        setPrescriptionFiles([]);
+        setSelectedAppointmentId("");
+
+        void queryClient.invalidateQueries({
+          queryKey: [
+            "prescription-history",
+            selectedPatient.id,
+          ],
+        });
+      },
+
+      onError: (mutationError: Error) => {
+        toast.error(
+          mutationError.message ||
+            "Failed to save prescription"
+        );
+      },
+    }
+  );
+};
 
   const columns: ColumnDef<DoctorPatient>[] = [
     {
@@ -1388,18 +1465,18 @@ if (followUpDate) {
                 <Button
                   variant="outline"
                   onClick={() => setPrescriptionDialogOpen(false)}
-                  disabled={createPrescriptionMutation.isPending}
+                  disabled={savePrescriptionMutation.isPending}
                 >
                   Cancel
                 </Button>
                 <Button
                   onClick={handleSavePrescription}
                   disabled={
-                    createPrescriptionMutation.isPending ||
+                    savePrescriptionMutation.isPending ||
                     !selectedAppointmentId
                   }
                 >
-                  {createPrescriptionMutation.isPending
+                  {savePrescriptionMutation.isPending
                     ? "Saving..."
                     : "Save Prescription"}
                 </Button>

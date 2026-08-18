@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import {
@@ -41,18 +42,29 @@ export default function PatientLayout({
 }) {
   const router = useRouter();
   const pathname = usePathname();
+  const isSelectionPage =
+  pathname === "/patient/clinicSelection" ||
+  pathname === "/patient/profileSelection";
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
   const [isChecking, setIsChecking] = useState(true);
+
+
+const queryClient = useQueryClient();
+
   const { patientId } =
   usePatientPortalSelection();
 
 const { data: dashboardData } =
-  usePatientDashboard(patientId || "");
+  usePatientDashboard(
+    isSelectionPage ? undefined : patientId || ""
+  );
 
 const profile =
-  dashboardData?.profile;
+  isAuthenticated && patientId
+    ? dashboardData?.profile
+    : undefined;
 
   const navigationItems = [
     {
@@ -93,12 +105,20 @@ const profile =
     },
   ];
 
-  const handleLogout = () => {
-    localStorage.removeItem("access_token");
-    document.cookie = "access_token=; Max-Age=0; path=/";
-    setIsAuthenticated(false);
-    router.push("/login");
-  };
+const handleLogout = () => {
+  // Remove authentication
+  localStorage.removeItem("access_token");
+  document.cookie = "access_token=; Max-Age=0; path=/";
+
+  // Clear all React Query cached data
+  queryClient.clear();
+
+  // Immediately remove patient data from UI
+  setIsAuthenticated(false);
+
+  // Go to login
+  router.replace("/login");
+};
 
   useEffect(() => {
     const checkAuth = () => {
@@ -130,19 +150,42 @@ const profile =
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  if (isChecking || isAuthenticated === null) {
-    return (
-      <div className="flex h-screen items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <div className="mb-4 inline-block h-12 w-12 animate-spin rounded-full border-4 border-solid border-blue-600 border-r-transparent"></div>
-          <p className="text-gray-600">Preparing your health portal...</p>
-        </div>
+if (isChecking || isAuthenticated === null) {
+  return (
+    <div className="flex h-screen items-center justify-center bg-gray-50">
+      <div className="text-center">
+        <div className="mb-4 inline-block h-12 w-12 animate-spin rounded-full border-4 border-solid border-blue-600 border-r-transparent"></div>
+        <p className="text-gray-600">
+          Preparing your health portal...
+        </p>
       </div>
-    );
-  }
+    </div>
+  );
+}
 
-  if (!isAuthenticated) return null;
+if (!isAuthenticated) return null;
 
+// Do not show patient portal layout
+// until clinic and profile are selected.
+if (isSelectionPage) {
+  return (
+    <div className="min-h-screen bg-slate-50">
+      <header className="flex items-center justify-end border-b border-gray-200 bg-white px-6 py-4">
+        <button
+          onClick={handleLogout}
+          className="flex items-center gap-2 rounded-lg px-4 py-2 text-red-600 transition-colors hover:bg-red-50"
+        >
+          <LogOut size={18} />
+          <span className="text-sm font-medium">Logout</span>
+        </button>
+      </header>
+
+      <main className="p-6">
+        {children}
+      </main>
+    </div>
+  );
+}
   return (
     <div className="flex h-screen overflow-hidden bg-gray-50">
       {mobileMenuOpen && (

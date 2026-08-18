@@ -307,10 +307,12 @@ hasPrescription:
               <div className="p-4 bg-white/10 rounded-2xl inline-block">
                 <Pill className="h-10 w-10 text-white" />
               </div>
-              <div>
-                <h3 className="text-xl font-bold">Active Medications</h3>
-                <p className="text-white-100 text-sm">{visitHistory.filter((visit) => visit.hasPrescription).length} current prescriptions</p>
-              </div>
+    <div>
+  <h3 className="text-xl font-bold">Active Medications</h3>
+  <p className="text-white-100 text-sm">
+    {historyItems.length} current prescriptions
+  </p>
+</div>
 <Button
   variant="secondary"
   className="w-full font-bold"
