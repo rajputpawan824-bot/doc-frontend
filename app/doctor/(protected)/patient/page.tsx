@@ -1,15 +1,24 @@
 "use client";
 
-import { KeyboardEvent, ReactNode, useEffect, useMemo, useState } from "react";
+import {
+  KeyboardEvent,
+  ReactNode,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import {
   Calendar,
+  Check,
   ChevronLeft,
   ChevronRight,
   Droplets,
   Eye,
+  File,
   FileText,
   HeartPulse,
   Mail,
+ RefreshCw,
   MoreVertical,
   Phone,
   Search,
@@ -17,6 +26,7 @@ import {
   Stethoscope,
   User,
   Users,
+    X,
 } from "lucide-react";
 import {
   ColumnDef,
@@ -30,7 +40,6 @@ import {
   SortingState,
   useReactTable,
 } from "@tanstack/react-table";
-import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Toaster } from "@/components/ui/sonner";
 import { Badge } from "@/components/ui/badge";
@@ -72,10 +81,13 @@ import {
 } from "@/services/admin/appointment";
 import {
   type PrescriptionPayload,
+  type PrescriptionAttachment,
+  type TemporaryDocument,
 
   usePrescriptionHistory,
    usePrescription,
   useSavePrescription,
+  useTemporaryDocuments,
 } from "@/services/admin/prescription";
 
 
@@ -104,11 +116,7 @@ type PrescriptionHistoryItem = {
   prescription?: string | string[];
   medicalNotes?: string | string[];
   followUpDate?: string | Date | null;
-  attachments?: {
-    _id?: string;
-    originalName: string;
-    filePath: string;
-  }[];
+  attachments?: PrescriptionAttachment[];
   createdAt?: string | Date;
   updatedAt?: string | Date;
   appointment?: {
@@ -133,6 +141,8 @@ type PrescriptionHistoryItem = {
     };
   };
 };
+
+
 
 type AppointmentOption = PatientAppointment & {
   tokenNumber?: string | number;
@@ -465,6 +475,12 @@ const getHistoryDoctorName = (item: PrescriptionHistoryItem) =>
 const getHistoryToken = (item: PrescriptionHistoryItem) =>
   getAppointmentToken(item);
 
+const getAttachmentUrl = (attachment: PrescriptionAttachment) =>
+  attachment.url ||
+  (attachment.filePath
+    ? `${process.env.NEXT_PUBLIC_API_URL ?? ""}${attachment.filePath}`
+    : "");
+
 const splitNumberedText = (value?: string | string[]) => {
   if (Array.isArray(value)) return value.filter(Boolean);
   if (!value) return [];
@@ -532,6 +548,7 @@ export default function PatientsPage() {
   const [viewPatientOpen, setViewPatientOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [prescriptionDialogOpen, setPrescriptionDialogOpen] = useState(false);
+  const [scannedFilesDialogOpen, setScannedFilesDialogOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("all");
   const [page] = useState(1);
   const [limit] = useState(10);
@@ -542,7 +559,10 @@ const [medicalNotes, setMedicalNotes] = useState("");
 const [followUpDate, setFollowUpDate] = useState("");
 
 const [prescriptionFiles, setPrescriptionFiles] = useState<File[]>([]);
-const [selectedAppointmentId, setSelectedAppointmentId] = useState("");
+	const [selectedTemporaryDocuments, setSelectedTemporaryDocuments] = useState<TemporaryDocument[]>([]);
+	const [pendingTemporaryDocuments, setPendingTemporaryDocuments] = useState<TemporaryDocument[]>([]);
+	const [temporaryDocumentsRefreshing, setTemporaryDocumentsRefreshing] = useState(false);
+	const [selectedAppointmentId, setSelectedAppointmentId] = useState("");
 
 
 
@@ -554,6 +574,23 @@ const {
 );
 
 const savePrescriptionMutation = useSavePrescription();
+
+const {
+  data: temporaryDocuments = [],
+  isLoading: temporaryDocumentsLoading,
+  error: temporaryDocumentsError,
+  refetch: refetchTemporaryDocuments,
+} = useTemporaryDocuments(scannedFilesDialogOpen);
+
+useEffect(() => {
+  if (scannedFilesDialogOpen && temporaryDocumentsError) {
+    toast.error(
+      temporaryDocumentsError instanceof Error
+        ? temporaryDocumentsError.message
+        : "Failed to load scanned files",
+    );
+  }
+}, [scannedFilesDialogOpen, temporaryDocumentsError]);
 
 useEffect(() => {
   if (!selectedAppointmentId) {
@@ -599,7 +636,6 @@ useEffect(() => {
   prescriptionLoading,
 ]);
 
-  const queryClient = useQueryClient();
   const { data, isLoading, error } = usePatients({ page, limit, search });
   const patients: DoctorPatient[] = (data?.data ?? []) as DoctorPatient[];
 
@@ -666,8 +702,41 @@ const appointmentOptions = useMemo(() => {
     setFollowUpDate("");
     // setFollowUpRequired(false);
     setPrescriptionFiles([]);
+    setSelectedTemporaryDocuments([]);
+    setPendingTemporaryDocuments([]);
     setSelectedAppointmentId("");
     setPrescriptionDialogOpen(true);
+  };
+
+const openScannedFilesDialog = () => {
+  setPendingTemporaryDocuments(selectedTemporaryDocuments);
+  setPrescriptionDialogOpen(false);
+  setScannedFilesDialogOpen(true);
+};
+
+const removeSelectedTemporaryDocument = (documentId: string) => {
+  setSelectedTemporaryDocuments((current) =>
+    current.filter((document) => document.id !== documentId)
+  );
+};
+
+const handleScannedFilesDialogOpenChange = (open: boolean) => {
+  if (!open) {
+    setPendingTemporaryDocuments(selectedTemporaryDocuments);
+    setScannedFilesDialogOpen(false);
+    setPrescriptionDialogOpen(true);
+    return;
+  }
+
+  setScannedFilesDialogOpen(true);
+};
+
+  const toggleTemporaryDocument = (document: TemporaryDocument) => {
+    setPendingTemporaryDocuments((current) =>
+      current.some((item) => item.id === document.id)
+        ? current.filter((item) => item.id !== document.id)
+        : [...current, document],
+    );
   };
 
   const ensureNumberedText = (value: string) => {
@@ -737,14 +806,36 @@ const handleSavePrescription = () => {
     );
   }
 
+  payload.append("isFollowUpRequired", "false");
+
+  prescriptionFiles.forEach((file) => {
+    payload.append("files", file);
+  });
+
+  payload.append(
+    "temporaryDocuments",
+    JSON.stringify(
+      selectedTemporaryDocuments.map((document) => ({ id: document.id })),
+    ),
+  );
+
+  const hasNewAttachments =
+    prescriptionFiles.length > 0 || selectedTemporaryDocuments.length > 0;
+
   savePrescriptionMutation.mutate(
     {
       appointmentId: selectedAppointmentId,
       data: payload,
       isExisting: !!prescriptionData,
+      patientId: selectedPatient.id,
     },
     {
-      onSuccess: () => {
+      onSuccess: (savedPrescription) => {
+        if (hasNewAttachments && !savedPrescription.attachments?.length) {
+          toast.error("Prescription was saved, but its attachments were not confirmed");
+          return;
+        }
+
         toast.success("Prescription saved");
 
         setPrescriptionDialogOpen(false);
@@ -753,14 +844,10 @@ const handleSavePrescription = () => {
         setMedicalNotes("");
         setFollowUpDate("");
         setPrescriptionFiles([]);
+        setSelectedTemporaryDocuments([]);
+        setPendingTemporaryDocuments([]);
         setSelectedAppointmentId("");
 
-        void queryClient.invalidateQueries({
-          queryKey: [
-            "prescription-history",
-            selectedPatient.id,
-          ],
-        });
       },
 
       onError: (mutationError: Error) => {
@@ -1279,15 +1366,19 @@ const handleSavePrescription = () => {
                               {item.attachments?.length ? (
                                 <div className="space-y-2">
                                   {item.attachments.map((attachment, attachmentIndex) => (
-                                    <a
+                                    <button
                                       key={attachment._id || attachmentIndex}
-                                      href={`${process.env.NEXT_PUBLIC_API_URL}${attachment.filePath}`}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
+                                      type="button"
+                                      onClick={() => {
+                                        const attachmentUrl = getAttachmentUrl(attachment);
+                                        if (attachmentUrl) {
+                                          window.open(attachmentUrl, "_blank", "noopener,noreferrer");
+                                        }
+                                      }}
                                       className="block text-sm text-blue-600 underline"
                                     >
-                                      {attachment.originalName}
-                                    </a>
+                                      {attachment.originalName || attachment.fileName || "Attachment"}
+                                    </button>
                                   ))}
                                 </div>
                               ) : (
@@ -1327,7 +1418,9 @@ const handleSavePrescription = () => {
           open={prescriptionDialogOpen}
           onOpenChange={setPrescriptionDialogOpen}
         >
-          <DialogContent className="max-h-[90vh] max-w-4xl overflow-y-auto">
+	   <DialogContent
+  className="!w-[85vw] !max-w-[900px] !h-[82vh] !max-h-[900px] overflow-y-auto"
+>
             <DialogHeader>
               <DialogTitle>Create Prescription</DialogTitle>
             </DialogHeader>
@@ -1449,17 +1542,88 @@ const handleSavePrescription = () => {
   />
 </div>
 
-              <div className="space-y-2 rounded-lg border bg-white p-4">
-                <Label>Medical Reports</Label>
-                <Input
-                  name="files"
-                  type="file"
-                  multiple
-                  onChange={(event) =>
-                    setPrescriptionFiles(Array.from(event.target.files || []))
-                  }
-                />
-              </div>
+<div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+  <div className="rounded-lg border p-4">
+    <Label>Medical Reports</Label>
+
+    <div className="mt-2 flex h-[150px] flex-col justify-center rounded-lg border-2 border-dashed bg-slate-50 px-4">
+      <p className="text-sm font-medium text-slate-700">
+        Upload medical reports
+      </p>
+
+      <p className="mt-1 text-xs text-slate-500">
+        Select reports from your device
+      </p>
+
+      <Input
+        name="files"
+        type="file"
+        multiple
+        className="mt-3"
+        onChange={(event) =>
+          setPrescriptionFiles(Array.from(event.target.files || []))
+        }
+      />
+    </div>
+  </div>
+
+  <div className="rounded-lg border p-4">
+    <Label>Scanned Files</Label>
+
+    <div className="mt-2 flex h-[150px] flex-col items-center justify-center rounded-lg border-2 border-dashed bg-slate-50">
+      <File className="mb-2 h-8 w-8 text-slate-400" />
+
+      <p className="text-sm font-medium text-slate-700">
+        Select scanned files from below
+      </p>
+
+      <p className="mt-1 text-xs text-slate-500">
+        Choose from your temporary documents
+      </p>
+
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        className="mt-3"
+        onClick={openScannedFilesDialog}
+      >
+{selectedTemporaryDocuments.length > 0 ? "Add File" : "Choose File"}
+      </Button>
+    </div>
+
+    {selectedTemporaryDocuments.length > 0 && (
+      <div className="mt-3 space-y-1 border-t pt-3">
+        <p className="text-sm font-medium text-slate-700">
+          Selected scanned files:
+        </p>
+
+        <ul className="space-y-1 text-sm text-slate-600">
+{selectedTemporaryDocuments.map((document) => (
+  <li
+    key={document.id}
+    className="flex items-center justify-between gap-2"
+  >
+    <div className="flex min-w-0 items-center gap-2">
+      <Check className="h-4 w-4 shrink-0 text-emerald-600" />
+      <span className="truncate">{document.originalFileName}</span>
+    </div>
+
+    <button
+      type="button"
+      onClick={() => removeSelectedTemporaryDocument(document.id)}
+      className="shrink-0 rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-red-600"
+      title="Remove file"
+    >
+      <X className="h-4 w-4" />
+    </button>
+  </li>
+))}
+        </ul>
+      </div>
+    )}
+  </div>
+</div>
 
               <div className="flex justify-end gap-3">
                 <Button
@@ -1483,6 +1647,128 @@ const handleSavePrescription = () => {
               </div>
             </div>
           </DialogContent>
+        </Dialog>
+
+        <Dialog
+          open={scannedFilesDialogOpen}
+          onOpenChange={handleScannedFilesDialogOpenChange}
+        >
+<DialogContent className="z-[60] flex !h-[80vh] !max-h-[850px] !w-[90vw] !max-w-[1200px] flex-col overflow-hidden p-0">
+	            <DialogHeader className="shrink-0 border-b p-6 pr-16">
+	              <div className="flex items-center justify-between gap-4">
+	                <div>
+	                  <DialogTitle>Select Scanned Files</DialogTitle>
+	                  <p className="mt-1 text-sm text-slate-500">
+	                    Select files from your temporary documents
+	                  </p>
+	                </div>
+                <Button
+	                  type="button"
+	                  variant="outline"
+	                  size="sm"
+	                  onClick={async () => {
+	                    setTemporaryDocumentsRefreshing(true);
+	                    try {
+	                      await refetchTemporaryDocuments();
+	                    } finally {
+	                      setTemporaryDocumentsRefreshing(false);
+	                    }
+	                  }}
+	                  disabled={temporaryDocumentsRefreshing}
+	                >
+	                  <RefreshCw
+	                    className={`mr-2 h-4 w-4 ${
+	                      temporaryDocumentsRefreshing ? "animate-spin" : ""
+	                    }`}
+	                  />
+	                  {temporaryDocumentsRefreshing ? "Refreshing..." : "Refresh"}
+	                </Button>
+	              </div>
+	            </DialogHeader>
+
+	            <div className="min-h-0 flex-1 overflow-y-auto p-6">
+	              {temporaryDocumentsLoading ? (
+	                <div className="py-16 text-center text-sm text-slate-500">
+	                  Loading scanned files...
+	                </div>
+	              ) : temporaryDocumentsError ? (
+	                <div className="rounded-lg border border-red-100 bg-red-50 p-4 text-sm text-red-700">
+	                  Unable to load scanned files. You can close this window and continue with medical reports.
+	                </div>
+	              ) : temporaryDocuments.length ? (
+	                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+	                  {temporaryDocuments.map((document) => {
+	                    const isSelected = pendingTemporaryDocuments.some(
+	                      (item) => item.id === document.id,
+	                    );
+	                    const isImage = document.mimeType?.startsWith("image/");
+
+	                    return (
+	                      <button
+	                        key={document.id}
+	                        type="button"
+	                        onClick={() => toggleTemporaryDocument(document)}
+	                        className={`relative overflow-hidden rounded-lg border text-left transition ${
+	                          isSelected
+	                            ? "border-blue-500 bg-blue-50 ring-2 ring-blue-100"
+	                            : "bg-white hover:border-blue-200 hover:bg-slate-50"
+	                        }`}
+	                        aria-pressed={isSelected}
+	                      >
+	                        <div className="flex aspect-[4/3] items-center justify-center bg-slate-100">
+	                          {isImage && document.url ? (
+	                            <img
+	                              src={document.url}
+	                              alt={document.originalFileName}
+	                              className="h-full w-full object-cover"
+	                            />
+	                          ) : (
+	                            <File className="h-12 w-12 text-slate-400" />
+	                          )}
+	                        </div>
+	                        <div className="flex items-center gap-2 p-3">
+	                          <FileText className="h-4 w-4 shrink-0 text-slate-500" />
+	                          <span className="truncate text-sm font-medium text-slate-700">
+	                            {document.originalFileName}
+	                          </span>
+	                        </div>
+	                        {isSelected && (
+	                          <span className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full bg-blue-600 text-white">
+	                            <Check className="h-4 w-4" />
+	                          </span>
+	                        )}
+	                      </button>
+	                    );
+	                  })}
+	                </div>
+	              ) : (
+	                <div className="py-16 text-center text-sm text-slate-500">
+	                  No scanned files available.
+	                </div>
+	              )}
+	            </div>
+
+	            <div className="flex shrink-0 justify-end gap-3 border-t p-4">
+	              <Button
+	                type="button"
+	                variant="outline"
+	                onClick={() => handleScannedFilesDialogOpenChange(false)}
+	              >
+	                Cancel
+	              </Button>
+	              <Button
+	                type="button"
+	                onClick={() => {
+	                  setSelectedTemporaryDocuments(pendingTemporaryDocuments);
+	                  setScannedFilesDialogOpen(false);
+	                  setPrescriptionDialogOpen(true);
+	                }}
+	                disabled={temporaryDocumentsLoading || !!temporaryDocumentsError}
+	              >
+	                Select Files
+	              </Button>
+	            </div>
+	          </DialogContent>
         </Dialog>
       </div>
     </>

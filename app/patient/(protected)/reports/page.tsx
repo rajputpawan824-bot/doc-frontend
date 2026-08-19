@@ -24,6 +24,7 @@ interface MedicalReport {
   fileName: string;
   originalName?: string;
   filePath?: string;
+  url?: string;
    uploadedAt?: string | Date;
 }
 export default function PatientReportsPage() {
@@ -76,12 +77,16 @@ const columns: ColumnDef<MedicalReport>[] = [
       <Button
         variant="outline"
         size="sm"
-        onClick={() =>
-          window.open(
-            `${process.env.NEXT_PUBLIC_API_URL}${row.original.filePath}`,
-            "_blank"
-          )
-        }
+        onClick={() => {
+          if (!row.original.url) {
+            if (process.env.NODE_ENV !== "production") {
+              console.warn("Medical report is missing a browser-accessible URL", row.original);
+            }
+            return;
+          }
+
+          window.open(row.original.url, "_blank", "noopener,noreferrer");
+        }}
       >
         <Eye className="h-4 w-4 mr-1" />
         View

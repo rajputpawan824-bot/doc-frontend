@@ -30,6 +30,86 @@ export interface PrescriptionResponse {
   medicalNotes: string;
   followUpDate?: string | null;
   isFollowUpRequired?: boolean;
+  attachments?: PrescriptionAttachment[];
+}
+
+export interface PrescriptionAttachment {
+  _id?: string;
+  fileName?: string;
+  originalName?: string;
+  mimeType?: string;
+  fileSize?: number;
+  filePath?: string;
+  uploadedAt?: string | Date;
+  url?: string;
+}
+
+function getPrescriptionResponse(value: unknown): PrescriptionResponse | null {
+  if (!value || typeof value !== "object") return null;
+
+  const response = value as PrescriptionResponse;
+  const envelope = value as { data?: unknown };
+
+  if (
+    "prescription" in response ||
+    "medicalNotes" in response ||
+    "attachments" in response
+  ) {
+    return response;
+  }
+
+  return getPrescriptionResponse(envelope.data);
+}
+
+export interface TemporaryDocument {
+  id: string;
+  originalFileName: string;
+  filePath: string;
+  mimeType?: string;
+  uploadedAt?: string;
+  url?: string;
+}
+
+function getTemporaryDocuments(value: unknown): TemporaryDocument[] {
+  if (Array.isArray(value)) return value as TemporaryDocument[];
+
+  if (value && typeof value === "object") {
+    const response = value as {
+      data?: unknown;
+      documents?: unknown;
+      temporaryDocuments?: unknown;
+    };
+
+    if (Array.isArray(response.documents)) {
+      return response.documents as TemporaryDocument[];
+    }
+
+    if (Array.isArray(response.temporaryDocuments)) {
+      return response.temporaryDocuments as TemporaryDocument[];
+    }
+
+    return getTemporaryDocuments(response.data);
+  }
+
+  return [];
+}
+
+export function useTemporaryDocuments(enabled = false) {
+  return useQuery<TemporaryDocument[]>({
+    queryKey: ["temporary-documents"],
+    queryFn: async () => {
+      const response = await clientApi.get("/temporary-documents/get-temp-document");
+
+      if (!response.success) {
+        throw new Error(
+          response.error || "Failed to fetch scanned files",
+        );
+      }
+
+      return getTemporaryDocuments(response.data).slice(0, 9);
+    },
+    enabled,
+  });
 }
 
 export function usePrescription(
@@ -53,7 +133,7 @@ export function usePrescription(
         return null;
       }
 
-      return response.data as PrescriptionResponse;
+      return getPrescriptionResponse(response.data);
     },
 
     enabled: !!appointmentId,
@@ -72,6 +152,7 @@ export function useSavePrescription() {
       appointmentId: string;
       data: PrescriptionRequestPayload;
       isExisting: boolean;
+      patientId?: string;
     }) => {
       if (isExisting) {
         const response = await clientApi.put(
@@ -86,7 +167,13 @@ export function useSavePrescription() {
           );
         }
 
-        return response.data;
+        const savedPrescription = getPrescriptionResponse(response.data);
+
+        if (!savedPrescription) {
+          throw new Error("Prescription save response did not include prescription data");
+        }
+
+        return savedPrescription;
       }
 
       const response = await clientApi.post(
@@ -101,7 +188,13 @@ export function useSavePrescription() {
         );
       }
 
-      return response.data;
+      const savedPrescription = getPrescriptionResponse(response.data);
+
+      if (!savedPrescription) {
+        throw new Error("Prescription save response did not include prescription data");
+      }
+
+      return savedPrescription;
     },
 
     onSuccess: (_, variables) => {
@@ -112,9 +205,14 @@ export function useSavePrescription() {
         ],
       });
 
-      queryClient.invalidateQueries({
-        queryKey: ["prescription-history"],
-      });
+      if (variables.patientId) {
+        queryClient.invalidateQueries({
+          queryKey: ["prescription-history", variables.patientId],
+        });
+        queryClient.invalidateQueries({
+          queryKey: ["patient-medical-history", variables.patientId],
+        });
+      }
     },
   });
 }

@@ -42,7 +42,23 @@ type PrescriptionAttachment = {
   originalName?: string;
   fileName?: string;
   filePath?: string;
+  url?: string;
   date?: string | Date;
+};
+
+const getAttachmentUrl = (attachment: PrescriptionAttachment) =>
+  attachment.url || "";
+const openAttachment = (attachment: PrescriptionAttachment) => {
+  const attachmentUrl = getAttachmentUrl(attachment);
+
+  if (!attachmentUrl) {
+    if (process.env.NODE_ENV !== "production") {
+      console.warn("Prescription attachment is missing a browser-accessible URL", attachment);
+    }
+    return;
+  }
+
+  window.open(attachmentUrl, "_blank", "noopener,noreferrer");
 };
 
 type PrescriptionHistoryItem = {
@@ -53,11 +69,21 @@ type PrescriptionHistoryItem = {
   followUpDate?: string | Date | null;
   createdAt?: string | Date;
   attachments?: PrescriptionAttachment[];
+
   appointment?: {
     date?: string | Date;
     tokenNumber?: string | number;
     doctorName?: string;
   };
+
+  doctor?: {
+    department?: string;
+    qualification?: string;
+    user?: {
+      name?: string;
+    };
+  };
+
   doctorName?: string;
 };
 
@@ -330,11 +356,10 @@ hasPrescription:
             </CardHeader>
             <CardContent className="space-y-4">
               {allAttachments.slice(0, 2).map((attachment, index) => (
-                <a
+                <button
                   key={attachment._id || attachment.filePath || index}
-                  href={`${process.env.NEXT_PUBLIC_API_URL}${attachment.filePath}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                  type="button"
+                  onClick={() => openAttachment(attachment)}
                   className="flex items-center justify-between p-3 bg-slate-50 rounded-xl"
                 >
                   <div className="flex items-center gap-3">
@@ -349,7 +374,7 @@ hasPrescription:
                     </div>
                   </div>
                   <Download className="h-4 w-4 text-blue-600 cursor-pointer" />
-                </a>
+                </button>
               ))}
               {allAttachments.length === 0 && (
                 <p className="text-sm text-slate-400">No documents found.</p>
@@ -363,7 +388,7 @@ hasPrescription:
   open={historyOpen}
   onOpenChange={setHistoryOpen}
 >
-  <DialogContent className="max-h-[90vh] max-w-6xl overflow-y-auto">
+<DialogContent className="w-[98vw] max-w-[1500px] max-h-[90vh] overflow-y-auto">
     <DialogHeader>
       <DialogTitle>
         Prescription History
@@ -436,14 +461,14 @@ hasPrescription:
                         </p>
                       </div>
 
-                      <p className="text-sm font-medium">
-                        Doctor:
-                        {" "}
-                        {item.doctorName ||
-                          item.appointment?.doctorName ||
-                          "-"}
-                      </p>
-
+<p className="text-sm font-medium">
+  Doctor:
+  {" "}
+  {item.doctor?.user?.name ||
+    item.doctorName ||
+    item.appointment?.doctorName ||
+    "-"}
+</p>
                     </div>
 
                     <div className="grid gap-5 md:grid-cols-2">
@@ -480,15 +505,14 @@ hasPrescription:
                       {attachments.length > 0 ? (
                         <div className="space-y-2">
                           {attachments.map((attachment, attachmentIndex) => (
-                            <a
+                            <button
                               key={attachment._id || attachment.filePath || attachmentIndex}
-                              href={`${process.env.NEXT_PUBLIC_API_URL}${attachment.filePath}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
+                              type="button"
+                              onClick={() => openAttachment(attachment)}
                               className="block text-sm text-blue-600 underline"
                             >
                               {attachment.originalName || attachment.fileName}
-                            </a>
+                            </button>
                           ))}
                         </div>
                       ) : (

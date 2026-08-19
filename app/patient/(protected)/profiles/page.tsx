@@ -114,6 +114,7 @@ interface MedicalReport {
   fileName: string;
   originalName?: string;
   filePath?: string;
+  url?: string;
   mimeType?: string;
   fileSize?: number;
   uploadedAt?: string | Date;
@@ -130,13 +131,17 @@ const renderMedicalReports = (reports?: MedicalReport[]) => {
       {reports.map((report, index) => (
         <a
           key={report._id || report.id || report.filePath || index}
-          href={
-            report.filePath
-              ? `${process.env.NEXT_PUBLIC_API_URL}${report.filePath}`
-              : report.downloadUrl
-          }
+          href={report.url}
           target="_blank"
           rel="noopener noreferrer"
+          onClick={(event) => {
+            if (!report.url) {
+              event.preventDefault();
+              if (process.env.NODE_ENV !== "production") {
+                console.warn("Medical report is missing a browser-accessible URL", report);
+              }
+            }
+          }}
           className="block text-sm text-blue-600 underline"
         >
           {report.originalName || report.fileName}
