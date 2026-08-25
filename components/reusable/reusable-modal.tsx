@@ -5,7 +5,7 @@ import { Plus, X ,Eye, EyeOff} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Modal from "../ui/modal";
 
-export type FieldType = "text" | "email" | "tel"|"file" | "number" | "password" | "textarea" | "select" | "radio" | "checkbox" | "date" | "time"| "checkbox-group"   | "document-manager"  | "patient-document-manager" | "custom";
+export type FieldType = "text" | "email" | "tel"|"file" | "number" | "password" | "textarea" | "select" | "radio" | "checkbox" | "date" | "time"| "checkbox-group"   | "document-manager"  | "patient-document-manager" | "FileText"  | "custom";
 export type FormDataValue = unknown;
 export type ReusableFormData = Record<string, FormDataValue>;
 
@@ -282,11 +282,13 @@ const [patientDocumentRows, setPatientDocumentRows] = useState<
   {
     documentName: string;
     file: File | null;
+    previewUrl?: string;
   }[]
 >([
   {
     documentName: "",
     file: null,
+    previewUrl: "",
   },
 ]);
 const [existingPatientDocuments, setExistingPatientDocuments] =
@@ -834,22 +836,92 @@ case "patient-document-manager":
             />
           </label>
 
-          <label className="block space-y-1">
-            <span className="text-sm font-medium text-slate-700">Choose File</span>
-            <input
-              type="file"
-              className={commonClasses}
-              onChange={(e) => {
-                const updatedRows = [...patientDocumentRows];
-                updatedRows[index].file = e.target.files?.[0] || null;
-                setPatientDocumentRows(updatedRows);
-                handleChange(
-                  field.name,
-                  updatedRows.filter((row) => row.documentName.trim() && row.file),
-                );
-              }}
-            />
-          </label>
+<label className="block space-y-1">
+  <span className="text-sm font-medium text-slate-700">
+    Choose File
+  </span>
+
+  {row.file && row.previewUrl ? (
+    <div className="relative w-full rounded-lg border border-slate-200 bg-slate-50 p-3">
+      <img
+        src={row.previewUrl}
+        alt="Selected document"
+        className="h-32 w-full rounded-lg object-contain"
+      />
+
+      <button
+        type="button"
+        onClick={() => {
+          const updatedRows = [...patientDocumentRows];
+
+          if (updatedRows[index].previewUrl) {
+            URL.revokeObjectURL(updatedRows[index].previewUrl);
+          }
+
+          updatedRows[index] = {
+            ...updatedRows[index],
+            file: null,
+            previewUrl: "",
+          };
+
+          setPatientDocumentRows(updatedRows);
+
+          handleChange(
+            field.name,
+            updatedRows.filter(
+              (row) => row.documentName.trim() && row.file
+            )
+          );
+        }}
+        className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-white text-red-500 shadow hover:bg-red-50"
+      >
+        ×
+      </button>
+    </div>
+  ) : (
+    <div>
+      <input
+        id={`patient-document-${index}`}
+        type="file"
+        accept="image/*"
+        className="sr-only"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+
+          if (!file) return;
+
+          const updatedRows = [...patientDocumentRows];
+
+          if (updatedRows[index].previewUrl) {
+            URL.revokeObjectURL(updatedRows[index].previewUrl);
+          }
+
+          updatedRows[index] = {
+            ...updatedRows[index],
+            file,
+            previewUrl: URL.createObjectURL(file),
+          };
+
+          setPatientDocumentRows(updatedRows);
+
+          handleChange(
+            field.name,
+            updatedRows.filter(
+              (row) => row.documentName.trim() && row.file
+            )
+          );
+        }}
+      />
+
+      <label
+        htmlFor={`patient-document-${index}`}
+        className="flex h-11 w-full cursor-pointer items-center justify-center rounded-lg border border-slate-300 bg-white text-sm font-medium text-slate-700 hover:bg-slate-50"
+      >
+        Choose File
+      </label>
+    </div>
+  )}
+</label>
 
           <button
             type="button"

@@ -1,7 +1,7 @@
 // app/verify-otp/page.tsx
 "use client";
 
-import { useState, useRef, Suspense } from "react";
+import { useState, useRef, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -27,6 +27,23 @@ function VerifyOTPForm() {
   const email = searchParams.get("email");
   const [otp, setOtp] = useState(["", "", "", "", "", ""]);
   const [isVerified, setIsVerified] = useState(false);
+  const [resendCooldown, setResendCooldown] = useState(0);
+  useEffect(() => {
+  if (resendCooldown <= 0) return;
+
+  const timer = setInterval(() => {
+    setResendCooldown((prev) => {
+      if (prev <= 1) {
+        clearInterval(timer);
+        return 0;
+      }
+
+      return prev - 1;
+    });
+  }, 1000);
+
+  return () => clearInterval(timer);
+}, [resendCooldown]);
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
   const router = useRouter();
 
@@ -49,17 +66,19 @@ function VerifyOTPForm() {
     },
   });
 
-  const { mutate: resendOtpMutation, isPending: isResending } = useApiMutation<
-    OtpResponse,
-    { email: string }
-  >("/auth/forgot-password", "POST", {
+const {
+  mutate: resendOtpMutation,
+  isPending: isResending,
+} = useApiMutation<OtpResponse, { email: string }>(
+  "/auth/forgot-password",
+  "POST",
+  {
     onSuccess: (data: OtpResponse) => {
       toast.success(data?.message || "OTP resent to your email");
+      setResendCooldown(60);
     },
-    onError: (error: Error) => {
-      toast.error(error.message || "Failed to resend OTP");
-    },
-  });
+  }
+);
 
   const handleChange = (index: number, value: string) => {
     if (value.length <= 1 && /^\d*$/.test(value)) {
@@ -114,13 +133,18 @@ function VerifyOTPForm() {
     }
   };
 
-  const handleResendOTP = async () => {
-    if (email) {
-      resendOtpMutation({ email });
-    } else {
-      toast.error("Email not found.");
-    }
-  };
+const handleResendOTP = () => {
+  if (!email) {
+    toast.error("Email not found.");
+    return;
+  }
+
+  if (resendCooldown > 0 || isResending) {
+    return;
+  }
+
+  resendOtpMutation({ email });
+};
 
   if (isVerified) {
     return (
@@ -216,20 +240,25 @@ function VerifyOTPForm() {
                 <p className="text-gray-600 dark:text-gray-400">
                   Didn&apos;t receive the code?
                 </p>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={handleResendOTP}
-                  disabled={isResending}
-                  className="text-blue-600 hover:text-blue-700"
-                >
-                  <RotateCcw
-                    className={`w-4 h-4 mr-2 ${
-                      isResending ? "animate-spin" : ""
-                    }`}
-                  />
-                  {isResending ? "Resending..." : "Resend OTP"}
-                </Button>
+        <Button
+  type="button"
+  variant="outline"
+  onClick={handleResendOTP}
+  disabled={isResending || resendCooldown > 0}
+  className="text-blue-600 hover:text-blue-700"
+>
+  <RotateCcw
+    className={`w-4 h-4 mr-2 ${
+      isResending ? "animate-spin" : ""
+    }`}
+  />
+
+  {isResending
+    ? "Resending..."
+    : resendCooldown > 0
+      ? `Resend OTP (${resendCooldown}s)`
+      : "Resend OTP"}
+</Button>
               </div>
 
               <div className="text-center">

@@ -44,6 +44,7 @@ import {
 } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import ReusableModal, { FormSection, ReusableFormData } from '@/components/reusable/reusable-modal';
+import PrescriptionDialog from '@/components/reusable/prescription-dialog';
 import {
   useAddPatient,
   useNextPatientCode,
@@ -438,6 +439,10 @@ const [selfExists, setSelfExists] =
   const [editPatientId, setEditPatientId] = useState<string>('');
   const [detailPatientId, setDetailPatientId] = useState<string>('');
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
+  const [reportsPatient, setReportsPatient] = useState<Patient | null>(null);
+  const [isReportsModalOpen, setIsReportsModalOpen] = useState(false);
+  const [isMedicalReportsModalOpen, setIsMedicalReportsModalOpen] = useState(false);
+  const [isPrescriptionDialogOpen, setIsPrescriptionDialogOpen] = useState(false);
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(10);
 
@@ -585,6 +590,7 @@ console.log("availableSlotsResponse", availableSlotsResponse);
   const updatePatientMutation = useUpdatePatient({
     onSuccess: (patient) => {
       setIsEditModalOpen(false);
+      setIsMedicalReportsModalOpen(false);
       setSelectedPatient(null);
       setEditPatientId('');
       void refetch();
@@ -974,6 +980,69 @@ emergencyContact: {
     setIsEditModalOpen(true);
   };
 
+  const handleOpenReports = (patient: Patient) => {
+    setReportsPatient(patient);
+    setIsReportsModalOpen(true);
+  };
+
+  const handleSaveMedicalReports = async (data: ReusableFormData) => {
+    if (!reportsPatient) return;
+
+    const medicalReports = Array.isArray(data.medicalReports)
+      ? data.medicalReports.filter(
+          (document): document is { documentName: string; file: File } =>
+            !!document &&
+            typeof document === 'object' &&
+            'file' in document &&
+            document.file instanceof File &&
+            typeof document.documentName === 'string' &&
+            document.documentName.trim().length > 0,
+        )
+      : [];
+    const deletedDocumentIds = Array.isArray(data.medicalReportsDeletedIds)
+      ? data.medicalReportsDeletedIds.filter(
+          (id): id is string => typeof id === 'string',
+        )
+      : [];
+
+    const payload: PatientCreateData = {
+      name: reportsPatient.name,
+      phoneNumber: reportsPatient.phoneNumber,
+      email: reportsPatient.email,
+      age: reportsPatient.age,
+      gender: reportsPatient.gender,
+      bloodGroup: reportsPatient.bloodGroup,
+      adhar: reportsPatient.adhar,
+      address: reportsPatient.address,
+      relation: reportsPatient.relation ?? 'SELF',
+      otherRelation: reportsPatient.otherRelation ?? '',
+      diseases: Array.isArray(reportsPatient.diseases)
+        ? reportsPatient.diseases
+        : typeof reportsPatient.diseases === 'string' && reportsPatient.diseases.trim()
+          ? [reportsPatient.diseases]
+          : [],
+      allergies: Array.isArray(reportsPatient.allergies)
+        ? reportsPatient.allergies
+        : typeof reportsPatient.allergies === 'string' && reportsPatient.allergies.trim()
+          ? [reportsPatient.allergies]
+          : [],
+      medicalHistory: reportsPatient.medicalHistory ?? '',
+      emergencyContact: reportsPatient.emergencyContact ?? {
+        name: '',
+        phone: '',
+        relation: '',
+        otherRelation: '',
+      },
+      medicalReports,
+      deletedDocumentIds,
+    };
+
+    await updatePatientMutation.mutateAsync({
+      id: reportsPatient.id,
+      data: payload,
+    });
+  };
+
 const handleEditPatient = async (data: ReusableFormData) => {
   const patient = editPatient ?? selectedPatient;
 
@@ -1152,6 +1221,20 @@ emergencyContact: {
                 title="Book appointment"
               >
                 Book Appointment
+              </Button>
+            )}
+            {isActive && canEditPatient && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleOpenReports(patient);
+                }}
+                title="Upload reports"
+              >
+                <FileText className="mr-2 h-4 w-4" />
+                Reports
               </Button>
             )}
             {/* <Button
@@ -1444,6 +1527,112 @@ emergencyContact: {
           </div>
         </div>
       </Modal>
+      <Modal
+        isOpen={isReportsModalOpen}
+        onClose={() => {
+          setIsReportsModalOpen(false);
+          setReportsPatient(null);
+        }}
+        title="What do you want to upload?"
+      >
+        <div className="flex flex-col gap-3 sm:flex-row">
+          <Button
+            onClick={() => {
+              setIsReportsModalOpen(false);
+              setIsPrescriptionDialogOpen(true);
+            }}
+          >
+            Prescription
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => {
+              setIsReportsModalOpen(false);
+              setIsMedicalReportsModalOpen(true);
+            }}
+          >
+            Medical Reports
+          </Button>
+        </div>
+      </Modal>
+      <PrescriptionDialog
+        key={`${reportsPatient?.id ?? 'none'}-${isPrescriptionDialogOpen ? 'open' : 'closed'}`}
+        patient={reportsPatient}
+        open={isPrescriptionDialogOpen}
+        onOpenChange={(open) => {
+          setIsPrescriptionDialogOpen(open);
+          if (!open) setReportsPatient(null);
+        }}
+      />
+      {reportsPatient && (
+        <ReusableModal
+          isOpen={isMedicalReportsModalOpen}
+          onClose={() => {
+            setIsMedicalReportsModalOpen(false);
+            setReportsPatient(null);
+          }}
+          onSave={handleSaveMedicalReports}
+          title={`Medical Reports - ${reportsPatient.patientCode}`}
+          sections={[
+            {
+              title: 'Patient Information',
+              icon: <User className="h-4 w-4" />,
+              fields: [
+                {
+                  name: 'name',
+                  label: 'Name',
+                  type: 'text',
+                  required: true,
+                  width: 'half',
+                  disabled: true,
+                  placeholder: 'Patient name',
+                },
+                {
+                  name: 'phoneNumber',
+                  label: 'Phone',
+                  type: 'tel',
+                  required: true,
+                  width: 'half',
+                  disabled: true,
+                  placeholder: 'Phone number',
+                },
+                {
+                  name: 'patientCode',
+                  label: 'Patient Code',
+                  type: 'text',
+                  width: 'half',
+                  disabled: true,
+                  placeholder: 'Patient code',
+                },
+              ],
+            },
+            {
+              title: 'Documents',
+              icon: <FileText className="h-4 w-4" />,
+              fields: [
+                {
+                  name: 'medicalReports',
+                  label: 'Documents',
+                  type: 'patient-document-manager',
+                  required: false,
+                  width: 'full',
+                },
+              ],
+            },
+          ]}
+          initialData={{
+            name: reportsPatient.name,
+            phoneNumber: reportsPatient.phoneNumber,
+            patientCode: reportsPatient.patientCode,
+            medicalReports: reportsPatient.medicalReports ?? [],
+          }}
+          isEdit={true}
+          size="lg"
+          saveButtonText={updatePatientMutation.isPending ? 'Uploading...' : 'Upload Reports'}
+          cancelButtonText="Cancel"
+          validationOnChange={true}
+        />
+      )}
       <ReusableModal
         isOpen={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}

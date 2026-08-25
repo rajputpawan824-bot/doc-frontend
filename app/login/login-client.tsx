@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -88,11 +88,9 @@ interface LoginResponse {
 export default function LoginClient() {
   const router = useRouter();
   const [selectedRole, setSelectedRole] = useState("admin");
-  const [otpSent, setOtpSent] =
-  useState(false);
-
-const [otp, setOtp] =
-  useState("");
+const [otpSent, setOtpSent] = useState(false);
+const [otp, setOtp] = useState("");
+const [otpTimer, setOtpTimer] = useState(0);
   const [selectedLanguage, setSelectedLanguage] = useState(
     "English (B a.s.: Admin)",
   );
@@ -103,12 +101,35 @@ const [otp, setOtp] =
     phone: "",
   });
 
-  const handleInputChange = (field: string, value: string) => {
-    setFormData((prev) => ({
-      ...prev,
-      [field]: value,
-    }));
-  };
+const handleInputChange = (field: string, value: string) => {
+  setFormData((prev) => ({
+    ...prev,
+    [field]: value,
+  }));
+};
+
+useEffect(() => {
+  if (otpTimer <= 0) return;
+
+  const timer = setInterval(() => {
+    setOtpTimer((prev) => {
+      if (prev <= 1) {
+        clearInterval(timer);
+        return 0;
+      }
+
+      return prev - 1;
+    });
+  }, 1000);
+
+  return () => clearInterval(timer);
+}, [otpTimer]);
+
+useEffect(() => {
+  if (otp) {
+    setOtpTimer(0);
+  }
+}, [otp]);
 
 const loginEndpoint =
   selectedRole === "patient"
@@ -134,18 +155,19 @@ onSuccess: async (data: any) => {
     data?.access_token;
 
   // PATIENT - FIRST STEP
-  if (
-    selectedRole === "patient" &&
-    !token
-  ) {
-    setOtpSent(true);
+if (
+  selectedRole === "patient" &&
+  !token
+) {
+  setOtpSent(true);
+  setOtpTimer(60);
 
-    toast.success(
-      data?.message || "OTP sent successfully"
-    );
+  toast.success(
+    data?.message || "OTP sent successfully"
+  );
 
-    return;
-  }
+  return;
+}
 
   // LOGIN SUCCESS
   if (token) {
@@ -359,26 +381,37 @@ const handleSubmit = (
   </div>
 </div>
 
-              {selectedRole === "patient" &&
-  otpSent && (
-    <div className="space-y-2">
-      <Label
-        htmlFor="otp"
-        className="text-sm font-medium"
-      >
-        OTP
-      </Label>
+{selectedRole === "patient" && otpSent && (
+  <div className="space-y-2">
+    <Label
+      htmlFor="otp"
+      className="text-sm font-medium"
+    >
+      OTP
+    </Label>
 
-      <Input
-        id="otp"
-        type="text"
-        value={otp}
-        onChange={(e) =>
-          setOtp(e.target.value)
-        }
-        placeholder="Enter OTP"
-      />
-    </div>
+    <Input
+      id="otp"
+      type="text"
+      inputMode="numeric"
+      maxLength={6}
+      value={otp}
+      onChange={(e) => {
+        const value = e.target.value
+          .replace(/\D/g, "")
+          .slice(0, 6);
+
+        setOtp(value);
+      }}
+      placeholder={
+        otp
+          ? "Enter OTP"
+          : otpTimer > 0
+          ? `Enter OTP — Wait ${otpTimer} seconds`
+          : "Enter OTP"
+      }
+    />
+  </div>
 )}
 
               {/* Password */}
@@ -429,13 +462,21 @@ const handleSubmit = (
 )}
 
               {/* Login Button */}
-              <Button
-                type="submit"
-                className="w-full py-6 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-lg cursor-pointer disabled:opacity-50"
-                disabled={isLoading}
-              >
-                Log In
-              </Button>
+<Button
+  type="submit"
+  className="w-full py-6 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-lg cursor-pointer disabled:opacity-50"
+  disabled={
+    isLoading ||
+    (selectedRole === "patient" &&
+      (!otpSent
+        ? !formData.phone
+        : !otp))
+  }
+>
+  {selectedRole === "patient" && !otpSent
+    ? "Send OTP"
+    : "Log In"}
+</Button>
 
               {/* Sign Up Link */}
               <div className="text-center">
