@@ -51,6 +51,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { getApiBaseUrl } from "@/lib/api/config";
+import { io } from "socket.io-client";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -72,6 +74,7 @@ import {
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
+import { useQueryClient } from "@tanstack/react-query";
 
 import type { Patient } from "@/app/admin/(protected)/patient/page";
 import { usePatientById, usePatients } from "@/services/admin/patient";
@@ -542,6 +545,7 @@ const NumberedList = ({
 };
 
 export default function PatientsPage() {
+  const queryClient = useQueryClient();
   const [selectedPatient, setSelectedPatient] = useState<DoctorPatient | null>(
     null,
   );
@@ -591,6 +595,107 @@ useEffect(() => {
     );
   }
 }, [scannedFilesDialogOpen, temporaryDocumentsError]);
+
+useEffect(() => {
+  if (!scannedFilesDialogOpen || typeof window === "undefined") return;
+
+  console.log(
+    "[TemporaryDocumentSocket][DOCTOR] SCANNED FILES OPEN",
+  );
+
+  const token = localStorage.getItem("access_token") || document.cookie
+    .split("; ")
+    .find((entry) => entry.startsWith("access_token="))
+    ?.split("=")[1];
+
+  if (!token) {
+    console.error(
+      "[TemporaryDocumentSocket][DOCTOR] SOCKET CONNECTION ERROR",
+      "No access token available",
+    );
+    return;
+  }
+
+  const socketUrl = getApiBaseUrl().replace(/\/api\/?$/, "");
+  const socket = io(`${socketUrl}/temporary-documents`, {
+    autoConnect: false,
+    auth: { token },
+    withCredentials: true,
+    transports: ["websocket", "polling"],
+  });
+
+  const handleConnect = () => {
+    console.log("[TemporaryDocumentSocket][DOCTOR] SOCKET CONNECTED");
+    console.log("[TemporaryDocumentSocket][DOCTOR] Socket ID:", socket.id);
+  };
+
+  const handleConnectError = (error: Error) => {
+    console.error(
+      "[TemporaryDocumentSocket][DOCTOR] SOCKET CONNECTION ERROR",
+    );
+    console.error("[TemporaryDocumentSocket][DOCTOR]", error.message);
+  };
+
+  const handleDisconnect = (reason: string) => {
+    console.log("[TemporaryDocumentSocket][DOCTOR] SOCKET DISCONNECTED");
+    console.log("[TemporaryDocumentSocket][DOCTOR] Reason:", reason);
+  };
+
+  const handleTemporaryDocumentAdded = (payload: unknown) => {
+    const documentPayload =
+      payload && typeof payload === "object" && "document" in payload
+        ? payload.document
+        : null;
+
+    if (
+      !documentPayload ||
+      typeof documentPayload !== "object" ||
+      !("id" in documentPayload) ||
+      !documentPayload.id
+    ) {
+      return;
+    }
+
+    const document = documentPayload as TemporaryDocument;
+    console.log(
+      "[TemporaryDocumentSocket][DOCTOR] DOCUMENT ADDED EVENT RECEIVED",
+    );
+    console.log(
+      "[TemporaryDocumentSocket][DOCTOR] Document ID:",
+      document.id,
+    );
+
+    queryClient.setQueryData<TemporaryDocument[]>(
+      ["temporary-documents"],
+      (currentDocuments = []) => {
+        if (
+          currentDocuments.some(
+            (existingDocument) => existingDocument.id === document.id,
+          )
+        ) {
+          return currentDocuments;
+        }
+
+        return [...currentDocuments, document];
+      },
+    );
+  };
+
+  console.log("[TemporaryDocumentSocket][DOCTOR] CONNECTING");
+  socket.on("connect", handleConnect);
+  socket.on("connect_error", handleConnectError);
+  socket.on("disconnect", handleDisconnect);
+  socket.on("temporary-document:added", handleTemporaryDocumentAdded);
+  socket.connect();
+
+  return () => {
+    socket.off("temporary-document:added", handleTemporaryDocumentAdded);
+    socket.disconnect();
+    socket.off("connect", handleConnect);
+    socket.off("connect_error", handleConnectError);
+    socket.off("disconnect", handleDisconnect);
+  };
+}, [queryClient, scannedFilesDialogOpen]);
 
 useEffect(() => {
   if (!selectedAppointmentId) {
@@ -782,10 +887,18 @@ const handleSavePrescription = () => {
     return;
   }
 
-  if (!prescription.trim() && !medicalNotes.trim()) {
-    toast.error("Add prescription or medical notes before saving");
-    return;
-  }
+const hasNewAttachments =
+  prescriptionFiles.length > 0 ||
+  selectedTemporaryDocuments.length > 0;
+
+if (
+  !prescription.trim() &&
+  !medicalNotes.trim() &&
+  !hasNewAttachments
+) {
+  toast.error("Add prescription, medical notes, or a file before saving");
+  return;
+}
 
   const payload = new FormData();
 
@@ -819,8 +932,7 @@ const handleSavePrescription = () => {
     ),
   );
 
-  const hasNewAttachments =
-    prescriptionFiles.length > 0 || selectedTemporaryDocuments.length > 0;
+
 
   savePrescriptionMutation.mutate(
     {
@@ -1634,6 +1746,7 @@ const handleSavePrescription = () => {
                   Cancel
                 </Button>
                 <Button
+                  className="bg-blue-600 hover:bg-blue-700 text-white"
                   onClick={handleSavePrescription}
                   disabled={
                     savePrescriptionMutation.isPending ||

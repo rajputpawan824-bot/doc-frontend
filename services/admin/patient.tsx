@@ -99,6 +99,7 @@ export type PatientCreateData = {
   file: File;
 }[];
   deletedDocumentIds?: string[];
+  temporaryDocumentIds?: string[];
   patientCode?: string;
   emergencyContactName?: string;
   emergencyContactPhone?: string;
@@ -393,6 +394,12 @@ if (data.deletedDocumentIds?.length) {
   formData.append(
     "deletedDocuments",
     JSON.stringify(data.deletedDocumentIds)
+  );
+}
+if (data.temporaryDocumentIds?.length) {
+  formData.append(
+    "temporaryDocumentIds",
+    JSON.stringify(data.temporaryDocumentIds)
   );
 }
   return formData;

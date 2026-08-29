@@ -94,6 +94,22 @@ function getTemporaryDocuments(value: unknown): TemporaryDocument[] {
   return [];
 }
 
+function normalizePatientId(value: unknown): string {
+  if (typeof value === "string") return value;
+
+  if (value && typeof value === "object") {
+    const candidate = value as {
+      _id?: unknown;
+      id?: unknown;
+      $oid?: unknown;
+    };
+
+    return normalizePatientId(candidate._id ?? candidate.id ?? candidate.$oid);
+  }
+
+  return "";
+}
+
 export function useTemporaryDocuments(enabled = false) {
   return useQuery<TemporaryDocument[]>({
     queryKey: ["temporary-documents"],
@@ -148,12 +164,23 @@ export function useSavePrescription() {
       appointmentId,
       data,
       isExisting,
+      patientId,
     }: {
       appointmentId: string;
       data: PrescriptionRequestPayload;
       isExisting: boolean;
-      patientId?: string;
+      patientId: string;
     }) => {
+      const normalizedPatientId = normalizePatientId(patientId);
+
+      if (!normalizedPatientId) {
+        throw new Error("Patient ID is required");
+      }
+
+      if (data instanceof FormData) {
+        data.set("patientId", normalizedPatientId);
+      }
+
       if (isExisting) {
         const response = await clientApi.put(
           `/appointment/${appointmentId}/updateprescription`,
@@ -205,12 +232,14 @@ export function useSavePrescription() {
         ],
       });
 
-      if (variables.patientId) {
+      const normalizedPatientId = normalizePatientId(variables.patientId);
+
+      if (normalizedPatientId) {
         queryClient.invalidateQueries({
-          queryKey: ["prescription-history", variables.patientId],
+          queryKey: ["prescription-history", normalizedPatientId],
         });
         queryClient.invalidateQueries({
-          queryKey: ["patient-medical-history", variables.patientId],
+          queryKey: ["patient-medical-history", normalizedPatientId],
         });
       }
     },

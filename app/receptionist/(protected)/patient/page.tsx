@@ -1004,6 +1004,11 @@ emergencyContact: {
           (id): id is string => typeof id === 'string',
         )
       : [];
+    const temporaryDocumentIds = Array.isArray(data.temporaryDocumentIds)
+      ? data.temporaryDocumentIds.filter(
+          (id): id is string => typeof id === 'string',
+        )
+      : [];
 
     const payload: PatientCreateData = {
       name: reportsPatient.name,
@@ -1035,6 +1040,7 @@ emergencyContact: {
       },
       medicalReports,
       deletedDocumentIds,
+      temporaryDocumentIds,
     };
 
     await updatePatientMutation.mutateAsync({
@@ -1535,8 +1541,9 @@ emergencyContact: {
         }}
         title="What do you want to upload?"
       >
-        <div className="flex flex-col gap-3 sm:flex-row">
+     <div className="flex flex-col items-center justify-center gap-3 sm:flex-row">
           <Button
+            className="bg-blue-600 hover:bg-blue-700 text-white"
             onClick={() => {
               setIsReportsModalOpen(false);
               setIsPrescriptionDialogOpen(true);
@@ -1649,6 +1656,7 @@ emergencyContact: {
         cancelButtonText="Cancel"
         saveButtonColor="linear-gradient(135deg, #3b82f6, #0ea5e9)"
         validationOnChange={true}
+           showScannedFiles={false}
       />
 
       {patientForEdit && (
@@ -1669,6 +1677,7 @@ emergencyContact: {
           cancelButtonText="Cancel"
           saveButtonColor="linear-gradient(135deg, #10b981, #059669)"
           validationOnChange={true}
+          showScannedFiles={false}
         />
       )}
 

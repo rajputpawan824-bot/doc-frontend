@@ -1,14 +1,15 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Check, File, FileText, RefreshCw, X } from "lucide-react";
+import { Check, File, FileText, FolderOpen, RefreshCw, X } from "lucide-react";
 import { toast } from "sonner";
 import { usePatientAppointments, type PatientAppointment } from "@/services/admin/appointment";
 import { type TemporaryDocument, usePrescription, useSavePrescription, useTemporaryDocuments } from "@/services/admin/prescription";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
+
 import { Label } from "@/components/ui/label";
+import { useTemporaryDocumentSocket } from "./use-temporary-document-socket";
 
 interface PrescriptionPatient { id: string; name: string; patientCode?: string; }
 
@@ -44,6 +45,7 @@ export default function PrescriptionDialog({ patient, open, onOpenChange }: Pres
   const { data: prescriptionData } = usePrescription(selectedAppointmentId || undefined);
   const savePrescriptionMutation = useSavePrescription();
   const { data: temporaryDocuments = [], isLoading: temporaryDocumentsLoading, error: temporaryDocumentsError, refetch: refetchTemporaryDocuments } = useTemporaryDocuments(scannedFilesOpen);
+  const visibleTemporaryDocuments = useTemporaryDocumentSocket(scannedFilesOpen, temporaryDocuments);
 
   const appointmentOptions = useMemo(() => {
     const today = new Date();
@@ -97,13 +99,129 @@ export default function PrescriptionDialog({ patient, open, onOpenChange }: Pres
               <div><Label>Appointment Date</Label><p className="text-sm">{selectedAppointment ? formatDate(getAppointmentDate(selectedAppointment)) : "-"}</p></div>
               <div><Label>Token</Label><p className="text-sm">{selectedAppointment ? `#${getAppointmentToken(selectedAppointment)}` : "-"}</p></div>
             </div>
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="rounded-lg border p-4"><Label>Medical Reports</Label><Input className="mt-3" type="file" multiple onChange={(event) => setPrescriptionFiles(Array.from(event.target.files || []))} /></div>
-              <div className="rounded-lg border p-4"><Label>Scanned Files</Label><Button type="button" variant="outline" className="mt-3" onClick={() => { setPendingTemporaryDocuments(selectedTemporaryDocuments); setScannedFilesOpen(true); }}><File className="mr-2 h-4 w-4" />{selectedTemporaryDocuments.length ? "Add File" : "Choose File"}</Button>
-                {selectedTemporaryDocuments.map((document) => <div key={document.id} className="mt-2 flex items-center justify-between text-sm"><span className="flex min-w-0 items-center gap-2 truncate"><Check className="h-4 w-4 text-emerald-600" />{document.originalFileName}</span><button type="button" onClick={() => setSelectedTemporaryDocuments((current) => current.filter((item) => item.id !== document.id))} aria-label="Remove file"><X className="h-4 w-4" /></button></div>)}
-              </div>
+<div className="space-y-3">
+  <h3 className="text-lg font-semibold text-slate-700">
+    Upload Prescription
+  </h3>
+
+  <div className="grid gap-4 md:grid-cols-2">
+
+    {/* Prescription Upload */}
+    <div className="rounded-lg border border-slate-200 p-3">
+      <Label className="mb-2 block">Prescription</Label>
+
+      <div className="flex h-[280px] items-center justify-center overflow-hidden rounded-lg border-2 border-dashed border-slate-300 bg-slate-50">
+        <div className="flex min-w-0 w-full flex-col items-center justify-center px-6 py-8 text-center">
+
+          <FolderOpen className="mb-5 h-14 w-14 text-blue-700" />
+
+          <p className="mb-5 text-base font-medium leading-6 text-slate-700">
+            Click the button below to
+            <br />
+            upload prescription files
+          </p>
+
+          <label
+            htmlFor="prescription-files"
+            className="inline-flex cursor-pointer items-center justify-center rounded-lg bg-blue-700 px-7 py-3 text-sm font-medium text-white transition hover:bg-indigo-600"
+          >
+            Choose File
+          </label>
+
+          <input
+            id="prescription-files"
+            type="file"
+            multiple
+            className="hidden"
+            onChange={(event) => {
+              setPrescriptionFiles(
+                Array.from(event.target.files || [])
+              );
+            }}
+          />
+
+          {prescriptionFiles.length > 0 && (
+            <div className="mt-4 w-full space-y-1 text-left">
+              {prescriptionFiles.map((file) => (
+                <div
+                  key={`${file.name}-${file.lastModified}`}
+                  className="truncate text-sm text-slate-600"
+                >
+                  {file.name}
+                </div>
+              ))}
             </div>
-            <div className="flex justify-end gap-3"><Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button><Button onClick={save} disabled={savePrescriptionMutation.isPending || !selectedAppointmentId}>{savePrescriptionMutation.isPending ? "Saving..." : "Save Prescription"}</Button></div>
+          )}
+        </div>
+      </div>
+    </div>
+
+    {/* Scanned Files */}
+    <div className="rounded-lg border border-slate-200 p-3">
+      <Label className="mb-2 block">Scanned Files</Label>
+
+      <div className="flex h-[280px] items-center justify-center overflow-hidden rounded-lg border-2 border-dashed border-slate-300 bg-slate-50">
+        <div className="flex min-w-0 w-full flex-col items-center justify-center px-6 py-8 text-center">
+
+          <FolderOpen className="mb-5 h-14 w-14 text-blue-700" />
+
+          <p className="mb-5 text-base font-medium leading-6 text-slate-700">
+            Click the button below to
+            <br />
+            upload scanned files
+          </p>
+
+          <Button
+            type="button"
+            className="rounded-lg bg-blue-700 px-7 py-3 text-sm font-medium text-white hover:bg-indigo-600"
+            onClick={() => {
+              setPendingTemporaryDocuments(
+                selectedTemporaryDocuments
+              );
+              setScannedFilesOpen(true);
+            }}
+          >
+            Scanned Files
+          </Button>
+
+          {selectedTemporaryDocuments.length > 0 && (
+            <div className="mt-3 max-h-16 w-full min-w-0 space-y-1 overflow-y-auto text-left">
+              {selectedTemporaryDocuments.map((document) => (
+                <div
+                  key={document.id}
+                  className="flex min-w-0 w-full items-center gap-2 rounded-md bg-white/80 px-2 py-1 text-sm"
+                >
+                  <Check className="h-4 w-4 shrink-0 text-emerald-600" />
+                  <span className="min-w-0 flex-1 truncate">
+                    {document.originalFileName}
+                  </span>
+                  <button
+                    type="button"
+                    className="shrink-0"
+                    onClick={() =>
+                      setSelectedTemporaryDocuments((current) =>
+                        current.filter(
+                          (item) => item.id !== document.id
+                        )
+                      )
+                    }
+                    aria-label="Remove file"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+            <div className="flex justify-end gap-3"><Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+            <Button    className="bg-blue-600 hover:bg-blue-700 text-white"
+            onClick={save} disabled={savePrescriptionMutation.isPending || !selectedAppointmentId}>{savePrescriptionMutation.isPending ? "Saving..." : "Save Prescription"}</Button></div>
           </div>
         </DialogContent>
       </Dialog>
@@ -139,9 +257,8 @@ export default function PrescriptionDialog({ patient, open, onOpenChange }: Pres
                 disabled={temporaryDocumentsRefreshing}
               >
                 <RefreshCw
-                  className={`mr-2 h-4 w-4 ${
-                    temporaryDocumentsRefreshing ? "animate-spin" : ""
-                  }`}
+                  className={`mr-2 h-4 w-4 ${temporaryDocumentsRefreshing ? "animate-spin" : ""
+                    }`}
                 />
                 {temporaryDocumentsRefreshing ? "Refreshing..." : "Refresh"}
               </Button>
@@ -157,9 +274,9 @@ export default function PrescriptionDialog({ patient, open, onOpenChange }: Pres
               <div className="rounded-lg border border-red-100 bg-red-50 p-4 text-sm text-red-700">
                 Unable to load scanned files. You can close this window and continue with medical reports.
               </div>
-            ) : temporaryDocuments.length ? (
+            ) : visibleTemporaryDocuments.length ? (
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                {temporaryDocuments.map((document) => {
+                {visibleTemporaryDocuments.map((document) => {
                   const isSelected = pendingTemporaryDocuments.some(
                     (item) => item.id === document.id,
                   );
@@ -176,11 +293,10 @@ export default function PrescriptionDialog({ patient, open, onOpenChange }: Pres
                             : [...current, document],
                         );
                       }}
-                      className={`relative overflow-hidden rounded-lg border text-left transition ${
-                        isSelected
-                          ? "border-blue-500 bg-blue-50 ring-2 ring-blue-100"
-                          : "bg-white hover:border-blue-200 hover:bg-slate-50"
-                      }`}
+                      className={`relative overflow-hidden rounded-lg border text-left transition ${isSelected
+                        ? "border-blue-500 bg-blue-50 ring-2 ring-blue-100"
+                        : "bg-white hover:border-blue-200 hover:bg-slate-50"
+                        }`}
                       aria-pressed={isSelected}
                     >
                       <div className="flex aspect-[4/3] items-center justify-center bg-slate-100">

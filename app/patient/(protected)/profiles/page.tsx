@@ -1035,6 +1035,7 @@ if (isLoading) {
   }
   isEdit
   size="xl"
+  showScannedFiles={false}
   
 />
 

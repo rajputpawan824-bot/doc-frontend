@@ -1,8 +1,22 @@
 "use client";
 
-import { FormEvent, ReactNode, useId, useMemo, useState } from "react";
-import { Plus, X ,Eye, EyeOff} from "lucide-react";
+import { FormEvent, ReactNode, useEffect, useId, useMemo, useState } from "react";
+import {
+  Check,
+  File as FileIcon,
+  FileText,
+  FolderOpen,
+  Plus,
+  RefreshCw,
+  X,
+  Eye,
+  EyeOff,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { type TemporaryDocument, useTemporaryDocuments } from "@/services/admin/prescription";
+import { useTemporaryDocumentSocket } from "./use-temporary-document-socket";
 import Modal from "../ui/modal";
 
 export type FieldType = "text" | "email" | "tel"|"file" | "number" | "password" | "textarea" | "select" | "radio" | "checkbox" | "date" | "time"| "checkbox-group"   | "document-manager"  | "patient-document-manager" | "FileText"  | "custom";
@@ -63,6 +77,7 @@ interface ReusableModalProps {
   saveButtonColor?: string;
   validationOnChange?: boolean;
   children?: ReactNode;
+  showScannedFiles?: boolean;
 showSaveButton?: boolean;
 }
 
@@ -81,6 +96,7 @@ export default function ReusableModal({
   saveButtonText,
   cancelButtonText,
   saveButtonColor,
+    showScannedFiles = true,
   validationOnChange = false,
     mode = "form",
   message,
@@ -118,6 +134,7 @@ showSaveButton = true,
   saveButtonColor={saveButtonColor}
   saveButtonText={saveButtonText}
   showSaveButton={showSaveButton}
+  showScannedFiles={showScannedFiles}
   size={size}
   title={title}
   validationOnChange={validationOnChange}
@@ -138,6 +155,7 @@ interface ReusableModalContentProps
 
   mode?: "form" | "alert";
   message?: ReactNode;
+  showScannedFiles: boolean;
 
   cancelButtonText?: string;
   formId: string;
@@ -230,6 +248,7 @@ function ReusableModalContent({
   cancelButtonText,
   formId,
   formSections,
+  showScannedFiles,
   initialData,
   isEdit,
   isOpen,
@@ -305,6 +324,29 @@ const [existingPatientDocuments, setExistingPatientDocuments] =
       ? documents
       : [];
   });
+  const [selectedTemporaryDocuments, setSelectedTemporaryDocuments] =
+    useState<TemporaryDocument[]>([]);
+  const [scannedFilesOpen, setScannedFilesOpen] = useState(false);
+  console.log(
+    "[TemporaryDocumentSocket] COMPONENT RENDER",
+    {
+      scannedFilesOpen,
+    },
+  );
+  const [pendingTemporaryDocuments, setPendingTemporaryDocuments] =
+    useState<TemporaryDocument[]>([]);
+  const [temporaryDocumentsRefreshing, setTemporaryDocumentsRefreshing] =
+    useState(false);
+  const {
+    data: temporaryDocuments = [],
+    isLoading: temporaryDocumentsLoading,
+    error: temporaryDocumentsError,
+    refetch: refetchTemporaryDocuments,
+  } = useTemporaryDocuments(scannedFilesOpen);
+  const visibleTemporaryDocuments = useTemporaryDocumentSocket(
+    scannedFilesOpen,
+    temporaryDocuments,
+  );
   const validateField = (
     name: string,
     value: FormDataValue,
@@ -440,12 +482,12 @@ const handleBlur = (name: string) => {
       ? field.required(formData)
       : field.required;
 
-    const widthClass = {
-      full: "col-span-1 md:col-span-1",
-      half: "col-span-1 md:col-span-1/2",
-      third: "col-span-1 md:col-span-1/3",
-      quarter: "col-span-1 md:col-span-1/4",
-    }[field.width || "full"];
+const widthClass = {
+  full: "col-span-1 md:col-span-2",
+  half: "col-span-1 md:col-span-1",
+  third: "col-span-1 md:col-span-1",
+  quarter: "col-span-1 md:col-span-1",
+}[field.width || "full"];
 
     const commonClasses = `w-full px-4 py-2.5 rounded-lg border ${
       errors[field.name] 
@@ -611,7 +653,10 @@ case "document-manager": {
         const id = document._id || document.id;
         const href = document.url || document.filePath;
         return (
-          <div key={id || `${documentLabel(document, index)}-${index}`} className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+<div
+  key={id || `${documentLabel(document, index)}-${index}`}
+  className="flex w-full items-center justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2"
+>
             {href ? (
               <a href={href} target="_blank" rel="noopener noreferrer" className="min-w-0 truncate text-sm text-blue-600 underline">
                 {documentLabel(document, index)}
@@ -785,226 +830,644 @@ if (filePath) {
 
 
   
-case "patient-document-manager":
+case "patient-document-manager": {
   const deletedDocumentIds = formData[`${field.name}DeletedIds`];
+
   return (
-    <div className="space-y-3">
-            {existingPatientDocuments.map((document, index) => {
-        const id = document._id || document.id;
-        const href = document.url || document.filePath;
-        return (
-          <div key={id || `${documentLabel(document, index)}-${index}`} className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
-            {href ? (
-              <a href={href} target="_blank" rel="noopener noreferrer" className="min-w-0 truncate text-sm text-blue-600 underline">
-                {documentLabel(document, index)}
-              </a>
-            ) : (
-              <span className="min-w-0 truncate text-sm text-slate-700">{documentLabel(document, index)}</span>
-            )}
+    <div className="w-full space-y-4">
+
+
+
+      {/* EXISTING DOCUMENTS */}
+      {existingPatientDocuments.length > 0 && (
+        <div className="w-full space-y-2">
+
+          {existingPatientDocuments.map((document, index) => {
+            const id = document._id || document.id;
+            const href = document.url || document.filePath;
+
+            return (
+              <div
+                key={id || `${documentLabel(document, index)}-${index}`}
+                className="flex w-full items-center justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2"
+              >
+                {href ? (
+                  <a
+                    href={href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="min-w-0 truncate text-sm text-blue-600 underline"
+                  >
+                    {documentLabel(document, index)}
+                  </a>
+                ) : (
+                  <span className="min-w-0 truncate text-sm text-slate-700">
+                    {documentLabel(document, index)}
+                  </span>
+                )}
+
+                <button
+                  type="button"
+                  aria-label={`Delete ${documentLabel(document, index)}`}
+                  onClick={() => setDocumentPendingDeletion(document)}
+                  className="shrink-0 text-lg leading-none text-slate-500 hover:text-red-600"
+                >
+                  ×
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+
+      {/* MAIN HEADING */}
+      <h3 className="text-base font-semibold text-slate-700">
+        Upload Medical Document
+      </h3>
+
+
+
+
+      {/* UPLOAD AREA */}
+      <div className="grid w-full grid-cols-1 gap-4 md:grid-cols-2">
+
+        {/* LEFT — MEDICAL DOCUMENT */}
+        <div className="w-full rounded-lg border border-slate-200 p-4">
+
+          <div className="space-y-4">
+
+            {/* DOCUMENT NAME */}
+            <label className="block w-full space-y-1">
+              <span className="text-sm font-medium text-slate-700">
+                Document Name
+              </span>
+
+              <input
+                type="text"
+                placeholder="Document Name"
+                className={`${commonClasses} w-full`}
+                value={patientDocumentRows[0]?.documentName || ""}
+                onChange={(e) => {
+                  const updatedRows = [...patientDocumentRows];
+
+                  updatedRows[0] = {
+                    ...updatedRows[0],
+                    documentName: e.target.value,
+                  };
+
+                  setPatientDocumentRows(updatedRows);
+
+                  handleChange(
+                    field.name,
+                    updatedRows.filter(
+                      (row) =>
+                        row.documentName.trim() && row.file
+                    ),
+                  );
+                }}
+              />
+            </label>
+
+            {/* MEDICAL DOCUMENT FILE */}
+            <label className="block w-full space-y-1">
+              <span className="text-sm font-medium text-slate-700">
+                Choose File
+              </span>
+
+              {patientDocumentRows[0]?.file &&
+              patientDocumentRows[0]?.previewUrl ? (
+                <div className="relative w-full rounded-lg border border-slate-200 bg-slate-50 p-3">
+
+                  <img
+                    src={patientDocumentRows[0].previewUrl}
+                    alt="Selected document"
+                    className="h-32 w-full rounded-lg object-contain"
+                  />
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const updatedRows = [...patientDocumentRows];
+
+                      if (updatedRows[0]?.previewUrl) {
+                        URL.revokeObjectURL(
+                          updatedRows[0].previewUrl,
+                        );
+                      }
+
+                      updatedRows[0] = {
+                        ...updatedRows[0],
+                        file: null,
+                        previewUrl: "",
+                      };
+
+                      setPatientDocumentRows(updatedRows);
+
+                      handleChange(
+                        field.name,
+                        updatedRows.filter(
+                          (row) =>
+                            row.documentName.trim() &&
+                            row.file,
+                        ),
+                      );
+                    }}
+                    className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-white text-red-500 shadow hover:bg-red-50"
+                  >
+                    ×
+                  </button>
+                </div>
+              ) : (
+                <div className="w-full">
+                  <input
+                    id="patient-document-0"
+                    type="file"
+                    accept="image/*"
+                    className="sr-only"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+
+                      if (!file) return;
+
+                      const updatedRows = [...patientDocumentRows];
+
+                      if (updatedRows[0]?.previewUrl) {
+                        URL.revokeObjectURL(
+                          updatedRows[0].previewUrl,
+                        );
+                      }
+
+                      updatedRows[0] = {
+                        ...updatedRows[0],
+                        file,
+                        previewUrl:
+                          URL.createObjectURL(file),
+                      };
+
+                      setPatientDocumentRows(updatedRows);
+
+                      handleChange(
+                        field.name,
+                        updatedRows.filter(
+                          (row) =>
+                            row.documentName.trim() &&
+                            row.file,
+                        ),
+                      );
+                    }}
+                  />
+
+                  <label
+                    htmlFor="patient-document-0"
+                    className="flex h-11 w-full cursor-pointer items-center justify-center rounded-lg border border-slate-300 bg-white text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+                  >
+                    Choose File
+                  </label>
+                </div>
+              )}
+            </label>
+
+            {/* REMOVE */}
             <button
               type="button"
-              aria-label={`Delete ${documentLabel(document, index)}`}
-              onClick={() => setDocumentPendingDeletion(document)}
-              className="shrink-0 text-lg leading-none text-slate-500 hover:text-red-600"
-            >
-              ×
-            </button>
-          </div>
-        );
-      })}
-      {patientDocumentRows.map((row, index) => (
-        <div
-          key={index}
-          className="space-y-3 rounded-lg border border-slate-200 p-3"
-        >
-          <label className="block space-y-1">
-            <span className="text-sm font-medium text-slate-700">Document Name</span>
-            <input
-              type="text"
-              placeholder="Document Name"
-              className={commonClasses}
-              value={row.documentName}
-              onChange={(e) => {
-                const updatedRows = [...patientDocumentRows];
-                updatedRows[index].documentName = e.target.value;
+              onClick={() => {
+                if (patientDocumentRows.length === 1) {
+                  setPatientDocumentRows([
+                    {
+                      documentName: "",
+                      file: null,
+                      previewUrl: "",
+                    },
+                  ]);
+
+                  handleChange(field.name, []);
+                  return;
+                }
+
+                const updatedRows =
+                  patientDocumentRows.filter(
+                    (_, i) => i !== 0,
+                  );
+
                 setPatientDocumentRows(updatedRows);
+
                 handleChange(
                   field.name,
-                  updatedRows.filter((row) => row.documentName.trim() && row.file),
+                  updatedRows.filter(
+                    (row) =>
+                      row.documentName.trim() &&
+                      row.file,
+                  ),
                 );
               }}
-            />
-          </label>
+              className="rounded border border-slate-300 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
+            >
+              -
+            </button>
+          </div>
+        </div>
 
-<label className="block space-y-1">
-  <span className="text-sm font-medium text-slate-700">
-    Choose File
-  </span>
+{showScannedFiles && (
+   <>
+        {/* RIGHT — SCANNED FILES */}
+        <div className="w-full rounded-lg border border-slate-200 p-4">
 
-  {row.file && row.previewUrl ? (
-    <div className="relative w-full rounded-lg border border-slate-200 bg-slate-50 p-3">
-      <img
-        src={row.previewUrl}
-        alt="Selected document"
-        className="h-32 w-full rounded-lg object-contain"
-      />
 
+
+          {/* SCANNED FILE UPLOAD BOX */}
+          <div className="rounded-lg bg-white p-2">
+
+            <div className="flex min-h-[250px] flex-col items-center justify-center rounded-lg border-2 border-dashed border-slate-300 bg-slate-50 px-6 py-8 text-center">
+
+              {/* FOLDER ICON */}
+              <div className="mb-5 flex h-16 w-16 items-center justify-center">
+                <FolderOpen className="h-16 w-16 text-blue-500" />
+              </div>
+
+              {/* DESCRIPTION */}
+              <p className="text-base font-medium text-slate-700">
+                Click the button below to upload    scanned files
+              </p>
+
+
+              {/* OR */}
+              <div className="my-4 flex w-full max-w-[120px] items-center ">
+
+              </div>
+
+              {/* CHOOSE FILE BUTTON */}
+              <Button
+                type="button"
+                onClick={() => {
+                  setPendingTemporaryDocuments(
+                    selectedTemporaryDocuments,
+                  );
+
+                  setScannedFilesOpen(true);
+                }}
+                className="bg-blue-700 px-6 text-white hover:bg-indigo-600"
+              >
+                Scanned Files
+              </Button>
+            </div>
+          </div>
+
+          {/* SELECTED SCANNED FILES */}
+          {selectedTemporaryDocuments.length > 0 && (
+            <div className="mt-4 space-y-2">
+
+              {selectedTemporaryDocuments.map(
+                (document) => (
+                  <div
+                    key={document.id}
+                    className="flex w-full min-w-0 items-center justify-between gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm"
+                  >
+                    <span className="flex min-w-0 items-center gap-2">
+                      <Check className="h-4 w-4 shrink-0 text-emerald-600" />
+
+                      <span className="min-w-0 truncate">
+                        {document.originalFileName}
+                      </span>
+                    </span>
+
+                    <button
+                      type="button"
+                      className="shrink-0 text-slate-500 hover:text-red-600"
+                      onClick={() => {
+                        const updatedDocuments =
+                          selectedTemporaryDocuments.filter(
+                            (item) =>
+                              item.id !== document.id,
+                          );
+
+                        setSelectedTemporaryDocuments(
+                          updatedDocuments,
+                        );
+
+                        handleChange(
+                          "temporaryDocumentIds",
+                          updatedDocuments.map(
+                            (item) => item.id,
+                          ),
+                        );
+                      }}
+                      aria-label="Remove file"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                ),
+              )}
+            </div>
+          )}
+        </div>
+         </>
+)}
+
+      </div>
+      
+
+      {/* ADD ANOTHER MEDICAL DOCUMENT */}
       <button
         type="button"
         onClick={() => {
-          const updatedRows = [...patientDocumentRows];
-
-          if (updatedRows[index].previewUrl) {
-            URL.revokeObjectURL(updatedRows[index].previewUrl);
-          }
-
-          updatedRows[index] = {
-            ...updatedRows[index],
-            file: null,
-            previewUrl: "",
-          };
-
-          setPatientDocumentRows(updatedRows);
-
-          handleChange(
-            field.name,
-            updatedRows.filter(
-              (row) => row.documentName.trim() && row.file
-            )
-          );
-        }}
-        className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-white text-red-500 shadow hover:bg-red-50"
-      >
-        ×
-      </button>
-    </div>
-  ) : (
-    <div>
-      <input
-        id={`patient-document-${index}`}
-        type="file"
-        accept="image/*"
-        className="sr-only"
-        onChange={(e) => {
-          const file = e.target.files?.[0];
-
-          if (!file) return;
-
-          const updatedRows = [...patientDocumentRows];
-
-          if (updatedRows[index].previewUrl) {
-            URL.revokeObjectURL(updatedRows[index].previewUrl);
-          }
-
-          updatedRows[index] = {
-            ...updatedRows[index],
-            file,
-            previewUrl: URL.createObjectURL(file),
-          };
-
-          setPatientDocumentRows(updatedRows);
-
-          handleChange(
-            field.name,
-            updatedRows.filter(
-              (row) => row.documentName.trim() && row.file
-            )
-          );
-        }}
-      />
-
-      <label
-        htmlFor={`patient-document-${index}`}
-        className="flex h-11 w-full cursor-pointer items-center justify-center rounded-lg border border-slate-300 bg-white text-sm font-medium text-slate-700 hover:bg-slate-50"
-      >
-        Choose File
-      </label>
-    </div>
-  )}
-</label>
-
-          <button
-            type="button"
-            onClick={() => {
-              const updatedRows = patientDocumentRows.filter((_, i) => i !== index);
-              setPatientDocumentRows(updatedRows);
-              handleChange(
-                field.name,
-                updatedRows.filter((row) => row.documentName.trim() && row.file),
-              );
-            }}
-            className="px-3 py-2 rounded border"
-          >
-            -
-          </button>
-        </div>
-      ))}
-      <button
-        type="button"
-        onClick={() =>
           setPatientDocumentRows([
             ...patientDocumentRows,
-            { documentName: "", file: null },
-          ])
-        }
-        className="px-3 py-2 rounded border"
+            {
+              documentName: "",
+              file: null,
+              previewUrl: "",
+            },
+          ]);
+        }}
+        className="rounded border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
       >
         + Add Another
       </button>
-      {documentPendingDeletion && (
-  <Modal
-    isOpen={true}
-    onClose={() => setDocumentPendingDeletion(null)}
-    title="Delete Document"
-    size="sm"
-    footer={
-      <div className="flex gap-3">
-        <Button
-          type="button"
-          variant="outline"
-          onClick={() => setDocumentPendingDeletion(null)}
-        >
-          Cancel
-        </Button>
 
-        <Button
-          type="button"
-          onClick={() => {
-            const filePath = documentPendingDeletion.filePath;
-
-            setExistingPatientDocuments((documents) =>
-              documents.filter(
-                (document) => document !== documentPendingDeletion
-              )
+      {/* SCANNED FILE SELECTION DIALOG */}
+      <Dialog
+        open={scannedFilesOpen}
+        onOpenChange={(nextOpen) => {
+          if (!nextOpen) {
+            setPendingTemporaryDocuments(
+              selectedTemporaryDocuments,
             );
 
-            if (filePath) {
-              const previousPaths = Array.isArray(deletedDocumentIds)
-                ? deletedDocumentIds
-                : [];
+            setScannedFilesOpen(false);
+            return;
+          }
 
-              handleChange(
-                `${field.name}DeletedIds`,
-                [...previousPaths, filePath]
-              );
-            }
+          setScannedFilesOpen(true);
+        }}
+      >
+        <DialogContent className="z-[60] flex !h-[80vh] !max-h-[850px] !w-[90vw] !max-w-[1200px] flex-col overflow-hidden p-0">
 
-            setDocumentPendingDeletion(null);
-          }}
-          className="bg-red-600 hover:bg-red-700"
+          <DialogHeader className="shrink-0 border-b p-6 pr-16">
+            <div className="flex items-center justify-between gap-4">
+
+              <div>
+                <DialogTitle>
+                  Select Scanned Files
+                </DialogTitle>
+
+                <p className="mt-1 text-sm text-slate-500">
+                  Select files from your temporary documents
+                </p>
+              </div>
+
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={async () => {
+                  setTemporaryDocumentsRefreshing(true);
+
+                  try {
+                    await refetchTemporaryDocuments();
+                  } finally {
+                    setTemporaryDocumentsRefreshing(false);
+                  }
+                }}
+                disabled={temporaryDocumentsRefreshing}
+              >
+                <RefreshCw
+                  className={`mr-2 h-4 w-4 ${
+                    temporaryDocumentsRefreshing
+                      ? "animate-spin"
+                      : ""
+                  }`}
+                />
+
+                {temporaryDocumentsRefreshing
+                  ? "Refreshing..."
+                  : "Refresh"}
+              </Button>
+            </div>
+          </DialogHeader>
+
+          <div className="min-h-0 flex-1 overflow-y-auto p-6">
+
+            {temporaryDocumentsLoading ? (
+              <div className="py-16 text-center text-sm text-slate-500">
+                Loading scanned files...
+              </div>
+            ) : temporaryDocumentsError ? (
+              <div className="rounded-lg border border-red-100 bg-red-50 p-4 text-sm text-red-700">
+                Unable to load scanned files. You can close this
+                window and continue with medical reports.
+              </div>
+            ) : visibleTemporaryDocuments.length ? (
+
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+
+                {visibleTemporaryDocuments.map(
+                  (document) => {
+                    const isSelected =
+                      pendingTemporaryDocuments.some(
+                        (item) =>
+                          item.id === document.id,
+                      );
+
+                    const isImage =
+                      document.mimeType?.startsWith(
+                        "image/",
+                      );
+
+                    return (
+                      <button
+                        key={document.id}
+                        type="button"
+                        onClick={() =>
+                          setPendingTemporaryDocuments(
+                            (current) =>
+                              current.some(
+                                (item) =>
+                                  item.id ===
+                                  document.id,
+                              )
+                                ? current.filter(
+                                    (item) =>
+                                      item.id !==
+                                      document.id,
+                                  )
+                                : [
+                                    ...current,
+                                    document,
+                                  ],
+                          )
+                        }
+                        className={`relative overflow-hidden rounded-lg border text-left transition ${
+                          isSelected
+                            ? "border-blue-500 bg-blue-50 ring-2 ring-blue-100"
+                            : "bg-white hover:border-blue-200 hover:bg-slate-50"
+                        }`}
+                        aria-pressed={isSelected}
+                      >
+
+                        <div className="flex aspect-[4/3] items-center justify-center bg-slate-100">
+
+                          {isImage && document.url ? (
+                            <img
+                              src={document.url}
+                              alt={
+                                document.originalFileName
+                              }
+                              className="h-full w-full object-cover"
+                            />
+                          ) : (
+                            <FileIcon className="h-12 w-12 text-slate-400" />
+                          )}
+
+                        </div>
+
+                        <div className="flex items-center gap-2 p-3">
+
+                          <FileText className="h-4 w-4 shrink-0 text-slate-500" />
+
+                          <span className="truncate text-sm font-medium text-slate-700">
+                            {document.originalFileName}
+                          </span>
+
+                        </div>
+
+                        {isSelected && (
+                          <span className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full bg-blue-600 text-white">
+                            <Check className="h-4 w-4" />
+                          </span>
+                        )}
+
+                      </button>
+                    );
+                  },
+                )}
+
+              </div>
+
+            ) : (
+              <div className="py-16 text-center text-sm text-slate-500">
+                No scanned files available.
+              </div>
+            )}
+
+          </div>
+
+          <div className="flex shrink-0 justify-end gap-3 border-t p-4">
+
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setPendingTemporaryDocuments(
+                  selectedTemporaryDocuments,
+                );
+
+                setScannedFilesOpen(false);
+              }}
+            >
+              Cancel
+            </Button>
+
+            <Button
+              type="button"
+              onClick={() => {
+                setSelectedTemporaryDocuments(
+                  pendingTemporaryDocuments,
+                );
+
+                handleChange(
+                  "temporaryDocumentIds",
+                  pendingTemporaryDocuments.map(
+                    (item) => item.id,
+                  ),
+                );
+
+                setScannedFilesOpen(false);
+              }}
+              disabled={
+                temporaryDocumentsLoading ||
+                !!temporaryDocumentsError
+              }
+            >
+              Select Files
+            </Button>
+
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* DELETE EXISTING PATIENT DOCUMENT */}
+      {documentPendingDeletion && (
+        <Modal
+          isOpen={true}
+          onClose={() =>
+            setDocumentPendingDeletion(null)
+          }
+          title="Delete Document"
+          size="sm"
+          footer={
+            <div className="flex gap-3">
+
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() =>
+                  setDocumentPendingDeletion(null)
+                }
+              >
+                Cancel
+              </Button>
+
+              <Button
+                type="button"
+                onClick={() => {
+                  const filePath =
+                    documentPendingDeletion.filePath;
+
+                  setExistingPatientDocuments(
+                    (documents) =>
+                      documents.filter(
+                        (document) =>
+                          document !==
+                          documentPendingDeletion,
+                      ),
+                  );
+
+                  if (filePath) {
+                    const previousPaths =
+                      Array.isArray(deletedDocumentIds)
+                        ? deletedDocumentIds
+                        : [];
+
+                    handleChange(
+                      `${field.name}DeletedIds`,
+                      [
+                        ...previousPaths,
+                        filePath,
+                      ],
+                    );
+                  }
+
+                  setDocumentPendingDeletion(null);
+                }}
+                className="bg-red-600 hover:bg-red-700"
+              >
+                Delete
+              </Button>
+
+            </div>
+          }
         >
-          Delete
-        </Button>
-      </div>
-    }
-  >
-    <p className="text-slate-700">
-      Are you sure you want to delete this document?
-    </p>
-  </Modal>
-)}
+          <p className="text-slate-700">
+            Are you sure you want to delete this document?
+          </p>
+        </Modal>
+      )}
+
     </div>
   );
+}
   case "checkbox-group":
   return (
     <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
